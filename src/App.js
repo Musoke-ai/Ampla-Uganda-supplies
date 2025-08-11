@@ -1,76 +1,139 @@
 import "./App.css";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 
-import DashBoard from "./app/Components/pages/DashBoard";
-import Inventory from "./app/Components/pages/Inventory";
-import Reports from "./app/Components/pages/Reports";
-import ItemsExerpt from "./app/features/items/ItemsExerpt";
-import Sales from "./app/features/items/Sales";
-import Debts from "./app/features/items/Debts";
-import History from "./app/features/items/History";
-import { useEffect } from "react";
-
+// Layout Components
 import Layout from "../src/app/Components/pages/publicPages/Layout";
-import Landing from "../src/app/Components/pages/publicPages/Landing";
-import Login from "../src/app/Components/pages/publicPages/Login";
-import Contact from "../src/app/Components/pages/publicPages/Contact";
-import Privancy from "../src/app/Components/pages/publicPages/Privancy";
-import TC from "../src/app/Components/pages/publicPages/TC";
-import SignUp from "../src/app/Components/pages/publicPages/SignUp";
-
 import ProtectedLayout from "./app/Components/pages/ProtectedLayout";
+import UserPageLayout from "./app/Components/pages/User/rolePages/UsePageLayout";
+
+// Page Components
+import Dashboard from "./app/Components/production/DashBoard";
+import InventoryPage from "./app/Components/pages/InventorySample";
+import ReportPage from "./app/Components/pages/ReportsSample";
+import ItemsExerpt from "./app/features/items/ItemsExerpt";
+import SalesPage from "./app/Components/pages/Sales";
+import HistoryPage from "./app/Components/pages/History";
+import CustomerPage from "./app/Components/CustomerPage";
+import PosPage from "./app/Components/pages/GeminiPos";
+import Login from "../src/app/Components/pages/publicPages/Login";
+import Production from "./../src/app/Components/Production";
 import SplashScreen from "./app/Components/pages/SplashScreen";
-import Help from "./app/Components/pages/publicPages/Help";
-import Invoice from "./app/documents/Invoice";
 import InvoiceForm from "./app/documents/InvoiceForm";
+import Documents from "./app/Components/pages/Documents";
+import PackagePage from "./app/Components/payments/Packages";
+import UserLanding from "./app/Components/pages/User/UserLanding";
+import Settings from "./app/Components/Settings";
+
+// Auth and Utility Components
+import RequireAuth from "./app/auth/RequireAuth";
+import PersistLogin from "./app/auth/PersistLogin";
+import MissingRoute from "./app/Components/MissingRoute";
+import AccessDenied from "./app/Components/pages/User/AccessDenied";
+
 
 function App() {
-
   return (
     <Routes>
-      {/* public routes */}
-      {/* New tab routes */}
-      <Route path="/privacy" element={<Privancy />} />
-      <Route path="/tc" element={<TC />} />
-      <Route path="/help" element={<Help />} />
-      {/* New tab routes */}
-
+      {/*
+      =================================================================
+      | Public Routes                                                 |
+      | These routes are accessible to everyone.                      |
+      =================================================================
+      */}
       <Route element={<Layout />}>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<SignUp />} />
-        <Route path="/contact" element={<Contact />} />
+        <Route path="/" element={<Login />} />
       </Route>
 
-      {/* protected routes */}
-      <Route exact path="/splashscreen" element={<SplashScreen />} />
-      <Route  element={<ProtectedLayout />}>
-        <Route exact path="/dashboard" element={<DashBoard />}></Route>
-        <Route exact path="/inventory" element={<Inventory />}></Route>
-        <Route exact path="/stock" element={<ItemsExerpt />}></Route>
-        <Route exact path="/sales" element={<Sales />}></Route>
-        <Route exact path="/debts" element={<Debts />}></Route>
-        <Route exact path="/reports" element={<Reports />}></Route>
-        <Route exact path="/history" element={<History />}></Route>
-        <Route exact path="/invoice" element={<Invoice />}></Route>
-        <Route exact path="/invoiceform" element={<InvoiceForm />}></Route>
+      {/*
+      =================================================================
+      | User-Specific Public Routes (No Main Layout)                  |
+      =================================================================
+      */}
+      <Route path="/userpage" element={<UserLanding />} />
+      <Route path="/userpagelayout" element={<UserPageLayout />}>
+        {/* Nested routes for the user page layout can go here */}
       </Route>
+
+      {/*
+      =================================================================
+      | Protected Routes                                              |
+      | These routes require authentication and authorization.        |
+      =================================================================
+      */}
+      <Route element={<PersistLogin />}>
+        {/* SplashScreen can be used to show a loading state while checking auth */}
+        <Route path="/prefetch" element={<SplashScreen />} />
+
+        {/* All routes within ProtectedLayout require a user to be logged in */}
+        <Route path="/home" element={<ProtectedLayout />}>
+
+          {/* Each feature route is wrapped in `RequireAuth` to check for specific user roles.
+              This is a standard and secure pattern in React Router v6 for role-based access control. */}
+
+          <Route element={<RequireAuth allowedRoles={['admin', 'dashboard']} />}>
+            <Route path="dashboard" element={<Dashboard />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={['admin', 'rawmaterials', 'expenses', 'orders', 'employees']} />}>
+            <Route path="production" element={<Production />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={['admin', 'products']} />}>
+            <Route path="inventory" element={<InventoryPage />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={['admin', 'stock']} />}>
+            <Route path="stock" element={<ItemsExerpt />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={['admin', 'customers']} />}>
+            <Route path="customers" element={<CustomerPage />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={['admin', 'sales']} />}>
+            <Route path="sales" element={<SalesPage />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={['admin']} />}>
+            <Route path="debts" element={<CustomerPage />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={['admin', 'reports']} />}>
+            <Route path="reports" element={<ReportPage />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={['admin', 'salesdesk']} />}>
+            <Route path="pos" element={<PosPage />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={['admin', 'history']} />}>
+            <Route path="history" element={<HistoryPage />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={['admin', 'settings']} />}>
+            <Route path="settings" element={<Settings />} />
+          </Route>
+
+          {/* Routes accessible only to 'admin' */}
+          <Route element={<RequireAuth allowedRoles={['admin']} />}>
+            <Route path="documents" element={<Documents />} />
+            <Route path="invoiceform" element={<InvoiceForm />} />
+            <Route path="packages" element={<PackagePage />} />
+          </Route>
+
+        </Route>
+      </Route>
+
+      {/*
+      =================================================================
+      | Special & Fallback Routes                                     |
+      =================================================================
+      */}
+      <Route path="/accessDenied" element={<AccessDenied />} />
+      {/* This catch-all route handles any undefined paths */}
+      <Route path="*" element={<MissingRoute />} />
     </Routes>
   );
 }
 
 export default App;
-
-// {
-  
-//       isLoading ?
-//       <div className='splashScreen'>
-     
-//         <ReactLoading type="bars" color="gray" height={'30px'} width={'30px'} className=''  />
-//        <br/>
-//         <span>Loading...</span>
-//         </div>
-//    : ""
-//    }
-
-

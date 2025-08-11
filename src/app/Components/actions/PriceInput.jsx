@@ -16,7 +16,7 @@ const handlePriceChange = (e) => {
     }else if(Number(value) < Number(item.itemLeastPrice)){
         e.target.style = "outline-color: red"; 
         item.salePrice = item.itemLeastPrice;
-        window.alert("Very low selling price entered! Item to be sold at its least price of "+item.itemLeastPrice);
+        // window.alert("Very low selling price entered! Item to be sold at its least price of "+item.itemLeastPrice);
     calcTotal();
     }
 }

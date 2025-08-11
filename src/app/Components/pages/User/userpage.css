@@ -1,0 +1,22 @@
+/* Side navbar styles */
+.side-navbar {
+    width: 250px;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    overflow-y: auto;
+  }
+  
+  .mobile-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+  }
+  
+  /* Add margin to content when side navbar is shown */
+  @media (min-width: 992px) {
+    .content-with-sidebar {
+      margin-left: 250px;
+    }
+  }

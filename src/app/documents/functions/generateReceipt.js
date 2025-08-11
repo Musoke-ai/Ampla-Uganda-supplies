@@ -10,8 +10,18 @@ const generateReceipt = (
     businessInfo,
     receiptItems,
     receiptNumber,
-    products
+    products,
+    customerDetails
 ) => {
+
+// Currency Formatter
+function formatCurrency(amount, locale = "en-UG", currency = "UGX") {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currency,
+  }).format(amount);
+}
+
     const totalAmount = receiptItems.reduce((accumulator, item) => {
         return accumulator += Number(item.saleQuantity)*Number(item.salePrice)
     }, 0)
@@ -90,7 +100,7 @@ const generateReceipt = (
         [
           {
             content: 'Sales Receipt To:'
-            +'\n'+ receiptItems[0]?.custName,
+            +'\n'+ customerDetails[0]?.custName,
             styles: {
               halign:'left',
               fontSize: 14
@@ -108,8 +118,10 @@ const generateReceipt = (
             index+1,
             extractItem(item.saleItemId),
             item.saleQuantity,
-            'Ush'+item.salePrice,
-            'Ush'+Number(item.salePrice)*Number(item.saleQuantity),
+            formatCurrency(item.salePrice),
+            formatCurrency(Number(item.salePrice)*Number(item.saleQuantity)),
+            // 'Ush'+item.salePrice,
+            // 'Ush'+Number(item.salePrice)*Number(item.saleQuantity),
         ]
      })
       ,
@@ -129,7 +141,7 @@ const generateReceipt = (
             }
           },
           {
-            content: 'Ush'+totalAmount,
+            content: formatCurrency(totalAmount),
             styles:{
               halign:'right'
             }
@@ -143,7 +155,7 @@ const generateReceipt = (
             }
           },
           {
-            content: 'Ush'+totalAmount,
+            content: formatCurrency(totalAmount),
             styles:{
               halign:'right'
             }

@@ -1,259 +1,269 @@
-import React from "react";
-import { useGetHistoryQuery } from '../../features/api/historySlice';
-import { useSelector } from "react-redux";
-import { selectHistory } from "../../features/api/historySlice";
-import { selectStock } from "../../features/stock/stockSlice";
-import ProductExcerpty from "../excerpts/ProductExcerpty";
-import { useGetSalesQuery, selectSales } from "../../features/api/salesSlice";
-import { useGetStatisticsQuery, selectStatistics } from "../../features/api/statisticsSlice";
-import format from "date-fns/format";
-import { selectProfile } from "../../auth/authSlice";
-import calendar from '../../icons/calendar.png'
-import CategoryExcerpty from "../excerpts/CategoryExcerpty";
-const DashBoard = () => {
+import React from 'react';
+import { useTheme } from '@mui/material/styles';
+import 'chart.js/auto';
+import { Dropdown } from 'react-bootstrap';
+import { Arrow90degDown, Arrow90degUp, ThreeDots } from 'react-bootstrap-icons';
+// import { format, parseISO } from 'date-fns';
 
-  const profile = useSelector(selectProfile);
+import RecentTransactions from '../tables/RescentTransactions';
 
-  const{
-    isLoading,
-    isError,
-    isSuccess,
-    error
-  } = useGetHistoryQuery();
-  
-  const {
-    isLoading: issalesLoading,
-    isSuccess: issalesSuccess,
-    isError: issalesError,
-    error: saleError
-  } = useGetSalesQuery();
+import { useSelector } from 'react-redux';
+import { selectStock } from '../../features/stock/stockSlice';
+import { selectSales } from '../../features/api/salesSlice';
+import { selectCustomers } from '../../features/api/customers';
+import { BoxFill, CartDashFill, Coin, CurrencyDollar, ExclamationOctagon, Grid1x2Fill, HouseDoor, Layers } from 'react-bootstrap-icons';
+import GraphFrame from '../graphs/GraphFrame';
+import SalesLineChart from '../graphs/SalesChart';
+import QuantitiesBarChart from '../graphs/BarComponent';
+import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval,getWeek, isSameMonth, isSameYear } from "date-fns";
+import { selectCategories } from '../../features/api/categorySlice';
+import { getWeekNumber, groupSalesBySRIDWithCustomer,formatCurrencyWithScale,calculateSalesMetricsToday, addCategoryNames, calculateSalesByCategoryWithPrice, calculateWeeklySalesPerDay,addCategoryToSales, calculateTotals, calculateTotal, calculateInventoryMetrics } from '../../dataAnalytics/functions';
+import HorizontalBarGraph from '../graphs/StockVision';
+import CurrencyFormat from 'react-currency-format';
 
-  const {
-    isLoading: isstatsLoading,
-    isSuccess: isstatsSuccess,
-    isError: isstatsError,
-    error: statError
-  } = useGetStatisticsQuery();
+const Dashboard = () => {
 
-  const sales = useSelector(selectSales);
-  const products = useSelector(selectStock);
-  const stats = useSelector(selectStatistics);
-  const totalPdt = products.length;
-  const mostStocked = (products.filter((product) => Number(product.itemQuantity) > 5)).length
-  const lowStocked = (products.filter((product)  =>  Number(product.itemQuantity) < 5)).length
-  const outOfStock = (products.filter((product)  =>  Number(product.itemQuantity) <= 0)).length
+// console.log("WeekNumber: "+getWeekNumber(2024,3,1));
+const salesData = useSelector(selectSales);
+const products = useSelector(selectStock);
+const categories = useSelector(selectCategories);
+const customers = useSelector(selectCustomers);
+console.log("Categories: "+JSON.stringify(categories));
+const totalProducts = products.length;
 
-  const top5Purchases = stats.filter((stat) => Number(stat.statItemSales) > 5)
-  const least5Selling = stats.filter((stat) => Number(stat.statItemSales) <= 5)
-
-const FormatDate = ({date}) => {
-  if(date){
-    const _date = new Date(date);
-    const fDate = format(_date,'MMM-dd-yyyy');
-    return fDate;
-  }else{
-    return "";
-  }
+const outOfStockProducts = products.reduce((count, product) => {
+if(product.itemQuantity <= 0){
+ return count+1;
 }
+return count;
+},0)
 
-const historyData = useSelector(selectHistory);
+console.log("outOfStockProducts: "+JSON.stringify(outOfStockProducts));
 
-  return (
-   <div className="dashBoard">
-      <div className="statistics">
+function getCurrentDateDetails() {
+    const now = new Date();
 
-        <div className="container">
-          <div className="summaryCont mt-3 mb-2">
-            <div className="bg-info sumItem shadow-sm rounded">
-              <h6>{totalPdt}</h6>
-              <p>Total products</p>
-            </div>
-            <div className="bg-success sumItem shadow-sm rounded">
-              <h6>{mostStocked}</h6>
-              <p>Most Stocked Products</p>
-            </div>
-            <div className="bg-warning sumItem shadow-sm rounded">
-              <h6>{lowStocked}</h6>
-              <p>Low Stocked Products</p>
-            </div>
-            <div className="bg-danger sumItem shadow-sm rounded">
-              <h6>{outOfStock}</h6>
-              <p>Out of Stock Products</p>
-            </div>
-          </div>
+    // Get the full year
+    const year = now.getFullYear();
 
+    // Get the month (0-indexed, so add 1)
+    const month = now.getMonth() + 1;
+
+    // Get the day of the month
+    const day = now.getDate();
+
+    return { day, month, year };
+}
+// Example usage
+const currentDate = getCurrentDateDetails();
+
+const weekNumber = getWeekNumber(currentDate.year, currentDate.month, currentDate.day);
+
+console.log('week Number: '+weekNumber+' week');
+  
+  const DailySales = calculateWeeklySalesPerDay(salesData, currentDate.year, currentDate.month, weekNumber);
+
+// Calculate totals
+const totals = calculateTotals(salesData);
+
+//calculate total quantity of stock for sell
+
+const salesDataWithCatId = addCategoryToSales(salesData, products);
+const SRID_groupedData = groupSalesBySRIDWithCustomer(salesData, customers);
+console.log("SRID: "+JSON.stringify(SRID_groupedData));
+// console.log("salesNew: "+JSON.stringify(salesDataWithCatId));
+const totalSales = calculateTotal(salesDataWithCatId);
+const catRankings = calculateSalesByCategoryWithPrice(salesDataWithCatId);
+const catRankingsWithNames = addCategoryNames(catRankings,categories);
+// console.log("SalesCat: "+JSON.stringify(catRankings));
+console.log("SalesCatNames: "+JSON.stringify(catRankingsWithNames));
+// console.log("End");
+
+const salesArray = Object.values(catRankingsWithNames);
+console.log('Rankings: '+JSON.stringify(catRankingsWithNames))
+
+const categoryMappedData = salesArray.map(item => {
+  return {
+    category: item.categoryName,
+    totalSales: item.totalAmount,
+    totalQuantity: item.totalQuantity,
+    percentageQuantity: item.quantityPercentage,
+    percentageSales: item.amountPercentage
+  };
+});
+
+// console.log('MappedData: '+JSON.stringify(mappedData));
+// // console.log('MappedData: '+JSON.stringify(mappedData));
+const inventoryMetrics = calculateInventoryMetrics(products);
+const todayMetrics = calculateSalesMetricsToday(salesData);
+console.log("inventory_metrics: "+JSON.stringify(inventoryMetrics));
+console.log("Today_metrics: "+todayMetrics.totalQuantity);
+
+    return (
+      <div>
+<div className='p-3'>
+      <div className='w-full bg-white shadow-md KPI d-flex align-items-center gap-4 ps-4'>
+<div>
+    <div className='d-flex gap-3 align-items-center'>
+        <div className='Kpi_icon'><Layers className='text-info' size={20}/></div>
+        <div className='d-flex flex-column'>
+            <div className='text-bold fs-6'style={{color:'#3D1CDA'}}>
+                {totalProducts}
+            </div>
+            <div className='fs-8 text-muted'>
+                Total Products
+            </div>
         </div>
-
-        <div className="graphs container">
-        <div className="d-flex justify-content-between align-items-center p-2 pt-3 rounded text-white" style={{backgroundColor: '#488A99'}}>
-  <h5 class="">Recent Activities</h5>
-  <button type="button" class="btn btn-secondary btn-sm" disabled>View All</button>
-  </div>
-  {/* <hr /> */}
-  {
-    isLoading?
-    <div class="d-flex flex-row justify-content-center align-content-center">
-      <h5>Loading recent activities...</h5>
     </div>
-    :""
-  }
-  {isSuccess?
+</div>
+
+<div>
+    <div className='d-flex gap-3 align-items-center'>
+        <div className='Kpi_icon'><BoxFill className='text-success' size={20}/></div>
+        <div className='d-flex flex-column'>
+            <div className='text-bold fs-6'style={{color:'#3D1CDA'}}>
+                {totalSales?.totalQuantity}
+            </div>
+            <div className='fs-8 text-muted'>
+                Products sold
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div>
+    <div className='d-flex gap-3 align-items-center'>
+        <div className='Kpi_icon'><CurrencyDollar className='text-primary' size={20}/></div>
+        
+        <div className='d-flex flex-column'>
+            <div className='text-bold fs-6'style={{color:'#3D1CDA'}}>
+              {formatCurrencyWithScale(totalSales?.totalCost).formatted}
+            </div>
+            <div className='fs-8 text-muted'>
+                Total Sales
+            </div>
+        </div>
+    </div>
+</div>
+
+<div>
+    <div className='d-flex gap-3 align-items-center justify-items-center '>
+        <div className='Kpi_icon'><Coin className='text-info' size={20}/></div>
+        <div className='d-flex flex-column'>
+            <div className='text-bold fs-6'style={{color:'#3D1CDA'}}>
+              {inventoryMetrics?.totalQuantity}
+            </div>
+            <div className='fs-8 text-muted'>
+              Stock on Hand
+            </div>
+        </div>
+    </div>
+</div>
+
+<div>
+    <div className='d-flex gap-3 align-items-center'>
+        <div className='Kpi_icon'><ExclamationOctagon color='red' size={20}/></div>
+    
+        <div className='d-flex flex-column'>
+            <div className='text-bold fs-6'style={{color:'#3D1CDA'}}>
+                {outOfStockProducts}
+            </div>
+            <div className='fs-8 text-muted'>
+                Out of Stock 
+            </div>
+        </div>
+    </div>
+</div>
+
+      </div>
+
+      <HorizontalBarGraph remainingStock={inventoryMetrics?.totalQuantity} _soldToday={todayMetrics?.totalQuantity} rescentSold={totalSales?.totalQuantity} />
+
+<div className='d-flex gap-2'>
+<GraphFrame title='Daily Sales' graph={<SalesLineChart data={DailySales.weeklyRevenue} />} />
+<GraphFrame title='Quantity Sold' graph={<QuantitiesBarChart data={DailySales.weeklySales} />}  />
+</div>
+
+<div className='d-flex gap-3'>
+<div className='bg-white rounded shadow-md d-flex flex-column w-75'>
+<div className='d-flex align-items-center justify-content-between ps-2 pe-2'>
+   <div className='text-muted fs-bold' style={{fontSize:'1rem'}} >Rescent Transactions</div>
    <div>
-   <table class="table table-striped">
-   <thead>
-     <tr>
-       <th scope="col">Date</th>
-       <th scope="col">Item</th>
-       <th scope="col">Transaction</th>
-       <th scope="col">Target</th>
-     </tr>
-   </thead>
-   <tbody>
+   <Dropdown>
+      <Dropdown.Toggle variant="transparent" id="dropdown-basic" className='border-none'>
+       <ThreeDots />
+      </Dropdown.Toggle>
+
+      <Dropdown.Menu>
+        <Dropdown.Item href="#/action-1">Action</Dropdown.Item>
+        <Dropdown.Item href="#/action-2">Another action</Dropdown.Item>
+        <Dropdown.Item href="#/action-3">Something else</Dropdown.Item>
+      </Dropdown.Menu>
+    </Dropdown>
+   </div>
+</div>
+
+<div className='bg-light shadow-md' style={{width:'100%', height:'1.5px'}}></div>
+
+<div>
+    <RecentTransactions data={SRID_groupedData} limit={5}/>
+</div>
+
+</div>
+
+<div className='bg-white rounded shadow-md d-flex flex-column' style={{width:'250px'}}>
+<div className='d-flex align-items-center justify-content-between ps-2 pe-2'>
+   <div className='text-muted fs-bold' style={{fontSize:'1rem'}} >Sales Per Category</div>
+   <div>
+   <Dropdown>
+      <Dropdown.Toggle variant="transparent" id="dropdown-basic" className='border-none'>
+       <ThreeDots />
+      </Dropdown.Toggle>
+
+      <Dropdown.Menu>
+        <Dropdown.Item href="#/action-1">Action</Dropdown.Item>
+        <Dropdown.Item href="#/action-2">Another action</Dropdown.Item>
+        <Dropdown.Item href="#/action-3">Something else</Dropdown.Item>
+      </Dropdown.Menu>
+    </Dropdown>
+   </div>
+</div>
+
+<div className='bg-light shadow-md' style={{width:'100%', height:'1.5px'}}></div>
+<div>
+   { 
+    categoryMappedData?.map((ranking, index) => {
+      return(
+<div className='d-flex justify-content-between p-2' key={index}>
+  {ranking?.percentageSales<50?<>
+    <div className='text-muted'>{ranking?.category}
+        <span className='text-danger'>(<Arrow90degDown />{ranking?.percentageSales}%)</span></div>
+        <div className='text-danger fs-bold'>{
+            formatCurrencyWithScale(ranking?.totalSales).formatted
+        }</div>
+    </>:
     <>
-  {
-    historyData.slice(0,5).map((history, index) => {
-
-    return(  <tr key={index}>
-      <th scope="row"><span><img src={calendar} width="20px" height="20px" /></span> &nbsp; {<FormatDate date = {history?.historyDateCreated} />} </th>
-      <td>{<ProductExcerpty itemId = {Number(history?.historyItemId)} field="itemName" />}</td>
-      <td>{history.historyAction}</td>
-      <td>{history.historyDetails}</td>
-    </tr>)
-
-    })
-  }
-  </>
-
-   </tbody>
- </table>
- </div>
-  :""}
-
-  {isError? 
-  <div class="d-flex flex-row justify-content-center align-content-center">
-    <h5>An expected error occured while loading your content!</h5>
-  </div>
-  :""}
-        </div>
-{/* //Top 5 purchase products */}
-
-<div className="graphs container">
-          <div className="d-flex justify-content-between align-items-center p-2 pt-3 rounded text-white" style={{backgroundColor: '#488A99'}}>
-  <h5 class="">Top 5 Purchased Products</h5>
-  <button type="button" class="btn btn-secondary btn-sm" disabled>View All</button>
-  </div>
-  {/* <hr /> */}
-  {
-   issalesLoading?
-    <div class="d-flex flex-row justify-content-center align-content-center">
-      <h5>Loading sales...</h5>
+    <div className='text-muted'>{ranking?.category}
+        <span className='text-success'>(<Arrow90degUp />{ranking?.percentageSales}%)</span></div>
+        <div className='text-success fs-bold'>{
+       formatCurrencyWithScale(ranking?.totalSales).formatted
+       }</div>
+    </>}
+        
     </div>
-    :""
-  }
-  {issalesSuccess?
-   <div className="mb-5">
-   <table class="table table-striped">
-   <thead>
-     <tr>
-       <th scope="col">Product Model</th>
-       <th scope="col">Product Name</th>
-       <th scope="col">Category </th>
-       <th scope="col">sales</th>
-       <th scope="col">Total</th>
-     </tr>
-   </thead>
-   <tbody>
-    <>
-  {
-   top5Purchases.slice(0,5).map((stat, index) => {
-
-    return(  <tr key={index}>
-      <td>{<ProductExcerpty itemId = {stat?.statItemId} field="itemModel" />}</td>
-      <td>{<ProductExcerpty itemId = {stat?.statItemId} field="itemName" />}</td>
-      <td>{<ProductExcerpty itemId = {stat?.statItemId} field="itemCategory" />}</td>
-      <td>{stat?.statItemSales}</td>
-      <td>{stat?.statItemSalesWorth}</td>
-    </tr>)
-
-    })
+      )
+    })}
     
+</div>
+</div>
 
-  }
-  </>
+</div>
 
-   </tbody>
- </table>
- </div>
-  :""}
-  {isError? 
-  <div class="d-flex flex-row justify-content-center align-content-center">
-    <h5>An expected error occured while loading your content!</h5>
-  </div>
-  :""}
-        </div>
-
-        {/* //Least Selling products */}
-
-<div className="graphs container">
-          <div className="d-flex justify-content-between align-items-center p-2 pt-3 rounded text-white" style={{backgroundColor: '#488A99'}}>
-  <h5 class="">Least Selling Products</h5>
-  <button type="button" class="btn btn-secondary btn-sm" disabled>View All</button>
-  </div>
-  {/* <hr /> */}
-  {
-   isstatsLoading?
-    <div class="d-flex flex-row justify-content-center align-content-center">
-      <h5>Loading sales...</h5>
-    </div>
-    :""
-  }
-  {isstatsSuccess?
-   <div className="" style={{paddingBottom:'2rem'}}>
-   <table class="table table-striped">
-   <thead>
-     <tr>
-       <th scope="col">Product Model</th>
-       <th scope="col">Product Name</th>
-       <th scope="col">Category </th>
-       <th scope="col">sales</th>
-       <th scope="col">Total</th>
-     </tr>
-   </thead>
-   <tbody>
-    <>
-  {
-    least5Selling.slice(0,5).map((stat, index) => {
-
-    return(  <tr key={index}>
-      
-      <td>{<ProductExcerpty itemId = {stat?.statItemId} field="itemModel" />}</td>
-      <td>{<ProductExcerpty itemId = {stat?.statItemId} field="itemName" />}</td>
-      <td>{<ProductExcerpty itemId = {stat?.statItemId} field="itemCategory" />}</td>
-      <td>{stat?.statItemSales}</td>
-      <td>{stat?.statItemSalesWorth}</td>
-    </tr>)
-
-    })
-    
-
-  }
-  </>
-
-   </tbody>
- </table>
- </div>
-  :""}
-  {isError? 
-  <div class="d-flex flex-row justify-content-center align-content-center">
-    <h5>An expected error occured while loading your content!</h5>
-  </div>
-  :""}
-        </div>
-
+</div>
 
       </div>
-      </div>
-  );
+    );
 };
 
-export default DashBoard;
+export default Dashboard;

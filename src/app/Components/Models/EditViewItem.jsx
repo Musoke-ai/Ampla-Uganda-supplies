@@ -7,6 +7,7 @@ import { selectCategories } from '../../features/api/categorySlice';
 import { PencilFill } from 'react-bootstrap-icons';
 import { LinearProgress } from '@mui/material';
 import CategoryExcerpty from '../excerpts/CategoryExcerpty'
+import Notification from '../alerts/GlobalNotify';
 const EditViewItem = ({itemId}) => {
   const categories = useSelector(selectCategories);
   const [updateItem, {
@@ -60,12 +61,6 @@ setItemCategory(item?.itemCategoryId)
     setItemNotes(item?item.itemNotes:"");
   }
 
-if(isError){
-  // console.log("Error: "+Object.keys(error));
-  // console.log("Error: "+error.error);
-  // console.log("Status: "+error.status);
-  // window.alert("Something went wrong! or check your Network")
-}
 
   const resetItem = () => {
     setItemName("");
@@ -109,13 +104,12 @@ useEffect(() => {
   setInvalidQuantity(false);
 if(item_quantity !== ""){
 if(Number(item_quantity) <= 0){
-  setInvalidQuantity(true);
-  setItemQuantity(1);
+  setItemQuantity(0);
 }
 }
 }, [item_quantity])
 
-  const canUpdate = [item_name, item_model, item_quality, item_quantity, item_condition, item_size, item_min_price, item_owner].every(Boolean) && !isLoading;
+  const canUpdate = [item_name, item_model, item_quantity, item_condition, item_size, item_min_price].every(Boolean) && !isLoading;
 
   const handleUpdateItem = async () => {
     if (canUpdate){
@@ -170,24 +164,54 @@ if(Number(item_quantity) <= 0){
  
    }
 
-   //Error origin too many renders
-  //  if(isSuccess){
-  //   setIsEditable(false);
-  //  }
+     //Setup notifaction popup
+     const [isOpen, setIsOpen] = useState(false);
+     const [notificationType, setNotificationType] = useState(true);
+     const [message, setMessage] = useState('');
+     const triggerNotification = (type) => {
+       setNotificationType(type);
+       setMessage(type ? 'Action completed successfully!' : 'An error occurred!');
+       setIsOpen(true);
+     };
+
+     
+  useEffect(() => {
+    if (isSuccess || isDeleteDone) {
+      triggerNotification(true);
+    }
+  }, [isSuccess, isDeleteDone]); // Run only when isSuccess changes
+
+  useEffect(() => {
+    if (isError || isErrorOnDelete) {
+      triggerNotification(false);
+    }
+  }, [isError, isErrorOnDelete,]); // Run only when isError changes
+
   return (
     <div>
    {!item ?  <div class="offcanvas offcanvas-end" tabindex="-1" id="viewItemDetails" aria-labelledby="viewItemDetails">
   <div class="offcanvas-header shadow-sm " style={{backgroundColor: "#1C4E80"}}>
     
-    <h5 class="text-danger" id="offcanvasRightLabel">Item Missing or Removed!</h5> 
+    <h5 class="text-danger" id="offcanvasRightLabel">Item Missing or Removed! </h5> 
     <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close" ></button>
   </div>
   {
-      isDeleteDone?<Alerts heading="Deleting done!" message={deleteData['Messages']} variant='success' autoHide={true} delay={7000} />
+      isDeleteDone?<Alerts 
+      heading="Deleting done!"
+       message={deleteData['Messages']}
+        variant='success'
+         autoHide={true} 
+         delay={7000} 
+         />
       :""
      }
   {
-      isErrorOnDelete?<Alerts heading="Deleting failed!" message={deleteData['Messages']} variant='success' autoHide={true} delay={7000} />
+      isErrorOnDelete?<Alerts 
+      heading="Deleting failed!"
+       message={deleteData['Messages']} 
+       variant='success'
+        autoHide={true}
+         delay={7000} />
       :""
      }
   </div>: 
@@ -199,7 +223,7 @@ if(Number(item_quantity) <= 0){
       {
       !isEditable? <span><button type='button' aria-label='editButton' className='btn btn-md btn-white btn-outline-info' onClick={() => {handleEditClk();fillEditableFields();}} ><PencilFill /></button></span>  :
    ""
-    }
+    }      
     
 
     <button type="button" class="btn-close text-white bg-white" data-bs-dismiss="offcanvas" aria-label="Close" onClick={resetItem} ></button>
@@ -344,14 +368,6 @@ if(Number(item_quantity) <= 0){
 </form>
   </div>
 
-  {isSuccess?
-  <Alerts heading="Process done!" message={data.message} variant='success' autoHide={true} delay={7000} />
-   :"" }
-
-{isError?
-  <Alerts heading={"Process status: "+error.status} message={error.error+': or Check your Network'} variant='danger' autoHide={true} delay={7000} />
-   :"" }
-
    {
     show?<Alerts
      heading="You are about to delete an item from the inventory"
@@ -363,9 +379,18 @@ if(Number(item_quantity) <= 0){
      delay={1000}
      />:""
    }
-
+{/* //Notification body */}
+<Notification
+        isOpen={isOpen}
+        isSuccess={notificationType}
+        message={message}
+        duration={5000} // 5 seconds
+        onClose={() => setIsOpen(false)}
+      />
 </div>
 }
+
+
 
     </div>
   );

@@ -29,18 +29,16 @@ const Alerts = ({ message, heading, autoHide, delay, variant, action, payload })
         <Button
           onClick={() => {
             action(payload);
+            setShow(false);
           }}
           variant="outline-primary"
         >
          Ok
         </Button>
         <Button
-          onClick={() => {
-            setShow(false);
-          }}
           variant="outline-success"
         >
-          close
+          Close
         </Button>
       </div>:
 
@@ -51,7 +49,7 @@ const Alerts = ({ message, heading, autoHide, delay, variant, action, payload })
           }}
           variant="outline-success"
         >
-          close
+          Close
         </Button>
       </div>
 }

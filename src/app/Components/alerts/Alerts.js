@@ -1,32 +1,27 @@
 import React from "react";
+import { Modal } from "react-bootstrap";
 
-const Alerts = ({ trigger, majorMsg, manorMsg, action, close }) => {
+const Alerts = ({ isDeleteSuccess, isDeleteError, isDeleteLoading, deleteError, showDeleteAlertModal, setShowDeleteAlertModal, action }) => {
   return (
     <div>
-      <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        <strong>You Are About to Delete an Item from the inventory</strong>{" "}
-        Click ok to Delete or Cancel to abort.
-        <div class="d-flex flex-row justify-content-between align-items-center mt-2">
-          <button
-            type="button"
-            class="btn btn-sm btn-primary"
-            onClick={() => {
-            //   handleDelete(item.itemId);
-            }}
-          >
-            {" "}
-            Ok{" "}
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm btn-danger"
-            // onClick={handleAlert}
-          >
-            Cancel
-          </button>
+      <Modal show={showDeleteAlertModal} onHide={() => setShowDeleteAlertModal(false)}>
+          <Modal.Header closeButton>
+            <Modal.Title>Alert</Modal.Title>
+          </Modal.Header>
+         <div className="text-danger">You are about to permanently delete this item! </div>
+          <Modal.Body>
+            {isDeleteSuccess?<div className="bg-success fw-bold text-white p-2">Item deleted successfully</div>:""}
+            {isDeleteError?<div className="bg-danger fw-bold text-white p-2">An error occured! {deleteError}</div>:""}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowDeleteAlertModal(false)}>Close</Button>
+            {
+              isDeleteLoading?<Button variant="primary" ><ReactLoading type="bars" color="gray" height={'30px'} width={'30px'} className=''/>deleting</Button>: <Button variant="danger" size="sm" onClick={() => handleDelete(materialId)} >Delete</Button>
+            }
+            
+          </Modal.Footer>
+        </Modal>
         </div>
-      </div>
-    </div>
   );
 };
 

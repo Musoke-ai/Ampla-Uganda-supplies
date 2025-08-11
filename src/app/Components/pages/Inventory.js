@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import Fuse from "fuse.js";
 import SearchIcon  from "@mui/icons-material/Search";
 import AddIcon from '@mui/icons-material/Add';
+import InventoryTable from "../tables/InventoryTable";
 
 
 const Inventory = () => {
@@ -29,7 +30,8 @@ const options = {
   threshold: 0.2,
   keys: ["itemName", "itemModel"],
 }
-  
+
+
   const fuse = new Fuse(data, options);
 
   if(searchTerm.length > 0){
@@ -58,7 +60,7 @@ const options = {
 
   return (
     <div className="inventory">
-
+{/* 
       <div className="custOperations bg-white w-100 p-4 mt-2 d-flex align-items-center" style={{height: '60px'}}>
         
           <div className="form-group has-search w-50 rounded border-0">
@@ -73,26 +75,23 @@ const options = {
           data-bs-toggle="modal"
           data-bs-target="#addItem"
         >
-          <span>
+          <span> */}
             {/* <img src="./icons/inventory (1).png" width="25px" height="25px" /> */}
-            <AddIcon sx={{color:'white'}}/>
+            {/* <AddIcon sx={{color:'white'}}/>
           </span>{" "}
           Add Item
         </button>
           </div>
 
-      </div> 
-
-      <div className="tContainer h-100 mt-2" >
-        <div className="container">
-          <div className="itemsTable">
-            <DisplayData
-              setItemToView = {handleSetItemId}
-               />
-          </div>
-          <div className="activeItemInfo"></div>
-        </div>
+      </div>  */}
+      <div style={{
+        width:"100%",
+        height:"100%",
+        padding:"1rem"
+      }}>
+      <InventoryTable />
       </div>
+
 
       {/* Add Item Model */}
       <div

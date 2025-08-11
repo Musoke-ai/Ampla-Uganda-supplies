@@ -1,5 +1,12 @@
 
   @import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
+  /* Step 1: Import the Poppins font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* Optional: You can also set it as the font for headings and other elements */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
+}
 *{
   box-sizing: border-box;
   font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
@@ -8,35 +15,72 @@
 }
 
 body {
-  /* margin: 0;
-  font-family: 'Roboto', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale; */
+  font-family: 'Poppins', sans-serif;
   font-size: 3px;
-  /* width: 100vw; */
-  /* height: 100vh; */
   overflow: hidden;
+  background-color: #F5F5F5;
 }
 body ul{
   list-style: none;
 }
 
 code {
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Poppins', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* For Webkit-based browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Light background for the track */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: gray; /* Primary color for the scrollbar */
+  border-radius: 10px;
+  border: 2px solid #f1f1f1; /* Adds a border to separate the thumb from the track */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: gray; /* Darker color on hover */
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: gray #f1f1f1;
+}
+
+/* Scrollbar for overflow in specific elements */
+.your-element-class {
+  scrollbar-color: gray #f1f1f1; /* Thumb color, Track color */
+  scrollbar-width: thin;
+}
+
+/* Apply transitions to all elements */
+* {
+  transition: all 0.3s ease-in-out;
 }
 
 .main {
   padding: 0;
   margin: 0;
-  display: grid;
-  grid-template-columns: 0.35fr 2fr;
-  font-family: 'Roboto', sans-serif;
+  /* display: grid; */
+  /* grid-template-columns: 0.35fr 2fr; */
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex: 1;
+  font-family: 'Poppins', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 0.8rem;
-  
   overflow: hidden;
 }
 .mainColor{
@@ -48,7 +92,7 @@ code {
 .sideBarCont{
   background-color: #F5F5F5;
   display: grid;
-  grid-template-rows: 0.3fr 2fr;
+  grid-template-rows: 0.39fr 2fr;
 }
 
 .sideBar {
@@ -63,25 +107,46 @@ code {
   padding-left: 0;
   overflow-y: hidden;
   padding-bottom: 1rem;
+  border: none;
   z-index: 10;
   transition: all ease 0.5s;
 }
 
-.sideBar::-webkit-scrollbar {
-  width: 0.4rem;
-  z-index: 12;
-}
- 
-.sideBar::-webkit-scrollbar-track {
-  /* box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3); */
-}
- 
-.sideBar::-webkit-scrollbar-thumb {
-  background-color: whitesmoke;
-  outline: 1px solid whitesmoke;
-    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+.cta-button {
+  font-family: 'Poppins', sans-serif;
+  background-color: #007BFF; /* Primary color, can be adjusted to fit your site’s theme */
+  color: white;
+  border: none;
+  padding: 15px 30px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 123, 255, 0.2);
+  transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
+.cta-button:hover {
+  background-color: #0056b3; /* Darker shade for hover effect */
+  transform: scale(1.05); /* Slightly increase size on hover */
+}
+
+.cta-button:active {
+  background-color: #004085; /* Even darker shade for active state */
+  transform: scale(1); /* Return to original size when clicked */
+}
+
+.cta-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5); /* Focus ring for accessibility */
+}
+ 
+
+.sideBar .quickSell{
+  background-color: lightblue;
+  color: red;
+  height: 30px;
+}
 .services {
   font-size: 20px;
   position: relative;
@@ -97,36 +162,23 @@ code {
 }
 
 .logo {
-  width: 100%;
-  height: 100%;
-  position: relative;
+  /* width: 100%;
+  height: 100%; */
+  /* position: relative; */
   display: flex;
-  justify-content: center;
+  flex-direction: row;
+  justify-content: space-between;
   align-items: center;
-  /* display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 25px;
-  width: 200px;
-  height: 50px;
-  border-bottom: 2px solid whitesmoke;
-  padding-top: 0.2rem;
-  padding-bottom: 0.2rem;
-  background-color: #1C4E80;
-  color: white; */
+  padding-right: 2rem;
+  gap: 1rem;
 }
-.logo::after{
+/* .logo::after{
   content: '';
   width: 100%;
   height: 1px;
   position: absolute;
   bottom: 0;
   background-color: #1C4E80;
-}
-
-/* .logo .H {
-  color: #DBAE58;
-  font-size: 26px;
 } */
 
 .sideBar .settings {
@@ -167,9 +219,12 @@ code {
   text-decoration: none;
   display: flex;
   flex-direction: row;
+  width: 100%;
   /* font-size: 13px; */
   gap: 0.5rem;
+  /* background-color: #130F40; */
   color: #202020;
+  transition: all ease 0.5s;
 }
 
 /* .sideBar ul li .Link .tag {
@@ -192,11 +247,12 @@ color: white;
 }
 
 .sideBar ul li:hover {
-  background-color: white;
+  background-color: #d2eaf0;
   border-top-left-radius: 20px;
   border-bottom-left-radius: 20px;
   color: black;
 }
+
 
 .active span {
   color: white;
@@ -206,29 +262,37 @@ color: white;
 
 .mainContent {
   background-color: white;
-  height: 95vh;
-  display: grid;
-  grid-template-rows: 0.25fr 2fr;
+  /* background-color: '#111111'; */
+  /* height: 95vh; */
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* display: grid;
+  grid-template-rows: 0.18 2fr; */
   overflow-y: hidden;
-  gap: 0.5rem;
+  /* gap: 0.5rem; */
   padding-bottom: 2rem;
 }
-/* .mainContentSize2{
-  grid-template-rows: 0.3fr 2fr;
-} */
-/* .mainContentSize1{
-  grid-template-rows: 0.05fr 2fr;
-} */
 .landingArea{
   width:100%;
+  height: 100vh;
+  z-index: 100;
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
   padding-bottom: 2rem;
+  background-color: #F5F5F5;
+  /* background-color: #111111 !important; */
 }
 
 .navBar {
-  background-color: #1C4E80;
+  /* background-color: #191970; */
+  /* background-color: #1C4E80; */
+  height: 55px;
+  /* background-color: #F5F5F5; */
+  /* background-color: green; */
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -236,9 +300,35 @@ color: white;
   box-shadow: rgba(0, 0, 0, 0.15) 1.95px 1.95px 2.6px;
   padding-left: 0;
   padding-right: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
   position: sticky;
   top: 0;
   z-index: 20;
+}
+
+.NavIcons{
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.NavIcons .packageDesign{
+  width: auto;
+  color: white;
+  font-weight: bolder;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  height: 25px;
+  box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
+  opacity: 0.6;
+  background-color: red;
+  border-radius: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .searchBar input {
@@ -265,7 +355,7 @@ color: white;
   justify-content: space-between;
   gap: 1rem;
   text-align: center;
-  border: 2px solid whitesmoke;
+  border: 2px solid black;
   border-radius: 50px;
   padding-left: 10px;
   min-width: 150px;
@@ -410,17 +500,16 @@ background-color: green;
    }
 
 .dashBoard .rescents {
-  background-color: white;
-  height: 95%;
+  /* background-color: white; */
   border-radius: 10px;
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
   margin-right: 0.5rem;
-  padding-top: 0.9rem;
+  /* padding-top: 0.9rem; */
   box-shadow: rgba(0, 0, 0, 0.05) 0px 6px 24px 0px,
     rgba(0, 0, 0, 0.08) 0px 0px 0px 1px;
   display: grid;
-  grid-template-rows: repeat(2, 1fr);
+  /* grid-template-rows: repeat(2, 1fr); */
   justify-content: center;
 }
 
@@ -794,9 +883,42 @@ color: red;
   display: grid;
   grid-template-columns: repeat(4,1fr);
   gap: 1rem;
+  border-radius: 1rem;
   background-color: white;
   padding: 1rem;
+  box-shadow: rgba(50, 50, 93, 0.25) 0px 2px 5px -1px, rgba(0, 0, 0, 0.3) 0px 1px 3px -1px;
   }
+
+  #metrics{
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 1rem;
+     }
+
+  .StockPerformace{
+    background-color: white;
+    padding: 1rem;
+    border-radius: 1rem;
+    box-shadow: rgba(50, 50, 93, 0.25) 0px 2px 5px -1px, rgba(0, 0, 0, 0.3) 0px 1px 3px -1px;
+  }
+
+  .other-details{
+    background-color: white;
+    border-radius: 1rem;
+    margin-right: 1rem;
+    padding: 1rem;
+   display: grid;
+   /* grid-template-columns: 3fr 1fr; */
+   height: 400px;
+  }
+
+  #salesTrend{
+    background-color: white;
+    width: 700px;
+    height: 300px;
+    border-radius: 1rem;
+  }
+
   .sumItem{
     display: flex;
     flex-direction: column;
@@ -843,11 +965,16 @@ padding-left: 2.375rem;
     border-right: 1px white;
   }
   .inventory {
-    width: 100%;
+    width: 97%;
     height: 100%;
+    margin-top: 2rem;
     display: grid;
     grid-template-rows: 0.5fr 3fr;
+    border-radius: 1rem;
+    margin-left: 1rem;
+    margin-right: 1rem;
     background-color: white;
+    box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 12px;
     overflow: hidden;
   }
   .signLogin{
@@ -982,3 +1109,315 @@ position: absolute;
 bottom: 0px;
 /* margin-top: 2px; */
   }
+
+/* FilterModal.css */
+
+/* .filter-modal {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.filter-option {
+  margin-bottom: 15px;
+}
+
+button {
+  font-family: 'Roboto', sans-serif;
+}
+
+.MuiBox-root {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.MuiTextField-root {
+  margin-top: 10px;
+}
+
+.MuiButton-root {
+  margin-top: 20px;
+} */
+
+.custom-select-box {
+  /*appearance: none;  Removes default browser styling */
+  background-color: white;
+  border: none;
+  border-radius: 8px; /* Rounded corners */
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* Shadow */
+  padding: 5px 5px;
+  font-size: 0.8rem;
+  outline: none; /* Removes focus outline */
+  width: 80%; /* Full width */
+  height: 25px;
+  margin-right: 4rem;
+  cursor: pointer;
+}
+
+.custom-select-box:focus {
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.15); /* Slightly increased shadow on focus */
+}
+
+.custom-select-container {
+  position: relative;
+  border: none;
+  outline: none; /* Removes focus outline */
+  max-width: 300px; /* Adjust width as needed */
+
+}
+
+.KPI{
+  height: 100px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* Shadow */
+  border-radius: 8px; /* Rounded corners */
+  /* margin-left: 1rem;
+  margin-right: 1rem; */
+
+}
+.Kpi_icon{
+  background-color: whitesmoke;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  padding: 0.5rem;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.15); /* Slightly increased shadow on focus */
+}
+
+/* //GobalNotify CSS */
+.notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 50px;
+  padding: 10px 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  z-index: 9999;
+  animation: fade-in 0.3s ease-in-out;
+}
+
+.notification.success {
+  border-color: #4caf50;
+  background-color: #e8f5e9;
+  color: #4caf50;
+}
+
+.notification.error {
+  border-color: #f44336;
+  background-color: #ffebee;
+  color: #f44336;
+}
+
+.icon {
+  font-size: 24px;
+  margin-right: 10px;
+  animation: bounce 1s infinite;
+}
+
+.notification.success .icon {
+  animation: pulse-success 1s infinite;
+}
+
+.notification.error .icon {
+  animation: shake-error 0.8s infinite;
+}
+
+.message {
+  flex-grow: 1;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #777;
+}
+
+.close-btn:hover {
+  color: #000;
+}
+
+/* Keyframes for animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-success {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+@keyframes shake-error {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+/* NavBarSample */
+/* Navbar Container */
+.side_bar {
+  width: 150px;
+  height: 100vh;
+  background: #2c3e50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: width 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+.side_bar.collapsed {
+  width: 80px;
+}
+
+/* Toggle Button */
+.toggle-btn {
+  margin: 10px;
+  padding: 8px 12px;
+  background-color: #34495e;
+  color: #ecf0f1;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.toggle-btn:hover {
+  background-color: #1abc9c;
+}
+
+/* Menu Styles */
+.menu {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+  width: 100%;
+}
+
+.menu-item {
+  width: 100%;
+  height: 50px;
+  padding: 15px;
+  color: #ecf0f1;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.3s, padding-left 0.3s;
+}
+
+.menu-item:hover {
+  background: #34495e;
+}
+
+.NavLink.active {
+  /* background: #1abc9c; */
+  background: green;
+}
+
+/* Icon and Text */
+.icon {
+  font-size: 1.5rem;
+  margin-right: 15px;
+}
+
+.text {
+  font-size: 1rem;
+}
+
+.side_bar.collapsed .menu-item {
+  justify-content: center;
+  padding-left: 0;
+}
+
+.side_bar.collapsed .icon {
+  margin-right: 0;
+}
+
+.side_bar.collapsed .text {
+  display: none;
+}
+
+/* //Toast component css */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  border-radius: 5px;
+  color: white;
+  z-index: 1000;
+}
+.toast-success { background-color: green; }
+.toast-error { background-color: red; }
+.toast-info { background-color: blue; }
+.toast-warning { background-color: orange; }
+.toast button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+
+.nav-pills .nav-link {
+  color: white !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 30px;
+  margin: 0 6px;
+  transition: all 0.3s ease;
+}
+
+.nav-pills .nav-link.active {
+  background: rgba(255, 255, 255, 0.35) !important;
+  color: #1b5e20 !important; /* dark green text */
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.nav-pills .nav-link:hover:not(.active) {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* <Nav.Link
+  eventKey={tab.key}
+  className={`fw-bold ${activeTab === tab.key ? 'active' : ''}`}
+  style={{
+    borderRadius: '30px',
+    padding: '6px 16px',
+    margin: '0 6px',
+    backgroundColor: activeTab === tab.key
+      ? 'rgba(255,255,255,0.35)'
+      : 'rgba(255,255,255,0.1)',
+    color: activeTab === tab.key ? '#1b5e20' : 'white',
+    fontWeight: activeTab === tab.key ? '700' : '500',
+    transition: 'all 0.3s ease',
+  }}
+> */
+
+
+
+

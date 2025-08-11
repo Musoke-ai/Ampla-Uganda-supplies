@@ -8,15 +8,21 @@ import { Provider } from 'react-redux';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+// Initialize toast container (usually placed once in your App component)
+import { ToastContainer } from 'react-toastify';
+import { SettingsProvider } from './app/Components/Settings';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <BrowserRouter>
     <Provider store={store}>
+      <SettingsProvider>
+      <ToastContainer />
       <Routes>
         <Route path="/*"element={<App />} />
       </Routes>
+      </SettingsProvider>
     </Provider>
     </BrowserRouter>
   </React.StrictMode>

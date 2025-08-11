@@ -3,6 +3,8 @@ import {useState, useEffect} from "react";
 function IncDecCounter({
   _item,
   calTotal,
+  calTotalProducts,
+  setTotalProducts
  
 }){
 
@@ -15,6 +17,7 @@ function IncDecCounter({
     _num++;
    _item.saleQuantity = _num
    calTotal();
+   calTotalProducts();
     }
   };
   let decNum = () => {
@@ -25,6 +28,7 @@ function IncDecCounter({
         setNum(1);        
    _item.saleQuantity = _num
    calTotal();
+   calTotalProducts();
         
       }else{
         let _num = num;
@@ -32,6 +36,7 @@ function IncDecCounter({
         _num--;
        _item.saleQuantity = _num
        calTotal();
+       calTotalProducts();
   
       }
      
@@ -46,6 +51,7 @@ setNum(1);
 let _num = num;
 _item.saleQuantity = _num
 calTotal();
+calTotalProducts();
     }else if(Number(num) > Number(_item.itemQuantity)){
       // calTotal();
       window.alert(_item.itemQuantity+" item(s) remaining!");
@@ -53,11 +59,13 @@ calTotal();
       let _num = num;
       _item.saleQuantity = _num
       calTotal();
+      calTotalProducts();
     }else{
       // window.alert('Items'+num)
       let _num = num;
       _item.saleQuantity = _num
       calTotal();
+      calTotalProducts();
     }
    }
   }, [num]);
@@ -73,6 +81,7 @@ const handleMouseLeave = (e) => {
     let _num = num;
       _item.saleQuantity = _num
       calTotal();
+      calTotalProducts();
   }
 }
 

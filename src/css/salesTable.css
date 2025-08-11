@@ -1,0 +1,135 @@
+/* General container styling */
+.sales-table-container {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Controls */
+  .table-controls {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+  }
+  
+  .table-controls input[type="text"] {
+    padding: 8px;
+    width: 200px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  .table-controls select {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  .sales-table-container {
+    margin: 20px;
+    padding: 10px;
+    font-family: Arial, sans-serif;
+  }
+  
+  .sales-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+  }
+  
+  .sales-table th,
+  .sales-table td {
+    border: 1px solid #ddd;
+    text-align: left;
+    padding: 8px;
+  }
+  
+  .sales-table th {
+    background-color: #f4f4f4;
+    cursor: pointer;
+  }
+  
+  .sales-table tbody tr.group-row td {
+    font-weight: bold;
+    background-color: #f9f9f9;
+  }
+  
+  .nested-sales-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .nested-sales-table th,
+  .nested-sales-table td {
+    border: 1px solid #ddd;
+    padding: 5px;
+  }
+  
+  .nested-sales-table th {
+    background-color: #e8e8e8;
+    font-size: 0.9em;
+  }
+  
+  .pagination-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+  }
+  
+  .pagination-controls button {
+    padding: 5px 10px;
+    margin: 0 5px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .pagination-controls button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+  
+  .table-controls {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  
+  .table-controls input[type="text"],
+  .table-controls select {
+    padding: 5px;
+    font-size: 1em;
+  }
+  
+  
+  /* Pagination controls */
+  .pagination-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+  }
+  
+  .pagination-controls button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: #fff;
+  }
+  
+  .pagination-controls button:disabled {
+    background-color: #ddd;
+    cursor: not-allowed;
+  }
+  
+  .pagination-controls span {
+    font-weight: bold;
+  }
+  

@@ -1,4 +1,8 @@
-import { configureStore, getDefaultMiddleware } from "@reduxjs/toolkit";
+// store.js
+
+import { configureStore } from "@reduxjs/toolkit";
+// Make sure to import your pusherMiddleware
+import { pusherMiddleware } from "./features/api/pusherMiddleware";
 import itemsReducer from './features/items/itemsSlice';
 import tableDataReducer from './features/Table/tableSlice';
 import { apiSlice } from "./features/api/apiSlice";
@@ -12,9 +16,12 @@ export const store = configureStore({
         auth: authReducer,
         [apiSlice.reducerPath]: apiSlice.reducer
     },
-    middleware: getDefaultMiddleware => 
-                 getDefaultMiddleware().concat(apiSlice.middleware),
-                 devTools: false
+    // --- THIS IS THE CORRECTED LINE ---
+    middleware: (getDefaultMiddleware) => 
+        getDefaultMiddleware().concat(apiSlice.middleware, pusherMiddleware), // <-- Add it here
+    
+    // Note: devTools should be at the top level, not inside middleware
+    devTools: false 
 })
 
 setupListeners(store.dispatch)

@@ -1,7 +1,6 @@
 
 import { apiSlice } from "../features/api/apiSlice";
-import { logOut } from "./authSlice";
-import { setProfile } from "./authSlice";
+import { logOut, setCredentials, setRoles, setProfile, setPermissions, setUserId } from "./authSlice";
 import {tags as commonTags } from '../features/api/commonTags'
 
 export const authApiSlice = apiSlice.injectEndpoints({
@@ -33,8 +32,9 @@ export const authApiSlice = apiSlice.injectEndpoints({
                   
                 }
             },
-           providesTags: [commonTags.profile],
+           providesTags: [commonTags.profile,commonTags.inventory],
         }),
+
         updateProfile: builder.mutation({
             query: credentials => ({
                 url:'/updateprofile',
@@ -69,9 +69,23 @@ export const authApiSlice = apiSlice.injectEndpoints({
         }),
         refresh: builder.mutation({
             query: () => ({
-                url: '',
+                url: '/refreshtoken',
                 method: 'GET'
-            })
+            }),
+            async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+                try {
+                    const { data } = await queryFulfilled
+                    const { accessToken, roles, permissions, user_id } = data?.data || {}
+                    dispatch(setCredentials({ accessToken }))
+                    dispatch(setUserId({ user_id }))
+                    //make sure always the roles is an array
+                    dispatch(setRoles({ roles: Array.isArray(roles) ? roles : [roles] }));
+                    dispatch(setPermissions({ permissions: Array.isArray(permissions) ? permissions : [permissions] }));
+                } catch (err) {
+                    console.log(err)
+                }
+            },
+            invalidatesTags: [commonTags.profile],
         }),
 
     }) 

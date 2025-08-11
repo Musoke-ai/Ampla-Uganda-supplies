@@ -109,8 +109,8 @@ const extractSalesPerReceipt = (_receiptNo) => {
       >
         <ul className='nav d-flex gap-5 fs-6 fw-bold'>
         <li className='nav-item navItem nav-item-active '>Reciept</li>
-<li className='nav-item navItem text-muted'>Quotation</li>
-<li className='nav-item navItem text-muted'>Catolog</li>
+{/* <li className='nav-item navItem text-muted'>Quotation</li>
+<li className='nav-item navItem text-muted'>Catolog</li> */}
 <li className='nav-item navItem text-muted'>Invoice</li>
 <li className='nav-item navItem text-muted'>
   </li>

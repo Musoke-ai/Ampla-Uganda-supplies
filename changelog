@@ -1,0 +1,23 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [1.1] - 2024-07-22
+### Added
+- New user authentication system using JWT with codeigniter shield library.
+
+### Changed
+
+
+### Deprecated
+
+
+### Removed
+- Removed 
+
+### Fixed
+- Fixed a bug causing the disturbing window alerts when the selling price of a product on a quick sale modal changes below the minimun selling price.
+- Resolved an issue with the email notification system.
+
+### Security
+- Patched a vulnerability that allowed SQL injection in the search functionality.

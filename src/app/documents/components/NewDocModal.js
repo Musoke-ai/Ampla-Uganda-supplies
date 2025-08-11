@@ -21,10 +21,10 @@ const NewDocModal = (props) => {
       </Modal.Header>
       <Modal.Body>
      <div className='d-flex justify-content-center'>
-        <div className='d-flex flex-column align-items-center justify-content-center'>
+        {/* <div className='d-flex flex-column align-items-center justify-content-center'>
         <button className='btn btn-white doc-icon' width={100} height={100} style={{borderRadius:"50%"}} ><img src={receiptLogo} width={100} height={100} style={{borderRadius:"50%"}}/></button>
        <div className='fw-bold mt-1'>Receipt</div>
-        </div>
+        </div> */}
         <div className='d-flex flex-column align-items-center justify-content-center'>
         <button className='btn btn-white doc-icon' width={100} height={100} style={{borderRadius:"50%"}} ><img src={quotationLogo} width={100} height={100} style={{borderRadius:"50%"}}/></button>
        <div className='fw-bold mt-1'>Quotation</div>
