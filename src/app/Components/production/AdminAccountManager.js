@@ -16,6 +16,7 @@ import {
 import { toast } from 'react-toastify';
 import { useRegisterMutation } from "../../auth/authApiSlice";
 import { useSelector } from "react-redux";
+import { useSettings } from "../Settings";
 import {
   selectAccounts,
   useChangePasswordMutation,
@@ -24,6 +25,7 @@ import {
 } from "../../features/api/AccountsSlice";
 import { selectRoles } from "../../auth/authSlice";
 import { Lock, LockFill, PencilSquare, TrashFill } from "react-bootstrap-icons";
+import jsPDF from 'jspdf';
 // --- Data and Configuration ---
 const rolesConfig = [
   {
@@ -116,37 +118,10 @@ function transformUsers(usersData) {
   });
 }
 
-// const initialUsers = [
-//   {
-//     id: 1,
-//     username: "admin_user",
-//     email: "admin@example.com",
-//     permissions: {
-//       Dashboard: ["View"],
-//       Employees: ["View", "Create", "Update"],
-//       "Raw Materials": ["View", "Create", "Update"],
-//       Expenses: ["View", "Create"],
-//       Orders: ["View"],
-//       Products: ["View", "Create", "Update", "Delete"],
-//       Settings: ["View", "Update"],
-//     },
-//   },
-//   {
-//     id: 2,
-//     username: "sales_person",
-//     email: "sales@example.com",
-//     permissions: {
-//       "Sales Desk": ["View", "Create"],
-//       Customers: ["View", "Create", "Update"],
-//       Sales: ["View", "Create"],
-//       "Credit Sales": ["View", "Create"],
-//     },
-//   },
-// ];
-
-
 // --- Main App Component ---
 export default function AdminAccountManager() {
+  const { settings } = useSettings();
+  const theme = settings.theme;
   const accounts = useSelector(selectAccounts);
   const [createUser, { isLoading, isSuccess }] = useRegisterMutation();
   const [deleteUser, { isLoading: isDeleteLoading, isSuccess: isDeleteSuccess, isError: isDeleteError, error:deleteError }] = useDeleteUserMutation();
@@ -167,6 +142,77 @@ const users = useMemo(() => transformUsers(accounts), [accounts]);
   const [formData, setFormData] = useState({});
   const [validated, setValidated] = useState(false);
   const [activeRoles, setActiveRoles] = useState([]);
+
+// --- Helper function to generate and download the PDF ---
+/**
+ * Generates a PDF with the user's account details and initiates a download.
+ * @param {object} userData - The user's data from the form.
+ * @param {string} userData.username - The user's chosen username.
+ * @param {string} userData.email - The user's email address.
+ * @param {string} userData.password - The user's password.
+ */
+const downloadAccountDetailsPdf = (userData) => {
+  // 1. Create a new jsPDF instance
+  const doc = new jsPDF();
+
+  // Get the current date and time for the timestamp
+  const creationTimestamp = new Date().toLocaleString();
+
+  // 2. Add content to the PDF
+  // Add a title
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Your Account Details', 20, 30);
+
+  // Add a horizontal line separator
+  doc.setLineWidth(0.5);
+  doc.line(20, 35, 190, 35);
+
+  // Add user details
+  doc.setFontSize(16);
+  doc.setFont('times', 'normal');
+  doc.text(`Welcome, ${userData.username}!`, 20, 50);
+
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Username:   ${userData.username}`, 20, 65);
+  doc.text(`Email:      ${userData.email}`, 20, 75);
+  // --- ADDED PASSWORD ---
+  // Note: Including passwords in downloadable files is a significant security risk.
+  doc.text(`Password:   ${userData.password}`, 20, 85);
+  
+  // --- ADDED TIMESTAMP ---
+  doc.text(`Created On: ${creationTimestamp}`, 20, 95);
+
+
+  // Add a strong security warning about the password
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 0, 0); // Set text color to red for emphasis
+  doc.text(
+    'WARNING: This document contains your plain-text password.',
+    20,
+    115
+  );
+  
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(150); // Reset to a less prominent color
+  doc.text(
+    'Please store your credentials in a secure password manager and',
+    20,
+    122
+  );
+   doc.text(
+    'save the file securely or delete it after memorizing it.',
+    20,
+    127
+  );
+
+
+  // 3. Save the PDF
+  // This will trigger a download in the browser.
+  doc.save(`${userData.username}-account-details.pdf`);
+};
 
   // --- Toast and Modal Handlers ---
   const handleShowToast = (message) => {
@@ -390,10 +436,10 @@ function extractAndModifyPermissions(permissions) {
           // name: _name.split("@")[0],
           accountType: "sharedAccount",
         }).unwrap();
-        //   downloadAccountSignInPDF(newAccount.name);
-        //   setNewAccount({ name: "", roles: [],password:"",email:"" });
-        setFormData({});
-        toast.success(data.message);
+         // Call the PDF download function with the user's data
+        downloadAccountDetailsPdf(formData);
+        handleCloseUserModal();
+        toast.success(data.message+" accounts details file will auto download!");
       } catch (err) {
         // return <Alerts heading="An error occured during registration!" message={error}/>
         if (!err.status) {
@@ -506,10 +552,11 @@ function extractAndModifyPermissions(permissions) {
   };
 
   return (
-    <Container className="py-4" style={{ backgroundColor: "#f8f9fa" }}>
+    // <Container className="py-4" style={{ backgroundColor: "#f8f9fa" }}>
+    <Container className="py-4">
       <header className="mb-4">
         <h1 className="d-flex align-items-center gap-3">
-          <i className="bi bi-shield-check"></i> Inventory User Management
+          <i className="bi bi-shield-check"></i> User Management
         </h1>
         <p className="text-muted">
           Create and manage user accounts with role-based permissions.
@@ -742,8 +789,9 @@ function extractAndModifyPermissions(permissions) {
             <Button variant="secondary" onClick={handleCloseUserModal}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit">
-              {currentUser ? "Save Changes" : "Create Account"}
+            <Button variant="primary" type="submit" disabled={isLoading}>
+              {/* {currentUser ? "Save Changes" : "Create Account"} */}
+              {isLoading?"Creating account...":"Create Account"}
             </Button>
           </Modal.Footer>
         </Form>
@@ -819,341 +867,3 @@ function extractAndModifyPermissions(permissions) {
   );
 }
 
-// import React, { useState, useEffect } from "react";
-// import { Table, Form, Button, Modal } from "react-bootstrap";
-// import { useRegisterMutation } from "../../auth/authApiSlice";
-// import { useSelector } from "react-redux";
-// import { selectAccounts, useChangePasswordMutation, useEditAccountMutation, useDeleteUserMutation } from "../../features/api/AccountsSlice";
-// import { selectRoles } from "../../auth/authSlice";
-// import { jsPDF } from "jspdf";
-// import { set } from "date-fns";
-// import PermissionWrapper from "../../auth/PermissionWrapper";
-
-// const rolesList = ["Inventory Manager", "Production Manager", "Accountant", "Admin"];
-// const permissionsList = ["Delete", "Edit", "create","export"];
-
-// const AdminAccountManager = () => {
-//   const accountsList = useSelector(selectAccounts);
-//   const roles = useSelector(selectRoles);
-//   const [accounts, setAccounts] = useState([]);
-//   const [showModal, setShowModal] = useState(false);
-//   const [newAccount, setNewAccount] = useState({ name: "", roles: [], permissions: [], email: "", password: "" });
-//   const [editingAccount, setEditingAccount] = useState(null);
-//   const [register, {isLoading, isSuccess}] = useRegisterMutation();
-//   const [changePassword, {isLoading:changePasswordIsLoading, isSuccess:isChangePasswordSuccess}] = useChangePasswordMutation();
-//   const [updateAccount, {isLoading:updateIsLoading, isSuccess:isUpdateSuccess}] = useEditAccountMutation();
-//   const [deleteUser, {isLoading:isDeleteUserLoading, isSuccess:isDeleteUserSuccess}] = useDeleteUserMutation();
-
-//   const [generatedPassword, setGeneratedPassword] = useState('');
-//   const [showPassword, setShowPassword] = useState(false);
-//   const [userId, setUserId] = useState("");
-
-//   const [confirming, setConfirming] = useState(false);
-//   const [countdown, setCountdown] = useState(5);
-
-// console.log("Roles: "+roles);
-
-//   const handleCreateAccount = () => {
-//     setShowModal(false);
-//     setNewAccount({ name: "", roles: [] });
-//   };
-
-//   const handleEditAccount = (id) => {
-//     const account = accounts.find((acc) => acc.id === id);
-//     setEditingAccount(account);
-//     setShowModal(true);
-//   };
-
-//   const generatePassword = () => {
-//     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-//     let password = '';
-//     for (let i = 0; i < 8; i++) {
-//       password += chars.charAt(Math.floor(Math.random() * chars.length));
-//     }
-//     setGeneratedPassword(password);
-//     setNewAccount({ ...newAccount, password: generatedPassword })
-//     setShowPassword(true);
-//   };
-
-//   const handleUpdateAccount = () => {
-//     setAccounts(accounts.map((acc) => (acc.id === editingAccount.id ? editingAccount : acc)));
-//     setShowModal(false);
-//     setEditingAccount(null);
-//   };
-
-//   const handleDeleteAccount = (id) => {
-//     setAccounts(accounts.filter((acc) => acc.id !== id));
-//   };
-
-//   const handleInvalidateLink = (id) => {
-//     setAccounts(accounts.map((acc) => (acc.id === id ? { ...acc, link: "Invalidated" } : acc)));
-//   };
-
-//   const handleRoleChange = (role, isChecked, account, setAccount) => {
-//     if (isChecked) {
-//       setAccount({ ...account, roles: [...account.roles, role] });
-//     } else {
-//       setAccount({ ...account, roles: account.roles.filter((r) => r !== role) });
-//     }
-//   };
-
-//   const handlePermissions = (permit, isChecked, account, setAccount) => {
-//     if (isChecked) {
-//       setAccount({ ...account, permissions: [...account.permissions, permit] });
-//     } else {
-//       setAccount({ ...account, permissions: account.permissions.filter((r) => r !== permit) });
-//     }
-//   };
-
-//   const handlePasswordReset = async (user_id, username) => {
-//     setUserId(user_id);
-//     generatePassword();
-//     if(generatedPassword.length>0){
-//       try{
-//         const data = await changePassword({user_id, newPassword: generatedPassword }).unwrap();
-//         downloadAccountSignInPDF(username);
-//         setGeneratedPassword("");
-//         setUserId("");
-//             }catch(err){
-//               console.log("Error occured: "+err);
-//             }
-//     }
-//   }
-
-// const downloadAccountSignInPDF = (username) => {
-//   const doc = new jsPDF();
-
-//   doc.setFontSize(16);
-//   doc.text("Your Sign-In Credentials", 20, 30);
-
-//   doc.setFontSize(12);
-//   doc.text(`Username: ${username}`, 20, 50);
-//   doc.text(`Password: ${generatedPassword}`, 20, 60);
-
-//   doc.save(`signin_credentials_${username}.pdf`);
-// };
-
-//   const handleSubmit = async () => {
-//     let _name = newAccount.name
-//     try{
-//       await register(
-//       {
-//         ... newAccount,
-//         password: generatedPassword,
-//         // name: _name.split("@")[0],
-//          accountType: "sharedAccount",
-//         }
-//       ).unwrap();
-//       downloadAccountSignInPDF(newAccount.name);
-//       setNewAccount({ name: "", roles: [],password:"",email:"" });
-//     } catch (err) {
-//       // return <Alerts heading="An error occured during registration!" message={error}/>
-//       if (!err.status) {
-//         // setErrMsg('No Server Response')
-//       window.alert("No Server Response")
-
-//         // setShowError(true)
-//     } else if (err.status === 400) {
-//       window.alert("Check your credentials and try again.")
-//         // setErrMsg('Missing Businessname or Password');
-//         // setShowError(true)
-//     } else if (err.status === 401) {
-//       window.alert("Unauthorised")
-//         // setErrMsg('Unauthorised');
-//         // setShowError(true)
-//     }
-//     else if (err.status === 404) {
-//       window.alert("Not Found")
-//         // setErrMsg('Unauthorised');
-//         // setShowError(true)
-//     }
-//     else if (err.status === 500) {
-//       window.alert("Internal Server Error")
-//         // setErrMsg('Unauthorised');
-//         // setShowError(true)
-//     }
-//     else if (err.status === 503) {
-//       window.alert("Service unavailable")
-//         // setErrMsg('Unauthorised');
-//         // setShowError(true)
-//     }
-//     else {
-//       window.alert("Check your credentials and try again.")
-//         // setErrMsg('Check your credentials and try again.');
-//         // setShowError(true)
-//         // errRef.current.focus();
-//     }
-//     }
-//   }
-
-//   const handleDeleteUser = async ()=> {
-// if(userId){
-//   try{
-// const _delete = await deleteUser({user_id:userId}).unwrap();
-// setUserId("");
-//   }catch(error){
-//     console.log("Error: "+ error);
-//   }
-// }
-//   }
-
-//   useEffect(() => {
-//     let timer;
-//     if (confirming) {
-//       timer = setInterval(() => {
-//         setCountdown(prev => {
-//           if (prev === 1) {
-//             setConfirming(false);
-//             clearInterval(timer);
-//             return 5;
-//           }
-//           return prev - 1;
-//         });
-//       }, 1000);
-//     }
-//     return () => clearInterval(timer);
-//   }, [confirming]);
-
-//   const handleClick = (id) => {
-//     setUserId(id);
-//     if (confirming) {
-//       handleDeleteUser();
-//       setConfirming(false);
-//       setCountdown(5);
-//     } else {
-//       setConfirming(true);
-//     }
-//   };
-
-//   return (
-//     <div className="container mt-4">
-//       <h2>Admin Account Manager</h2>
-//       <div className="d-flex flex-row justify-content-between">
-//      <div>
-//       <PermissionWrapper required={['create']} children={<Button variant="primary" onClick={() => setShowModal(true)}>Create Account</Button>} />
-//       </div>
-//      {/* <div><Button variant="info" >Roles/Permisions</Button></div> */}
-//       </div>
-
-//       <Table striped bordered hover className="mt-3">
-//         <thead className="table-dark">
-//           <tr>
-//             <th>Username</th>
-//             <th>Roles</th>
-//             <th>Permissions</th>
-//             <th>Actions</th>
-//           </tr>
-//         </thead>
-//         <tbody>
-//           {accountsList.map((acc) => (
-//             <tr key={acc.id}>
-//               <td>{acc.username}</td>
-//               <td>{acc.roles?.join(", ")}</td>
-//               <td>{acc.permissions?.join(", ")}</td>
-//               {/* <td>{acc.link}</td> */}
-//               <td>
-
-//                 {
-//                 // changePasswordIsLoading?userId === acc.id? <Button variant="warning" size="sm"  >Resetting...</Button>:<Button variant="warning" size="sm"  >Reset password</Button>:
-//                 // <Button variant="warning" size="sm" onClick={()=>handlePasswordReset(acc.id, acc.username)} >Reset password</Button>
-//                 }
-//                 {/* <Button variant="info" size="sm" onClick={() => handleEditAccount(acc.id)}>Edit</Button>{" "} */}
-// <PermissionWrapper required={['delete']} children={        <Button
-//       variant={confirming ? "warning" : "danger"}
-//       size="sm"
-//       onClick={() => handleClick(acc.id)}
-//     >
-//       {confirming ? userId === acc.id? `Click again (${countdown})` : "Delete":"Delete"}
-//     </Button>} />
-//                 {
-//                 // isDeleteUserLoading?userId === acc.id? <Button variant="danger" size="sm"  >Deleting...</Button>:<Button variant="warning" size="sm"  >Delete</Button>:
-//                 // <Button variant="danger" size="sm" onClick={()=>handleDeleteUser(acc.id)} >Delete</Button>
-//                 }
-//               </td>
-//             </tr>
-//          ))}
-//         </tbody>
-//       </Table>
-
-//       <Modal show={showModal} onHide={() => setShowModal(false)}>
-//         <Modal.Header closeButton>
-//           <Modal.Title>{editingAccount ? "Edit Account" : "Create New Account"}</Modal.Title>
-//         </Modal.Header>
-//         <Modal.Body>
-//           <Form>
-//             <Form.Group>
-//               <Form.Label>User Name/Email</Form.Label>
-//               <Form.Control
-//                 type="text"
-//                 value={editingAccount ? editingAccount.name : newAccount.name}
-//                 onChange={(e) => editingAccount ? setEditingAccount({ ...editingAccount, name: e.target.value, email: e.target.value }) : setNewAccount({ ...newAccount, name: e.target.value, email: e.target.value  })}
-//               />
-//             </Form.Group>
-//             {/* <Form.Group>
-//               <Form.Label>Email</Form.Label>
-//               <Form.Control
-//                 type="email"
-//                 value={editingAccount ? editingAccount.email : newAccount.email}
-//                 onChange={(e) => editingAccount ? setEditingAccount({ ...editingAccount, email: e.target.value }) : setNewAccount({ ...newAccount, email: e.target.value })}
-//               />
-//             </Form.Group> */}
-//             {/* <Form.Group>
-//               <Form.Label>Password</Form.Label>
-//               <Form.Control
-//                 type="password"
-//                 value={editingAccount ? editingAccount.password : newAccount.password}
-//                 onChange={(e) => editingAccount ? setEditingAccount({ ...editingAccount, password: e.target.value }) : setNewAccount({ ...newAccount, password: e.target.value })}
-//               />
-//             </Form.Group> */}
-//                  <Button variant="secondary" onClick={generatePassword} className="mt-3">
-//           Generate Password
-//         </Button>
-
-//         {showPassword && (
-//           <div className="mt-3">
-//             <p><strong>Generated Password:</strong> <code>{generatedPassword}</code></p>
-//             <p><em>Please copy this password now—it will not be shown again.</em></p>
-//           </div>
-//         )}
-//             <Form.Group className="mt-2">
-//               <Form.Label>Roles</Form.Label>
-//               {rolesList.map((role) => (
-//                 <Form.Check
-//                   key={role}
-//                   type="checkbox"
-//                   label={role}
-//                   checked={(editingAccount ? editingAccount.roles : newAccount.roles).includes(role)}
-//                   onChange={(e) => editingAccount ? handleRoleChange(role, e.target.checked, editingAccount, setEditingAccount) : handleRoleChange(role, e.target.checked, newAccount, setNewAccount)}
-//                 />
-//               ))}
-//             </Form.Group>
-//             <Form.Group className="mt-2">
-//               <Form.Label>Permisions</Form.Label>
-//               {permissionsList.map((permit) => (
-//                 <Form.Check
-//                   key={permit}
-//                   type="checkbox"
-//                   label={permit}
-//                   checked={(editingAccount ? editingAccount?.permissions : newAccount?.permissions)?.includes(permit)}
-//                   onChange={(e) => editingAccount ? handlePermissions(permit, e.target.checked, editingAccount, setEditingAccount) : handlePermissions(permit, e.target.checked, newAccount, setNewAccount)}
-//                 />
-//               ))}
-//             </Form.Group>
-//           </Form>
-//         </Modal.Body>
-//         <Modal.Footer>
-//           <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
-//           {
-//             isLoading?<Button variant="primary" >
-//            Saving...
-//           </Button>:<Button variant="primary" onClick={editingAccount ? handleUpdateAccount : handleSubmit}>
-//             {editingAccount ? "Update" : "Create"}
-//           </Button>
-//           }
-//         </Modal.Footer>
-//       </Modal>
-//     </div>
-//   );
-// };
-
-// export default AdminAccountManager;

@@ -4,6 +4,7 @@ import { BsExclamationCircleFill } from 'react-icons/bs';
 import { useUpdateProfileMutation } from '../auth/authApiSlice';
 import { useSelector } from 'react-redux';
 import { selectProfile } from '../auth/authSlice';
+import { selectRoles } from '../auth/authSlice';
 
 // --- End of Placeholder ---
 
@@ -113,6 +114,8 @@ const BusinessProfile = ({ profile, setProfile }) => {
 
 // --- Main Settings Page Component ---
 const Settings = () => {
+     const roles = useSelector(selectRoles);
+     const isAllowed = roles?.includes("admin");
     const reduxProfile = useSelector(selectProfile);
     // Destructure what you need from the simplified context
     const { settings, updateSetting, handleThemeChange } = useSettings();
@@ -143,6 +146,9 @@ const Settings = () => {
             </header>
 
             <Stack gap={4}>
+            
+            {isAllowed?
+<>
                 <BusinessProfile profile={businessProfile} setProfile={setBusinessProfile} />
 
                 <Card>
@@ -183,6 +189,8 @@ const Settings = () => {
                         </LocalSetting>
                     </Stack></Card.Body>
                 </Card>
+
+           </> :""}
 
                 <Card>
                     <Card.Header as="h5">Appearance</Card.Header>

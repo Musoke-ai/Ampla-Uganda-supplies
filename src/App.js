@@ -16,6 +16,7 @@ import HistoryPage from "./app/Components/pages/History";
 import CustomerPage from "./app/Components/CustomerPage";
 import PosPage from "./app/Components/pages/GeminiPos";
 import Login from "../src/app/Components/pages/publicPages/Login";
+import ForgetPassword from "./app/Components/pages/publicPages/ForgetPassword";
 import Production from "./../src/app/Components/Production";
 import SplashScreen from "./app/Components/pages/SplashScreen";
 import InvoiceForm from "./app/documents/InvoiceForm";
@@ -42,6 +43,7 @@ function App() {
       */}
       <Route element={<Layout />}>
         <Route path="/" element={<Login />} />
+        <Route path="/magic-login" element={<ForgetPassword />} />
       </Route>
 
       {/*

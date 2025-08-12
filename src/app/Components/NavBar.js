@@ -61,13 +61,13 @@ const handleLogout = async () => {
                     <Calendar className="text-white" />
                     <CurrentDate />
                 </div>
-                <ConnectionStatus />
             </div>
 
             {/* Profile & Icons */}
             <div className="d-flex align-items-center gap-4">
-                {/* User Avatar & Logout */}
-                <UserAvatar logout={handleLogout} />
+            <div><ConnectionStatus /></div>
+             <div>   {/* User Avatar & Logout */}
+                <UserAvatar logout={handleLogout} /></div>
             </div>
         </div>
     );

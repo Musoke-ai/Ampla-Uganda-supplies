@@ -129,7 +129,8 @@ const Login = () => {
         
         <div className=" p-5 bg-black shadow rounded d-flex flex-column gap-2 ">
         <div>{isLoading?<LinearProgress sx={{width: '100%'}} />:"" }</div>
-        <div> <h2 className="mb-4 text-success">Login to Ampla Uganda</h2></div>
+        <div> <h2 className="mb-4 text-success text-center">Ampla Uganda</h2></div>
+        <div> <h2 className="mb-4 text-success text-center">Login</h2></div>
          <div>
          <Form className=''>
               <Form.Group className="mb-3">
@@ -169,10 +170,11 @@ const Login = () => {
       I trust this Device
     </label>
     <p>{persist ? 'You trust this Device.' : 'You do not trust this Device.'}</p>
-    <Button variant="success" onClick={handleSubmit}>Login</Button>
+    <Button variant="success" className='w-100' onClick={handleSubmit}>Login</Button>
   </div>
     <div>
   <p className='mt-2'>Forget password <a href="http://localhost/mystock/index.php/login/magic-link">Use a Login Link</a></p>
+  {/* <p className='mt-2'><Link to='/magic-login' >Forget password Use a Login Link</Link></p> */}
    
   </div>
 
