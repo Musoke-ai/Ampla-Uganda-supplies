@@ -23,6 +23,8 @@ import {
   selectStok,
 } from "../features/api/stockSlice";
 
+import { toast } from 'react-toastify';
+
 const initialProducts = [
   { id: 1, name: 'Product A' },
   { id: 2, name: 'Product B' },
@@ -90,9 +92,10 @@ const StockEntry = () => {
     const handleAddStock = async () => {
     try {
        await addStock({stockItems}).unwrap();
+       toast.success("Stock added successfully!");
       setStockItems([]);
 
-    } catch (err) {console.log("Error occurred! "+err);}
+    } catch (err) {toast.error("Error occured while adding stock: "+err.message);}
   };
 
   return (
@@ -117,14 +120,14 @@ const StockEntry = () => {
               <Table striped bordered hover responsive>
                 <thead>
                   <tr>
-                    <th>Product Name</th>
+                    <th>Product Details</th>
                     <th className="text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredProducts.map((product) => (
                     <tr key={product.itemId}>
-                      <td>{product.itemName}</td>
+                      <td className={`${product.itemQuantity>0?'':'text-danger fw-bold'}`}>{product.itemName} - <span className="text-muted">{product.itemQuantity}</span></td>
                       <td className="text-center">
                         <Button
                           size="sm"
