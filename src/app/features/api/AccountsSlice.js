@@ -47,7 +47,7 @@ export const extendedAccountsApiSlice = apiSlice.injectEndpoints({
         editAccount: builder.mutation(
             {
                 query: payload => ({
-                url: '/editAccount',
+                url: '/updateUserRoles',
                 method: 'post',
                 body: payload
             }

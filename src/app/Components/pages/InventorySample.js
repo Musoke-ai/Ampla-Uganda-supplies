@@ -42,13 +42,16 @@ const initialFormState = {
   itemOwner: "",
 };
 
-// --- Helper Functions ---
-const formatCurrency = (amount) => `$${parseFloat(amount || 0).toFixed(2)}`;
+
 
 // --- Main App Component ---
 export default function InventoryPage() {
 
 const { settings } = useSettings();
+const currency = settings.currency!=='none'?settings?.currency:"";
+
+// --- Helper Functions ---
+const formatCurrency = (amount) => `${currency}${parseFloat(amount || 0).toFixed(2)}`;
 
   const inventory = useSelector(selectStock);
   const [createInventory, { isloading, isSuccess, isError, Error }] =
@@ -598,7 +601,7 @@ const { settings } = useSettings();
                   <Form.Group className="mb-3">
                     <Form.Label>Stock Price</Form.Label>
                     <InputGroup>
-                      <InputGroup.Text>$</InputGroup.Text>
+                      <InputGroup.Text>{currency}</InputGroup.Text>
                       <Form.Control
                         type="number"
                         placeholder="0.00"
@@ -619,7 +622,7 @@ const { settings } = useSettings();
                   <Form.Group className="mb-3">
                     <Form.Label>Least Price</Form.Label>
                     <InputGroup>
-                      <InputGroup.Text>$</InputGroup.Text>
+                      <InputGroup.Text>{currency}</InputGroup.Text>
                       <Form.Control
                         type="number"
                         placeholder="0.00"

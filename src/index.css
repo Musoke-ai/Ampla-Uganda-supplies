@@ -1,24 +1,56 @@
+/* --- CSS Refactoring Suggestions --- */
 
-  @import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
-  /* Step 1: Import the Poppins font */
+/*
+  RECOMMENDATION 1: Use <link> in HTML for fonts instead of @import for better performance.
+  However, keeping the @import statements here for structural reference.
+*/
+@import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
-/* Optional: You can also set it as the font for headings and other elements */
-h1, h2, h3, h4, h5, h6 {
-    font-family: 'Poppins', sans-serif;
+/*
+  RECOMMENDATION 2: Use CSS Custom Properties (Variables) for Theming.
+  This centralizes your theme values, making maintenance and updates much easier.
+*/
+:root {
+  --font-primary: 'Poppins', sans-serif;
+  --font-secondary: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+
+  --color-primary: #1C4E80;
+  --color-secondary: #488A99;
+  /* --color-background: #F5F5F5; */
+  --color-background: '';
+  --color-surface: #ffffff;
+  --color-text-primary: #202020;
+  --color-text-light: #ffffff;
+  --color-danger: #f44336;
+  --color-success: #4caf50;
+
+  --scrollbar-thumb-color: gray;
+  --scrollbar-track-color: #f1f1f1;
+
+  --shadow-sm: rgba(0, 0, 0, 0.16) 0px 1px 4px;
+  --shadow-md: rgba(0, 0, 0, 0.1) 0px 4px 12px;
 }
-*{
+
+/*
+  RECOMMENDATION 3: Consolidate Global Styles & Use a Modern CSS Reset.
+  - Combine all universal selector (*) rules.
+  - Set a sensible base font-size on the body. The original '3px' was likely a typo.
+*/
+*, *::before, *::after {
   box-sizing: border-box;
-  font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  font-family: 'Poppins', sans-serif;
-  font-size: 3px;
+  font-family: var(--font-primary);
+  font-size: 1rem; /* Standard base font size (usually 16px) */
   overflow: hidden;
-  background-color: #F5F5F5;
+  background-color: white;
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 body ul{
   list-style: none;
@@ -26,8 +58,10 @@ body ul{
 
 code {
   font-family: 'Poppins', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-primary);
 }
 
 /* For Webkit-based browsers (Chrome, Safari, Edge) */
@@ -37,42 +71,35 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1; /* Light background for the track */
+  background: var(--scrollbar-track-color);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: gray; /* Primary color for the scrollbar */
+  background-color: var(--scrollbar-thumb-color);
   border-radius: 10px;
-  border: 2px solid #f1f1f1; /* Adds a border to separate the thumb from the track */
+  border: 2px solid var(--scrollbar-track-color);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: gray; /* Darker color on hover */
+  background-color: var(--color-primary);
 }
 
 /* For Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: gray #f1f1f1;
+  scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);
 }
 
-/* Scrollbar for overflow in specific elements */
-.your-element-class {
-  scrollbar-color: gray #f1f1f1; /* Thumb color, Track color */
-  scrollbar-width: thin;
-}
-
-/* Apply transitions to all elements */
-* {
-  transition: all 0.3s ease-in-out;
-}
+/*
+  RECOMMENDATION 4: Avoid global transitions.
+  Applying transitions with '*' is bad for performance. Apply them directly
+  to the components that need them (e.g., .cta-button, .menu-item).
+*/
 
 .main {
   padding: 0;
   margin: 0;
-  /* display: grid; */
-  /* grid-template-columns: 0.35fr 2fr; */
   height: 100vh;
   width: 100vw;
   display: flex;
@@ -84,20 +111,20 @@ code {
   overflow: hidden;
 }
 .mainColor{
-  background-color: #1C4E80;
+  background-color: var(--color-primary);
 }
 .text-main{
-  color: #1C4E80;
+  color: var(--color-primary);
 }
 .sideBarCont{
-  background-color: #F5F5F5;
+  background-color: var(--color-background);
   display: grid;
   grid-template-rows: 0.39fr 2fr;
 }
 
 .sideBar {
   height: 100vh;
-  background-color: #F5F5F5;
+  background-color: var(--color-background);
   color: black;
   display: flex;
   flex-direction: column;
@@ -112,22 +139,34 @@ code {
   transition: all ease 0.5s;
 }
 
+/*
+  RECOMMENDATION 5: Add Media Queries for Responsiveness.
+  This is a basic example. On screens smaller than 992px (tablets/mobile),
+  we hide the sidebar. You would typically add a button to the NavBar
+  to toggle the sidebar's visibility.
+*/
+@media (max-width: 991.98px) {
+  .sideBar {
+    display: none; /* Hide the sidebar on smaller screens */
+  }
+}
+
 .cta-button {
-  font-family: 'Poppins', sans-serif;
-  background-color: #007BFF; /* Primary color, can be adjusted to fit your site’s theme */
-  color: white;
+  font-family: var(--font-primary);
+  background-color: var(--color-primary);
+  color: var(--color-text-light);
   border: none;
   padding: 15px 30px;
   font-size: 16px;
   font-weight: 600;
   border-radius: 8px;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0, 123, 255, 0.2);
+  box-shadow: var(--shadow-sm);
   transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
 .cta-button:hover {
-  background-color: #0056b3; /* Darker shade for hover effect */
+  background-color: var(--color-secondary);
   transform: scale(1.05); /* Slightly increase size on hover */
 }
 
@@ -173,13 +212,6 @@ code {
   gap: 1rem;
 }
 /* .logo::after{
-  content: '';
-  width: 100%;
-  height: 1px;
-  position: absolute;
-  bottom: 0;
-  background-color: #1C4E80;
-} */
 
 .sideBar .settings {
   position: absolute;
@@ -204,7 +236,7 @@ code {
 .sideBar ul li {
   height: auto;
   cursor: pointer;
-  color: #202020;
+  color: var(--color-text-primary);
   transition: all 0.7s ease;
   padding-left: 0.2rem;
   padding-top: 0.2rem;
@@ -221,11 +253,10 @@ code {
   flex-direction: row;
   width: 100%;
   /* font-size: 13px; */
-  gap: 0.5rem;
-  /* background-color: #130F40; */
-  color: #202020;
+  /* gap: 0.5rem;
+  color: var(--color-text-primary);
   transition: all ease 0.5s;
-}
+} */
 
 /* .sideBar ul li .Link .tag {
   color: #202020;
@@ -233,14 +264,14 @@ code {
 } */
 
 .sideBar ul li.active {
-  background-color: #488A99;
+  background-color: var(--color-secondary);
   border-top-left-radius: 20px;
   border-bottom-left-radius: 20px;
   color: white;
 }
 
 .sideBar ul li.active:hover{
-  background-color: #488A99;
+  background-color: var(--color-secondary);
 }
 .sideBar ul li.active .icons{
 color: white;
@@ -261,38 +292,35 @@ color: white;
 }
 
 .mainContent {
-  background-color: white;
+  /* background-color: var(--color-surface); */
+  /* background-color: #202020; */
   /* background-color: '#111111'; */
   /* height: 95vh; */
-  height: 100vh;
+  height: 100%;
   width: 100%;
   display: flex;
   flex-direction: column;
-  flex: 1;
+  /* flex: 1; */
   /* display: grid;
   grid-template-rows: 0.18 2fr; */
   overflow-y: hidden;
   /* gap: 0.5rem; */
-  padding-bottom: 2rem;
+  /* padding-bottom: 2rem; was causing trouble of showing something like dive from the bottom*/
 }
 .landingArea{
   width:100%;
-  height: 100vh;
+  height: 100%;
   z-index: 100;
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
   padding-bottom: 2rem;
-  background-color: #F5F5F5;
+  /* background-color: #202020; */
   /* background-color: #111111 !important; */
 }
 
 .navBar {
-  /* background-color: #191970; */
-  /* background-color: #1C4E80; */
   height: 55px;
-  /* background-color: #F5F5F5; */
-  /* background-color: green; */
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -322,7 +350,7 @@ color: white;
   padding-left: 1rem;
   padding-right: 1rem;
   height: 25px;
-  box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
+  box-shadow: var(--shadow-sm);
   opacity: 0.6;
   background-color: red;
   border-radius: 0.6rem;
@@ -396,19 +424,19 @@ color: white;
 .dashBoard .expenses {
   min-width: 200px;
   height: 100px;
-  background-color: white;
+  background-color: var(--color-surface);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
+  box-shadow: var(--shadow-sm);
 }
 .dashBoard .profitLoss{
   min-width: 200px;
   height: 100px;
-  background-color: white;
+  background-color: var(--color-surface);
   border-radius: 10px;
-  box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
+  box-shadow: var(--shadow-sm);
 }
 
 .dashBoard .expenses .title {
@@ -522,14 +550,14 @@ background-color: green;
 .graphs {
   width: 100%;
   height: auto;
-  background-color: white;
+  background-color: var(--color-surface);
   display: flex;
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
   /* grid-template-columns: 1fr 0.3fr; */
   border-radius: 10px;
-  box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
+  box-shadow: var(--shadow-sm);
 }
 .salesPerCat{
   font-size: 16px;
@@ -559,7 +587,7 @@ width: 100%;
 overflow: auto;
 padding-left: 1rem;
 padding-right: -1rem;
-background-color: white;
+background-color: var(--color-surface);
 
 }
 .custNav{
@@ -621,13 +649,23 @@ table{
 table thead{
   position: sticky;
   top: 0;
-  background-color: white;
+  background-color: var(--color-surface);
   /* background-color: green; */
   z-index: 10;
 }
 table thead th{
   padding: 0.5rem;
 }
+
+.sortable-header {
+  cursor: pointer;
+  user-select: none; /* Prevents text selection on double click */
+}
+
+.sortable-header:hover {
+  background-color: #e9ecef; /* Or use a theme variable */
+}
+
 tbody{
   width: 100%;
   height: 100%;
@@ -1417,7 +1455,3 @@ button {
     transition: 'all 0.3s ease',
   }}
 > */
-
-
-
-

@@ -1,0 +1,79 @@
+/* d:/Ampla/ampla/ampla/src/app/Components/pages/PosPage.css */
+
+.pos-page-container {
+    font-family: 'Inter', sans-serif;
+    /* background-color: #f8f9fa; */
+    /* Adjust height based on your app's header/navbar height */
+    height: calc(100vh - 60px); 
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content-pos {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.main-content-pos > .row {
+    height: 100%;
+}
+
+.product-grid-container,
+.cart-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.product-grid {
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.cart-body-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.cart-items {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.product-card {
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    border-radius: 0.5rem;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.quantity-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.price-toggle-btn {
+    cursor: pointer;
+}
+
+.mobile-cart-button-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0.75rem;
+    background-color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(5px);
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+}

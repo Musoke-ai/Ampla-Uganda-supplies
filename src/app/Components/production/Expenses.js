@@ -2,15 +2,19 @@ import React, { useState } from "react";
 import { Table, Button, Container, Modal, Form } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useSelector } from "react-redux";
-import { selectExpenses, useAddExpenseMutation, useUpdateExpenseMutation, useDeleteExpenseMutation } from "../../features/api/ExpensesSlice";
+import {
+  selectExpenses,
+  useAddExpenseMutation,
+  useUpdateExpenseMutation,
+  useDeleteExpenseMutation,
+} from "../../features/api/ExpensesSlice";
 import { LinearProgress } from "@mui/material";
-import { Pencil } from "react-bootstrap-icons";
-import { Delete } from "@mui/icons-material";
-
-import { toast } from 'react-toastify';
+import { Pencil, ArrowUp, ArrowDown } from "react-bootstrap-icons";
+import { Delete, Search } from "@mui/icons-material";
+import { toast } from "react-toastify";
 import PermissionWrapper from "../../auth/PermissionWrapper";
-import { selectPermissions } from "../../auth/authSlice";
 import { useSettings } from "../Settings";
+import { useTableSortSearch } from "../../hooks/useTableSortSearch";
 
 const handleApiError = (error) => {
   const status = error?.status || 'unknown';
@@ -35,13 +39,26 @@ const handleApiError = (error) => {
   toast.error(toastMessage, { autoClose: 4000 });
 };
 
+const searchableFields = ['category', 'description', 'givenTo', 'remarks'];
+
 const FactoryExpenses = () => {
   const { settings } = useSettings();
   const currency = settings?.currency!=='none'?settings?.currency:"";
 
   const expenses = useSelector(selectExpenses);
 
-  const [addExpense, {data,isLoading,isError,Error,isSuccess}] = useAddExpenseMutation();
+  const {
+    items: sortedExpenses,
+    requestSort,
+    sortConfig,
+    setSearchTerm,
+    searchTerm
+  } = useTableSortSearch(expenses, searchableFields);
+
+  const [addExpense, {
+    data,
+    isLoading, isError, Error, isSuccess
+  }] = useAddExpenseMutation();
   const [updateExpense, {data:updateData,isLoading: isUpdateLoading,isError: isUpdateError,Error: updateError,isSuccess: isUpdateSuccess}] = useUpdateExpenseMutation();
   const [deleteExpense, {data:deleteData,isLoading: isDeleteLoading,isError: isDeleteError,Error: deleteError,isSuccess: isDeleteSuccess}] = useDeleteExpenseMutation();
 
@@ -57,6 +74,16 @@ const FactoryExpenses = () => {
   });
 
   const [isEdit, setisEdit] = useState(false);
+
+  const getSortIcon = (key) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return null;
+    }
+    if (sortConfig.direction === 'ascending') {
+      return <ArrowUp />;
+    }
+    return <ArrowDown />;
+  };
 
   const handleDeleteModalClose = () => {
 setShowDeleteModal(false);
@@ -120,11 +147,21 @@ setShowModal(true);
   return (
     <Container className="mt-4">
       <h2 className="mb-3">Factory Expenses</h2>
-      <PermissionWrapper required={['expensescreate']} children={
-      <Button variant="primary" onClick={() => setShowModal(true)} className="mb-3">
-        Add New Expense
-      </Button>
-      } />
+      <div className="d-flex justify-content-between mb-3">
+        <Form.Group style={{ maxWidth: "400px" }}>
+          <Form.Control
+            type="text"
+            placeholder="Search by category, description, receiver, or remarks"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </Form.Group>
+        <PermissionWrapper required={['expensescreate']}>
+          <Button variant="primary" onClick={() => setShowModal(true)}>
+            Add New Expense
+          </Button>
+        </PermissionWrapper>
+      </div>
       <Modal show={showModal} onHide={() => {setShowModal(false); setisEdit(false);}}>
         <Modal.Header closeButton>
           <Modal.Title>{isEdit?<div>Edit Expense</div>:<div>Add Expense</div>}</Modal.Title>
@@ -186,18 +223,30 @@ setShowModal(true);
         <thead className="table-dark">
           <tr>
             <th>#</th>
-            <th>Date</th>
-            <th>Category</th>
-            <th>Description</th>
-            <th>Amount (USH)</th>
-            <th>Received By</th>
-            <th>Remarks</th>
+            <th onClick={() => requestSort('expenseDateCreated')} style={{ cursor: 'pointer' }}>
+              Date {getSortIcon('expenseDateCreated')}
+            </th>
+            <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }}>
+              Category {getSortIcon('category')}
+            </th>
+            <th onClick={() => requestSort('description')} style={{ cursor: 'pointer' }}>
+              Description {getSortIcon('description')}
+            </th>
+            <th onClick={() => requestSort('amount')} style={{ cursor: 'pointer' }}>
+              Amount ({currency}) {getSortIcon('amount')}
+            </th>
+            <th onClick={() => requestSort('givenTo')} style={{ cursor: 'pointer' }}>
+              Received By {getSortIcon('givenTo')}
+            </th>
+            <th onClick={() => requestSort('remarks')} style={{ cursor: 'pointer' }}>
+              Remarks {getSortIcon('remarks')}
+            </th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {expenses.length > 0 ? (<>{
-            expenses.map((expense, index) => (
+          {sortedExpenses.length > 0 ? (<>{
+            sortedExpenses.map((expense, index) => (
               <tr key={index}>
                 <td>{index+1}</td>
                 <td>{expense.expenseDateCreated}</td>
@@ -217,8 +266,8 @@ setShowModal(true);
               </tr>
             ))}
          <tr className="fs-5 fw-bold">
-          <td colspan={4} >Total: </td>
-          <td>{currency}{expenses?.reduce((prev, curr) => prev+Number(curr.amount)||0, 0)} </td>
+          <td colSpan={4} >Total: </td>
+          <td>{currency}{sortedExpenses?.reduce((total, item) => total + (Number(item.amount) || 0), 0).toFixed(2)} </td>
           </tr> </> ) : (
             <tr>
               <td colSpan="3" className="text-center">No expenses recorded</td>

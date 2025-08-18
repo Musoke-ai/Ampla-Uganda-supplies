@@ -112,7 +112,7 @@ function transformUsers(usersData) {
     return {
       id: user.id,
       username: cleanUsername,
-      email: cleanUsername.includes("@") ? cleanUsername : null,
+      email: user.email,
       permissions: newPermissions,
     };
   });
@@ -124,9 +124,11 @@ export default function AdminAccountManager() {
   const theme = settings.theme;
   const accounts = useSelector(selectAccounts);
   const [createUser, { isLoading, isSuccess }] = useRegisterMutation();
+  const [updateUser, { isLoading: isUpdateLoading }] = useEditAccountMutation();
   const [deleteUser, { isLoading: isDeleteLoading, isSuccess: isDeleteSuccess, isError: isDeleteError, error:deleteError }] = useDeleteUserMutation();
 //   const initialUsers = transformUsers(accounts);
 const users = useMemo(() => transformUsers(accounts), [accounts]);
+const [isEdit, setIsEdit] = useState(false);
 
 //   const [users, setUsers] = useState(initialUsers);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -239,6 +241,7 @@ const downloadAccountDetailsPdf = (userData) => {
   };
 
   const handleCloseUserModal = () => {
+    setIsEdit(false);
     setShowUserModal(false);
     setCurrentUser(null);
     setFormData({});
@@ -261,6 +264,7 @@ const downloadAccountDetailsPdf = (userData) => {
   };
 
   const handleCloseViewModal = () => {
+    setIsEdit(false);
     setShowViewModal(false);
     setUserToView(null);
   };
@@ -421,64 +425,43 @@ function extractAndModifyPermissions(permissions) {
         setValidated(true);
         return;
       }
+
       const permissions = formData.permissions;
       const roleData = extractAndModifyPermissions(permissions);
       const _permissions = roleData.actions;
       const _roles = roleData.roles;
-      const dataToSubmit = { ...formData };
-      delete dataToSubmit.password; // Don't store password in the user object
-      try {
-        const data = await createUser({
-          ...formData,
-          roles: _roles,
-          permissions: _permissions,
-          // password: generatedPassword,
-          // name: _name.split("@")[0],
-          accountType: "sharedAccount",
-        }).unwrap();
-         // Call the PDF download function with the user's data
-        downloadAccountDetailsPdf(formData);
-        handleCloseUserModal();
-        toast.success(data.message+" accounts details file will auto download!");
-      } catch (err) {
-        // return <Alerts heading="An error occured during registration!" message={error}/>
-        if (!err.status) {
-          // setErrMsg('No Server Response')
-        //   window.alert("No Server Response");
-        toast.error("No Server Response");
 
-          // setShowError(true)
-        } else if (err.status === 400) {
-        //   window.alert("Check your credentials and try again.");
-          toast.error("Check your credentials and try again.");
-          // setErrMsg('Missing Businessname or Password');
-          // setShowError(true)
-        } else if (err.status === 401) {
-        //   window.alert("Unauthorised");
-          toast.error("Unauthorised");
-          // setErrMsg('Unauthorised');
-          // setShowError(true)
-        } else if (err.status === 404) {
-        //   window.alert("Not Found");
-          toast.error("Not Found");
-          // setErrMsg('Unauthorised');
-          // setShowError(true)
-        } else if (err.status === 500) {
-        //   window.alert("Internal Server Error");
-          toast.error("Internal Server Error");
-          // setErrMsg('Unauthorised');
-          // setShowError(true)
-        } else if (err.status === 503) {
-        //   window.alert("Service unavailable");
-          toast.error("Service unavailable");
-          // setErrMsg('Unauthorised');
-          // setShowError(true)
-        } else {
-        //   window.alert("Check your credentials and try again.");
-          toast.error("Check your credentials and try again.");
-          // setErrMsg('Check your credentials and try again.');
-          // setShowError(true)
-          // errRef.current.focus();
+      if (currentUser) {
+        // --- Update existing user ---
+        try {
+          const payload = {
+            id: currentUser.id,
+            username: formData.username,
+            email: formData.email,
+            roles: _roles,
+            permissions: _permissions,
+          };
+          const data = await updateUser(payload).unwrap();
+          toast.success(data.message || "User updated successfully!");
+          handleCloseUserModal();
+        } catch (err) {
+          toast.error(err?.data?.message || "User update failed.");
+        }
+      } else {
+        // --- Create new user ---
+        try {
+          const data = await createUser({
+            ...formData,
+            roles: _roles,
+            permissions: _permissions,
+            accountType: "sharedAccount",
+          }).unwrap();
+          // Call the PDF download function with the user's data
+          downloadAccountDetailsPdf(formData);
+          handleCloseUserModal();
+          toast.success(data.message + " account details file will auto download!");
+        } catch (err) {
+          toast.error(err?.data?.message || "User creation failed.");
         }
       }
     };
@@ -615,14 +598,14 @@ function extractAndModifyPermissions(permissions) {
                       {/* <i className="bi bi-eye-fill"></i> */}
                      <Lock />
                     </Button>
-                    {/* <Button
+                    <Button
                       variant="outline-primary"
                       size="sm"
                       className="me-2"
-                      onClick={() => handleOpenUserModal(user)}
+                      onClick={() => {handleOpenUserModal(user);setIsEdit(true)}}
                     >
                       <PencilSquare />
-                    </Button> */}
+                    </Button> 
                     <Button
                       variant="outline-danger"
                       size="sm"
@@ -789,10 +772,13 @@ function extractAndModifyPermissions(permissions) {
             <Button variant="secondary" onClick={handleCloseUserModal}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit" disabled={isLoading}>
+            {isEdit?<Button variant="primary" type="submit" disabled={isUpdateLoading}>
+              {/* {currentUser ? "Save Changes" : "Create Account"} */}
+              {isLoading?"Updating user...":"Update user"}
+            </Button>:<Button variant="primary" type="submit" disabled={isLoading}>
               {/* {currentUser ? "Save Changes" : "Create Account"} */}
               {isLoading?"Creating account...":"Create Account"}
-            </Button>
+            </Button>}
           </Modal.Footer>
         </Form>
       </Modal>
@@ -866,4 +852,3 @@ function extractAndModifyPermissions(permissions) {
     </Container>
   );
 }
-

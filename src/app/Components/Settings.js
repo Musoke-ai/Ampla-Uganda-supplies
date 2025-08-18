@@ -218,6 +218,15 @@ const Settings = () => {
                     </Button>
                 </Stack>
             </Stack>
+
+            <footer className="mt-5 pt-4 border-top text-center text-muted small">
+                <p>
+                    &copy; {new Date().getFullYear()} Ampla Uganda. All Rights Reserved.
+                </p>
+                <p>
+                    Version 1.0.0 | Developed by Hamuzah&Steve Co.
+                </p>
+            </footer>
         </Container>
     );
 };

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
-import { Table, Button, Modal, Form } from "react-bootstrap";
+import { Table, Button, Modal, Form, InputGroup } from "react-bootstrap";
 
 import { useSelector } from "react-redux";
 import { selectEmployees } from "../../features/api/employeesSlice";
@@ -8,9 +8,14 @@ import { useAddEmployeeMutation, useUpdateEmployeeMutation, useDeleteEmployeeMut
 import { LinearProgress } from "@mui/material";
 import EmployeeDailyList from "./Process/EmployeeDailyList";
 import PermissionWrapper from "../../auth/PermissionWrapper";
-import { Delete, Edit } from "@mui/icons-material";
+import { Delete, Edit, Search } from "@mui/icons-material";
+import { ArrowUp, ArrowDown } from "react-bootstrap-icons";
 import { toast } from 'react-toastify';
 import { useSettings } from "../Settings";
+import { useTableSortSearch } from "../../hooks/useTableSortSearch";
+
+// Define which fields in the employee object are searchable
+const searchableFields = ['empName', 'empRole', 'empContact', 'empEmail', 'empLocation'];
 
 /**
  * EmployeeManagement component for handling CRUD operations for employees.
@@ -21,6 +26,7 @@ const EmployeeManagement = () => {
 // Get currency settings from context
 const { settings } = useSettings();
 const currency = settings.currency!=='none'?settings?.currency:"";
+const theme = settings.theme;
 
   // Defines the initial state structure for an employee object.
   const initialEmployeeState = { empID: "", empName: "", empRole: "", empContact: "", empEmail: "", empLocation: "", empSalary: "", empStatus: 1, startDate: "", endDate: "" };
@@ -34,6 +40,24 @@ const currency = settings.currency!=='none'?settings?.currency:"";
   const [updateEmployee, {isLoading:isUpdateLoading,isError:isUpdateError,Error:updateError,isSuccess:isUpdateSuccess}] = useUpdateEmployeeMutation();
   const [deleteEmployee, {data:deleteData, isLoading:isDeleteLoading, isError:isDeleteError, Error:deleteError,isSuccess:isDeleteSuccess}] = useDeleteEmployeeMutation();
   
+  // --- Search and Sort Logic ---
+  // Filter out any employees without a name before passing to the hook
+  const validEmployees = useMemo(() => employees.filter(e => e.empName && e.empName.length > 0), [employees]);
+
+  // Apply the custom hook for search and sort functionality
+  const {
+    items: sortedEmployees,
+    requestSort,
+    sortConfig,
+    setSearchTerm,
+    searchTerm
+  } = useTableSortSearch(validEmployees, searchableFields, { key: 'empName', direction: 'ascending' });
+
+  // Helper to display sort direction icon in table headers
+  const getSortIcon = (key) => {
+    if (!sortConfig || sortConfig.key !== key) return null;
+    return sortConfig.direction === 'ascending' ? <ArrowUp className="ms-1" /> : <ArrowDown className="ms-1" />;
+  };
   // --- Component State Management ---
   // State for controlling the visibility of modals and alerts.
   const [showModal, setShowModal] = useState(false);
@@ -181,27 +205,40 @@ toast.success(_delete?.message || 'Employee deleted successfully');
       </>
         } />
       </div>
+
+      {/* Search Input */}
+      <div className="mt-3" style={{ maxWidth: '400px' }}>
+        <InputGroup>
+          <InputGroup.Text className={`${theme==='dark'?'text-white':'text-dark'}`}><Search /></InputGroup.Text>
+          <Form.Control
+            type="text"
+            placeholder="Search employees..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </InputGroup>
+      </div>
      
       {/* Employee Data Table */}
       <Table striped bordered hover className="mt-3">
         <thead className="table-dark">
           <tr>
-            <th>#</th>
-            <th>Name</th>
-            <th>Role</th>
-            <th>Contact</th>
-            <th>Email</th>
-            <th>Location</th>
-            <th>Daily Pay</th>
-            <th>Status</th>
+            <th onClick={() => requestSort('empID')} className="sortable-header"># {getSortIcon('empID')}</th>
+            <th onClick={() => requestSort('empName')} className="sortable-header">Name {getSortIcon('empName')}</th>
+            <th onClick={() => requestSort('empRole')} className="sortable-header">Role {getSortIcon('empRole')}</th>
+            <th onClick={() => requestSort('empContact')} className="sortable-header">Contact {getSortIcon('empContact')}</th>
+            <th onClick={() => requestSort('empEmail')} className="sortable-header">Email {getSortIcon('empEmail')}</th>
+            <th onClick={() => requestSort('empLocation')} className="sortable-header">Location {getSortIcon('empLocation')}</th>
+            <th onClick={() => requestSort('empSalary')} className="sortable-header">Daily Pay {getSortIcon('empSalary')}</th>
+            <th onClick={() => requestSort('empStatus')} className="sortable-header">Status {getSortIcon('empStatus')}</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {/* Conditionally render rows if employees exist, otherwise show a message */}
-          {employees.length > 0 ? (
+          {sortedEmployees.length > 0 ? (
             <>
- {employees?.filter(employee => employee?.empName?.length !== 0).map((emp, idx) => (
+ {sortedEmployees.map((emp, idx) => (
             <tr key={emp.empID}>
               <td>{idx+1}</td>
               <td>{emp?.empName}</td>
@@ -221,7 +258,7 @@ toast.success(_delete?.message || 'Employee deleted successfully');
           {/* Footer row to display the total salary */}
           <tr >
             <td colSpan={6} className="fs-5 fw-bold" >Total:</td>
-            <td className="fs-6 fw-bold">{currency}{employees?.reduce((prev, curr) => prev+Number(curr.empSalary)||0,0)}</td>
+            <td className="fs-6 fw-bold">{currency}{sortedEmployees.reduce((prev, curr) => prev + Number(curr.empSalary) || 0, 0)}</td>
           </tr>
             </>
           ) : (

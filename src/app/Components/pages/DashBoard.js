@@ -6,29 +6,44 @@ import { Arrow90degDown, Arrow90degUp, ThreeDots } from 'react-bootstrap-icons';
 // import { format, parseISO } from 'date-fns';
 
 import RecentTransactions from '../tables/RescentTransactions';
-
-import { useSelector } from 'react-redux';
-import { selectStock } from '../../features/stock/stockSlice';
-import { selectSales } from '../../features/api/salesSlice';
-import { selectCustomers } from '../../features/api/customers';
 import { BoxFill, CartDashFill, Coin, CurrencyDollar, ExclamationOctagon, Grid1x2Fill, HouseDoor, Layers } from 'react-bootstrap-icons';
 import GraphFrame from '../graphs/GraphFrame';
 import SalesLineChart from '../graphs/SalesChart';
 import QuantitiesBarChart from '../graphs/BarComponent';
 import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval,getWeek, isSameMonth, isSameYear } from "date-fns";
-import { selectCategories } from '../../features/api/categorySlice';
+
+// --- RTK Query Hooks for Data Fetching ---
+import { useGetStockQuery } from '../../features/stock/stockSlice';
+import { useGetSalesQuery } from '../../features/api/salesSlice';
+import { useGetCustomersQuery } from '../../features/api/customers';
+import { useGetCategoriesQuery } from '../../features/api/categorySlice';
+
+// --- Loading/Error Components ---
+import { Spinner } from 'react-bootstrap';
+
 import { getWeekNumber, groupSalesBySRIDWithCustomer,formatCurrencyWithScale,calculateSalesMetricsToday, addCategoryNames, calculateSalesByCategoryWithPrice, calculateWeeklySalesPerDay,addCategoryToSales, calculateTotals, calculateTotal, calculateInventoryMetrics } from '../../dataAnalytics/functions';
 import HorizontalBarGraph from '../graphs/StockVision';
 import CurrencyFormat from 'react-currency-format';
 
 const Dashboard = () => {
 
-// console.log("WeekNumber: "+getWeekNumber(2024,3,1));
-const salesData = useSelector(selectSales);
-const products = useSelector(selectStock);
-const categories = useSelector(selectCategories);
-const customers = useSelector(selectCustomers);
-console.log("Categories: "+JSON.stringify(categories));
+  // --- Data Fetching with RTK Query ---
+  // Each component should be responsible for fetching its own data.
+  // This makes the component more resilient and independent of pre-fetching logic.
+  const { data: salesData = [], isLoading: isSalesLoading, isError: isSalesError } = useGetSalesQuery();
+  const { data: products = [], isLoading: isProductsLoading, isError: isProductsError } = useGetStockQuery();
+  const { data: categories = [], isLoading: isCategoriesLoading, isError: isCategoriesError } = useGetCategoriesQuery();
+  const { data: customers = [], isLoading: isCustomersLoading, isError: isCustomersError } = useGetCustomersQuery();
+
+
+  if (isSalesLoading || isProductsLoading || isCategoriesLoading || isCustomersLoading) {
+      return <div className="d-flex justify-content-center align-items-center" style={{ height: '80vh' }}><Spinner animation="border" /> <span className='ms-2'>Loading Dashboard...</span></div>;
+  }
+
+  if (isSalesError || isProductsError || isCategoriesError || isCustomersError) {
+      return <div className="alert alert-danger">Error loading dashboard data. Please try refreshing the page.</div>;
+  }
+
 const totalProducts = products.length;
 
 const outOfStockProducts = products.reduce((count, product) => {

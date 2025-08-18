@@ -1,18 +1,23 @@
-import React, { useRef, useState } from "react";
-import { Table, Button, Modal, Form, Container } from "react-bootstrap";
+import React, { useMemo, useState } from "react";
+import { Table, Button, Modal, Form, Container, InputGroup } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useSelector } from "react-redux";
 import { selectRawMaterials, useAddRawMaterialMutation, useUpdateRawMaterialMutation, useDeleteRawMaterialMutation } from "../../features/api/rawmaterialsSlice";
 import ReactLoading from 'react-loading';
 import RawMaterialModal from "./Process/SelectRawMaterials";
 import PermissionWrapper from "../../auth/PermissionWrapper";
-import { Delete, Edit } from "@mui/icons-material";
+import { Delete, Edit, Search } from "@mui/icons-material";
 import { useSettings } from "../Settings";
 import { toast } from "react-toastify";
+import { useTableSortSearch } from "../../hooks/useTableSortSearch";
+import { ArrowUp, ArrowDown } from "react-bootstrap-icons";
+
+const searchableFields = ['name', 'size', 'supplier', 'note'];
 
 const RawMaterialsTable = () => {
 const { settings } = useSettings();
 const currency = settings.currency!=="none"?settings?.currency:"";
+const theme = settings.theme;
 
     const rawMaterials = useSelector(selectRawMaterials);
     const [addRawMaterial, {isLoading, isError, error, isSuccess} ]= useAddRawMaterialMutation();
@@ -26,6 +31,8 @@ const currency = settings.currency!=="none"?settings?.currency:"";
 
   const [materialId, setMaterialId] = useState("");
 
+  const { items: sortedMaterials, requestSort, sortConfig, setSearchTerm, searchTerm } = useTableSortSearch(rawMaterials, searchableFields);
+
   const [formData, setFormData] = useState({
     name: "", size: "", Quantity: "", unitPrice: "", supplier: "", note: "", expiry: ""
   });
@@ -34,6 +41,16 @@ const currency = settings.currency!=="none"?settings?.currency:"";
     setSelectedMaterial(material);
     setFormData(material);
     setShowEditModal(true);
+  };
+
+  const getSortIcon = (key) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return null;
+    }
+    if (sortConfig.direction === 'ascending') {
+      return <ArrowUp />;
+    }
+    return <ArrowDown />;
   };
 
   const handleAdd = async () => {
@@ -85,39 +102,54 @@ toast.error("An error occured! "+error.status);
   return (
     <Container className="mt-4">
       <h2 className="text-center mb-4">Raw Materials</h2>
-      <div className="d-flex justify-content-between">
-        <PermissionWrapper required={['rawcreate']} children={
-          <>
-  <div>
-          <Button variant="primary" className="mb-3" onClick={() => setShowAddModal(true)}>
-        Add New Raw Material
-      </Button>
+      <div className="d-flex justify-content-between mb-3">
+      <div>
+ <InputGroup style={{ maxWidth: "400px" }}>
+          <InputGroup.Text className={`${theme==='dark'?'text-white':'text-dark'}`}><Search /></InputGroup.Text>
+          <Form.Control
+            placeholder="Search by name, size, supplier, or note"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </InputGroup>
       </div>
-      
-      <div className="mb-3">
-        <RawMaterialModal />
+       <PermissionWrapper required={['rawcreate']}>
+        <div className="d-flex justify-content-between">
+          <div><RawMaterialModal /> </div>
+          <div><Button variant="primary" onClick={() => setShowAddModal(true)} className="ms-2">
+                Add New Raw Material
+              </Button></div>
         </div>
-          </>
-        } />
-      
-      
+        </PermissionWrapper>
       </div>
       
       <Table striped bordered hover responsive className="table-sm shadow-sm">
         <thead className="table-dark">
           <tr>
            <th>#</th>
-           <th>Raw Material</th>
-           <th>Size</th>
-           <th>Stock onHand</th>
-           <th>Unit Price</th>
-           <th>Supplier</th>
-           <th>Note</th>
+            <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>
+              Raw Material {getSortIcon('name')}
+            </th>
+            <th onClick={() => requestSort('size')} style={{ cursor: 'pointer' }}>
+              Size {getSortIcon('size')}
+            </th>
+            <th onClick={() => requestSort('Quantity')} style={{ cursor: 'pointer' }}>
+              Stock onHand {getSortIcon('Quantity')}
+            </th>
+            <th onClick={() => requestSort('unitPrice')} style={{ cursor: 'pointer' }}>
+              Unit Price {getSortIcon('unitPrice')}
+            </th>
+            <th onClick={() => requestSort('supplier')} style={{ cursor: 'pointer' }}>
+              Supplier {getSortIcon('supplier')}
+            </th>
+            <th onClick={() => requestSort('note')} style={{ cursor: 'pointer' }}>
+              Note {getSortIcon('note')}
+            </th>
             <th className="text-center">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {rawMaterials.map((material, idx) => (
+          {sortedMaterials.map((material, idx) => (
             <tr key={material.id}>
              <td>{idx+1}</td>
              <td>{material.name}</td>
@@ -134,8 +166,8 @@ toast.error("An error occured! "+error.status);
           ))}
           <tr >
             <td className="fs-5 fw-bold"  colSpan={2}>Total:</td>
-            <td className="fs-5 fw-bold" >{rawMaterials.reduce((prev, curr)  => prev+Number(curr.Quantity) || 0, 0 )}</td>
-            <td className="fs-5 fw-bold"  >{currency}{rawMaterials.reduce((prev, curr)  => prev+Number(curr.unitPrice) || 0, 0 )}</td>
+            <td className="fs-5 fw-bold" >{sortedMaterials.reduce((total, item) => total + (Number(item.Quantity) || 0), 0)}</td>
+            <td className="fs-5 fw-bold"  >{currency}{sortedMaterials.reduce((total, item) => total + (Number(item.unitPrice) || 0), 0).toFixed(2)}</td>
           </tr>
         </tbody>
       </Table>

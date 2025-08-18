@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Table,
   Button,
   Form,
   ProgressBar,
+  InputGroup,
   ToggleButton,
   ToggleButtonGroup,
   Modal,
@@ -19,14 +20,20 @@ import {
   useUpdateOrderMutation,
 } from "../../features/api/orderSlice";
 import { LinearProgress } from "@mui/material";
-import { Book, Delete, Edit } from "@mui/icons-material";
-import { BookHalf } from "react-bootstrap-icons";
+import { Book, Delete, Edit, Search } from "@mui/icons-material";
+import { ArrowDown, ArrowUp, BookHalf } from "react-bootstrap-icons";
 import PermissionWrapper from "../../auth/PermissionWrapper";
 import { useSettings } from "../Settings";
+import { useTableSortSearch } from "../../hooks/useTableSortSearch";
+
+const searchableFields = ['customerName', 'productName', 'customSize', 'description'];
 
 const OrderManagement = () => {
   const { settings } = useSettings();
   const currency = settings?.currency!=="none"?settings?.currency:"";
+  const theme = settings.theme;
+
+  // --- Redux Selectors and RTK Query Mutations ---
   const [addOrder, { isLoading, isError, error, isSuccess }] =
     useAddOrderMutation();
   const [
@@ -50,6 +57,28 @@ const OrderManagement = () => {
   const orders = useSelector(selectOrders);
   const customers = useSelector(selectCustomers);
   const products = useSelector(selectStock);
+
+  // --- Data Enrichment & Table State Management ---
+  const enrichedOrders = useMemo(() => {
+    const customerMap = new Map(customers.map(c => [c.custId, c.custName]));
+    const productMap = new Map(products.map(p => [p.itemId, p.itemName]));
+    return orders.map(order => ({
+      ...order,
+      customerName: customerMap.get(order.custId) || `Cust ID: ${order.custId}`,
+      productName: productMap.get(order.prodId) || 'Custom Item',
+    }));
+  }, [orders, customers, products]);
+
+  const {
+    items: sortedAndFilteredOrders,
+    requestSort,
+    sortConfig,
+    setSearchTerm,
+    searchTerm
+  } = useTableSortSearch(enrichedOrders, searchableFields);
+
+
+  // --- Local Component State ---
   const [orderType, setOrderType] = useState("default");
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -57,7 +86,6 @@ const OrderManagement = () => {
   const [customer, setCustomer] = useState("");
   const [isUpdate, setIsUpdate] = useState(false);
   const [sellingCost, setSellingCost] = useState(0);
-  const [prodId, setProdId] = useState("");
   const [orderId, setOrderId] = useState("");
   const [order, setOrder] = useState({
     custId: 0,
@@ -72,6 +100,26 @@ const OrderManagement = () => {
     description:'',
   });
 
+  // --- Derived State & Helper Functions ---
+  const visibleOrders = useMemo(() => {
+    return sortedAndFilteredOrders.filter(order => {
+      if (orderType === 'default') return !order.customSize;
+      if (orderType === 'custom') return !!order.customSize;
+      return true;
+    });
+  }, [sortedAndFilteredOrders, orderType]);
+
+  const getSortIcon = (key) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return null;
+    }
+    if (sortConfig.direction === 'ascending') {
+      return <ArrowUp className="ms-1" />;
+    }
+    return <ArrowDown className="ms-1" />;
+  };
+
+  // --- Effects ---
   useEffect(() => {
     setOrder({ ...order, custId: custId });
   }, [custId]);
@@ -166,16 +214,6 @@ useEffect(() => {
   }));
 }, [sellingCost, order.quantity]); // Runs when dependencies change.
 
-
-  const getCustomerName = (custId) => {
-const customer = customers.filter(customer => customer.custId === custId);
-return customer[0]?.custName;
-  }
-  const getProductName = (prodId) => {
-const product = products.filter(product => Number(product.itemId) === Number(prodId));
-return product[0]?.itemName;
-  }
-
   const canSave = Boolean(order.custId && (order.customSize || order.prodId) && order.quantity && order.totalCost );
   return (
     <div className="container mt-4">
@@ -213,39 +251,42 @@ return product[0]?.itemName;
         </div>
       </div>
 
+      <div className="d-flex justify-content-start mt-3">
+        <InputGroup style={{ maxWidth: "400px" }}>
+          <InputGroup.Text className={`${theme==='dark'?'text-white':'text-dark'}`}><Search /></InputGroup.Text>
+          <Form.Control
+            placeholder="Search by customer, product, size, or description"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </InputGroup>
+      </div>
+
       <Table striped bordered hover className="mt-3">
         <thead className="table-dark">
           <tr>
             <th>#</th>
-            <th>Customer</th>   
-            {orderType==='default'?<th>Product</th>:""}
-            {orderType==='custom'?<th>Size</th>:""}
-            <th>Number of Layers</th>
-            <th>Quantity Ordered</th>
-            <th>Quantity Produced</th>
+            <th onClick={() => requestSort('customerName')} style={{ cursor: 'pointer' }}>Customer {getSortIcon('customerName')}</th>
+            {orderType==='default'?<th onClick={() => requestSort('productName')} style={{ cursor: 'pointer' }}>Product {getSortIcon('productName')}</th>:""}
+            {orderType==='custom'?<th onClick={() => requestSort('customSize')} style={{ cursor: 'pointer' }}>Size {getSortIcon('customSize')}</th>:""}
+            <th onClick={() => requestSort('layers')} style={{ cursor: 'pointer' }}>Layers {getSortIcon('layers')}</th>
+            <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }}>Ordered {getSortIcon('quantity')}</th>
+            <th onClick={() => requestSort('quantityProduced')} style={{ cursor: 'pointer' }}>Produced {getSortIcon('quantityProduced')}</th>
             <th>Progress</th>
-            <th>Total Cost</th>
-            <th>Paid</th>
-            <th>Remaining</th>
-            <th>Description</th>
+            <th onClick={() => requestSort('totalCost')} style={{ cursor: 'pointer' }}>Total Cost {getSortIcon('totalCost')}</th>
+            <th onClick={() => requestSort('amountPaid')} style={{ cursor: 'pointer' }}>Paid {getSortIcon('amountPaid')}</th>
+            <th >Remaining</th>
+            <th onClick={() => requestSort('description')} style={{ cursor: 'pointer' }}>Description {getSortIcon('description')}</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {orders
-            ?.filter((order) => {
-              if (orderType === "default") {
-               return !order?.customSize;
-              }
-              if (orderType === "custom") {
-                  return !!order?.customSize; 
-              }
-            })
-            .map((order, index) => (
+          {visibleOrders.length > 0 ? (
+            visibleOrders.map((order, index) => (
               <tr key={index}>
                 <td>{index + 1}</td>
-                 <td>{getCustomerName(order.custId)}</td>
-                {orderType==='default'?<td>{getProductName(order.prodId)}</td>:""}
+                 <td>{order.customerName}</td>
+                {orderType==='default'?<td>{order.productName}</td>:""}
                  {orderType==='custom'?  <td>{order.customSize}</td> :""}
                 <td>{order.layers}</td>
                 <td>{order.quantity}</td>
@@ -303,49 +344,20 @@ return product[0]?.itemName;
                   </div>
                 </td>
               </tr>
-            ))}
+            ))
+          ) : (
+            <tr><td colSpan="12" className="text-center">No orders found.</td></tr>
+          )}
             <tr className="fs-5 fw-bold">
               <td colSpan={4}>Total: </td>
-              <td >{orders
-            ?.filter((order) => {
-              if (orderType === "default") {
-                 return !order?.customSize; 
-              }
-              if (orderType === "custom") {
-                 return !!order?.customSize; 
-              }
-            }).reduce((prev, curr) => prev+Number(curr.quantity)||0, 0)}</td>
+              <td >{visibleOrders.reduce((prev, curr) => prev+Number(curr.quantity)||0, 0)}</td>
              
-              <td >{orders
-            ?.filter((order) => {
-              if (orderType === "default") {
-                return !order?.customSize; 
-              }
-              if (orderType === "custom") {
-                  return !!order?.customSize; 
-              }
-            }).reduce((prev, curr) => prev+Number(curr.quantityProduced)||0, 0)}</td>
+              <td >{visibleOrders.reduce((prev, curr) => prev+Number(curr.quantityProduced)||0, 0)}</td>
             <td></td>
 
-             <td colSpan={1} >{currency}{orders
-            ?.filter((order) => {
-              if (orderType === "default") {
-                return !order?.customSize; 
-              }
-              if (orderType === "custom") {
-                 return !!order?.customSize; 
-              }
-            }).reduce((prev, curr) => prev+Number(curr.totalCost)||0, 0)}</td>
+             <td colSpan={1} >{currency}{visibleOrders.reduce((prev, curr) => prev+Number(curr.totalCost)||0, 0).toFixed(2)}</td>
 
-             <td >{currency}{orders
-            ?.filter((order) => {
-              if (orderType === "default") {
-                 return !order?.customSize; 
-              }
-              if (orderType === "custom") {
-                 return !!order?.customSize; 
-              }
-            }).reduce((prev, curr) => prev+Number(curr.amountPaid)||0, 0)}</td>
+             <td >{currency}{visibleOrders.reduce((prev, curr) => prev+Number(curr.amountPaid)||0, 0).toFixed(2)}</td>
 
             </tr>
         </tbody>
@@ -377,21 +389,21 @@ return product[0]?.itemName;
                   <Form.Control
                     as="select"
                     className="mb-3"
+                    value={order.prodId || ""}
                     style={{ height: "40px" }}
                     onChange={(e) => {
                       const value = Number(e.target.value);
                       !isNaN(value)
                         ? setOrder({ ...order, prodId: value })
                         : setOrder({ ...order, prodId: "" });
-                        setProdId(value);
                     }}
                   >
-                    <option>
-                    {isUpdate?getProductName(order?.prodId):"Select Product"}
+                    <option value="" disabled>
+                      Select Product
                     </option>
                     {products.map((product) => {
                       return (
-                        <option value={product.itemId}>
+                        <option key={product.itemId} value={product.itemId}>
                           {product.itemName}
                         </option>
                       );
