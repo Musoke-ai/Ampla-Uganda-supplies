@@ -1,5 +1,3 @@
-/* --- CSS Refactoring Suggestions --- */
-
 /*
   RECOMMENDATION 1: Use <link> in HTML for fonts instead of @import for better performance.
   However, keeping the @import statements here for structural reference.

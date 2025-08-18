@@ -53,10 +53,6 @@ function PosPage() {
   const [saleDetails, setSaleDetails] = useState({});
      // State to manage the visibility of the modal
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  // Function to open the modal
-  const handleShow = () => setShowReceiptModal(true);
-  // Function to close the modal
-  const handleClose = () => setShowReceiptModal(false);
 
   const [makeSale, { isLoading }] = useMakeSalesMutation();
 
@@ -117,6 +113,11 @@ function PosPage() {
     setCustomer(null);
     setEndDate("");
   };
+
+  // Function to open the modal
+  const handleShow = () => setShowReceiptModal(true);
+  // Function to close the modal
+  const handleClose = () => {clearCart();setShowReceiptModal(false);};
 
   const handleHoldSale = () => {
     if (cart.length === 0) return;
@@ -413,25 +414,6 @@ function PosPage() {
           <Button variant="success" onClick={completeSale} disabled={isLoading || !tenderedAmount}>{isLoading ? "Processing..." : "Complete Sale"}</Button>
         </Modal.Footer>
       </Modal>
-      {/* <PaymentModal
-        show={showPaymentModal}
-        onHide={handleClosePaymentModal}
-        total={total}
-        cartLength={cart.length}
-        paymentMethod={paymentMethod}
-        setPaymentMethod={setPaymentMethod}
-        tenderedAmount={tenderedAmount}
-        setTenderedAmount={setTenderedAmount}
-        moreInfo={moreInfo}
-        setMoreInfo={setMoreInfo}
-        endDate={endDate}
-        setEndDate={setEndDate}
-        changeDue={changeDue}
-        dueAmount={dueAmount}
-        onCompleteSale={completeSale}
-        isLoading={isLoading}
-        settings={settings}
-      /> */}
 
       {/* Held Sales Modal */}
       <Modal show={showHeldSalesModal} onHide={() => setShowHeldSalesModal(false)} centered>
@@ -488,7 +470,7 @@ function PosPage() {
         keyboard={false}
       >
         <Modal.Header>
-          <Modal.Title>Fullscreen Modal</Modal.Title>
+          <Modal.Title>Receipt Generation Tool</Modal.Title>
         </Modal.Header>
         <Modal.Body>
          <AmplaReceipt companyInfo={companyProfile} customerName={custId} cart={cart} saleDetails={saleDetails}  />
