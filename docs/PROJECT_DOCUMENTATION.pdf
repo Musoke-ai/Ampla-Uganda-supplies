@@ -1,0 +1,303 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 2571 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td (AMPLA / POWEREDSTOCK PROJECT DOCUMENTATION) Tj
+72 706 Td () Tj
+72 692 Td (PURPOSE AND AUDIENCE) Tj
+72 678 Td (This document explains what each major section of the application does, how it works at a) Tj
+72 664 Td (high level, and why it exists. It is written for stakeholders, developers, and operators) Tj
+72 650 Td (who need a clear map of the system’s features and flows.) Tj
+72 636 Td () Tj
+72 622 Td (---) Tj
+72 608 Td () Tj
+72 594 Td (1. PROJECT OVERVIEW \(WHAT & WHY\)) Tj
+72 580 Td (The project is a React-based inventory and point‑of‑sale \(POS\) system that supports sales,) Tj
+72 566 Td (customer management, stock control, and business operations such as production tracking) Tj
+72 552 Td (and expenses. It integrates role‑based access control and real‑time updates for) Tj
+72 538 Td (operational accuracy.) Tj
+72 524 Td () Tj
+72 510 Td (Why this exists:) Tj
+72 496 Td (• Small and growing businesses need to track stock, sales, customers, and production in) Tj
+72 482 Td (one place.) Tj
+72 468 Td (• Operators need a fast POS workflow with receipts and credit tracking.) Tj
+72 454 Td (• Managers need analytics, reports, and operational oversight.) Tj
+72 440 Td () Tj
+72 426 Td (---) Tj
+72 412 Td () Tj
+72 398 Td (2. APPLICATION STRUCTURE \(HOW IT’S ORGANIZED\)) Tj
+72 384 Td (The app is built with Create React App and uses React Router for page navigation. Feature) Tj
+72 370 Td (code lives under `src/app`, with components in feature‑specific folders and data access) Tj
+72 356 Td (through Redux Toolkit + RTK Query.) Tj
+72 342 Td () Tj
+72 328 Td (Key structural layers:) Tj
+72 314 Td (• **Routing Layer**: Defines public vs. protected routes and role‑restricted features.) Tj
+72 300 Td (• **State/Data Layer**: Redux Toolkit slices + RTK Query for fetch/update.) Tj
+72 286 Td (• **UI Layer**: React components \(React‑Bootstrap, MUI, etc.\).) Tj
+72 272 Td () Tj
+72 258 Td (---) Tj
+72 244 Td () Tj
+72 230 Td (3. ROUTING AND ACCESS CONTROL \(WHAT IT DOES & WHY\)) Tj
+72 216 Td (WHAT IT DOES) Tj
+72 202 Td (Routes are split into:) Tj
+72 188 Td (• **Public pages** \(login, password reset\).) Tj
+72 174 Td (• **Protected pages** \(dashboard, POS, inventory, customers, reports, production, etc.\).) Tj
+72 160 Td (• **Role‑restricted pages** \(admin‑only pages like documents and packages\).) Tj
+72 146 Td () Tj
+72 132 Td (HOW IT WORKS) Tj
+72 118 Td (• `PersistLogin` restores session state on reload.) Tj
+72 104 Td (• `RequireAuth` wraps routes and checks user roles.) Tj
+72 90 Td () Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Length 2307 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td (WHY) Tj
+72 706 Td (Operational features \(like POS or inventory editing\) must be limited to authorized roles) Tj
+72 692 Td (to prevent data loss and enforce accountability.) Tj
+72 678 Td () Tj
+72 664 Td (---) Tj
+72 650 Td () Tj
+72 636 Td (4. INVENTORY / STOCK MANAGEMENT \(WHAT, HOW, WHY\)) Tj
+72 622 Td (WHAT IT DOES) Tj
+72 608 Td (Inventory management lets staff create, edit, search, export, and delete stock items. It) Tj
+72 594 Td (also calculates aggregate stock value and total quantities.) Tj
+72 580 Td () Tj
+72 566 Td (HOW IT WORKS) Tj
+72 552 Td (• Data is fetched via RTK Query endpoints \(`getStock`, `addStock`, `updateStock`,) Tj
+72 538 Td (`deleteStock`\).) Tj
+72 524 Td (• UI lists stock items with filtering and sorting.) Tj
+72 510 Td (• Exports to CSV/PDF are available for reporting and offline sharing.) Tj
+72 496 Td () Tj
+72 482 Td (WHY) Tj
+72 468 Td (Accurate stock counts prevent overselling, reduce shrinkage, and help with procurement) Tj
+72 454 Td (decisions.) Tj
+72 440 Td () Tj
+72 426 Td (---) Tj
+72 412 Td () Tj
+72 398 Td (5. POS \(POINT OF SALE\) FLOW \(WHAT, HOW, WHY\)) Tj
+72 384 Td (WHAT IT DOES) Tj
+72 370 Td (POS allows a cashier to search products, add them to a cart, apply discounts/tax, select) Tj
+72 356 Td (payment method, record payment, and generate receipts. It also supports holding a sale for) Tj
+72 342 Td (later completion.) Tj
+72 328 Td () Tj
+72 314 Td (HOW IT WORKS) Tj
+72 300 Td (• Products are pulled from stock \(`selectStock` selector\).) Tj
+72 286 Td (• Cart logic enforces quantity limits against stock.) Tj
+72 272 Td (• Totals \(subtotal, discount, tax, total\) are computed in memory.) Tj
+72 258 Td (• `makeSales` mutation persists the sale to the backend.) Tj
+72 244 Td (• Receipt UI is shown after completion, with print/PDF download.) Tj
+72 230 Td () Tj
+72 216 Td (WHY) Tj
+72 202 Td (POS is the revenue engine of the system. It needs speed, accuracy, and receipts for) Tj
+72 188 Td (audit/compliance.) Tj
+72 174 Td () Tj
+72 160 Td (---) Tj
+72 146 Td () Tj
+72 132 Td (6. SALES & CUSTOMER TRACKING \(WHAT, HOW, WHY\)) Tj
+72 118 Td (WHAT IT DOES) Tj
+72 104 Td (Sales records capture customer purchases, payment details, and any dues. Customers can) Tj
+72 90 Td (have multiple orders or credit balances.) Tj
+ET
+endstream
+endobj
+4 0 obj
+<< /Length 2463 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td () Tj
+72 706 Td (HOW IT WORKS) Tj
+72 692 Td (• Sales data is created in POS and stored by the sales API.) Tj
+72 678 Td (• Customer pages aggregate sales and calculate balances \(amount paid vs. amount due\).) Tj
+72 664 Td () Tj
+72 650 Td (WHY) Tj
+72 636 Td (Tracking dues and payment history ensures proper follow‑up on credit and improves) Tj
+72 622 Td (cash‑flow visibility.) Tj
+72 608 Td () Tj
+72 594 Td (---) Tj
+72 580 Td () Tj
+72 566 Td (7. PRODUCTION SECTION \(WHAT, HOW, WHY\)) Tj
+72 552 Td (The Production area groups together operational workflows required for manufacturing or) Tj
+72 538 Td (order fulfillment.) Tj
+72 524 Td () Tj
+72 510 Td (7.1 EMPLOYEES/WORKERS) Tj
+72 496 Td (**What:** Manage employees \(CRUD\), daily lists, and payroll details.) Tj
+72 482 Td (**How:** RTK Query mutations plus searchable tables.) Tj
+72 468 Td (**Why:** Workforce data ties directly to production capacity and costs.) Tj
+72 454 Td () Tj
+72 440 Td (7.2 RAW MATERIALS) Tj
+72 426 Td (**What:** Manage raw materials stock, suppliers, and unit costs.) Tj
+72 412 Td (**How:** RTK Query CRUD operations; searchable table with totals.) Tj
+72 398 Td (**Why:** Raw material tracking ensures production doesn’t stall and controls input costs.) Tj
+72 384 Td () Tj
+72 370 Td (7.3 EXPENSES) Tj
+72 356 Td (**What:** Track factory expenses by category, amount, and receiver.) Tj
+72 342 Td (**How:** RTK Query CRUD; searchable table + totals.) Tj
+72 328 Td (**Why:** Expenses are critical for margin analysis and operational auditing.) Tj
+72 314 Td () Tj
+72 300 Td (7.4 ORDERS) Tj
+72 286 Td (**What:** Track customer orders \(default product orders and custom orders\), quantities) Tj
+72 272 Td (produced, progress, and payment status.) Tj
+72 258 Td (**How:** Orders are enriched with customer/product names, displayed with progress bars,) Tj
+72 244 Td (and editable in a modal.) Tj
+72 230 Td (**Why:** This provides production planning, work‑in‑progress tracking, and fulfillment) Tj
+72 216 Td (accountability.) Tj
+72 202 Td () Tj
+72 188 Td (7.5 PRODUCTION FLOW \(OPTIONAL VISUALIZATION\)) Tj
+72 174 Td (**What:** A visual workflow map of production stages.) Tj
+72 160 Td (**How:** React‑Flow diagram with editable stage notes.) Tj
+72 146 Td (**Why:** Helps operations document and communicate how work progresses across stages.) Tj
+72 132 Td () Tj
+72 118 Td (---) Tj
+72 104 Td () Tj
+72 90 Td (8. REPORTS & ANALYTICS \(WHAT, HOW, WHY\)) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Length 2041 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td (WHAT IT DOES) Tj
+72 706 Td (Reports summarize stock, sales, orders, expenses, and other metrics for decision‑making.) Tj
+72 692 Td (Dashboards display KPIs and charts.) Tj
+72 678 Td () Tj
+72 664 Td (HOW IT WORKS) Tj
+72 650 Td (• Data from multiple slices \(stock, sales, expenses, orders, customers\) is aggregated.) Tj
+72 636 Td (• Charts show comparisons like stock vs. sales.) Tj
+72 622 Td () Tj
+72 608 Td (WHY) Tj
+72 594 Td (Business owners need quick insight into inventory health, revenue performance, and) Tj
+72 580 Td (operational bottlenecks.) Tj
+72 566 Td () Tj
+72 552 Td (---) Tj
+72 538 Td () Tj
+72 524 Td (9. DOCUMENTS & RECEIPTS \(WHAT, HOW, WHY\)) Tj
+72 510 Td (WHAT IT DOES) Tj
+72 496 Td (Document workflows include invoices and receipts. Receipts can be previewed, printed, and) Tj
+72 482 Td (downloaded as PDFs.) Tj
+72 468 Td () Tj
+72 454 Td (HOW IT WORKS) Tj
+72 440 Td (• Receipt components build HTML previews and use jsPDF for PDF creation.) Tj
+72 426 Td (• Invoice tools aggregate stock and customer data for billing.) Tj
+72 412 Td () Tj
+72 398 Td (WHY) Tj
+72 384 Td (Formal documents support accounting, compliance, and customer trust.) Tj
+72 370 Td () Tj
+72 356 Td (---) Tj
+72 342 Td () Tj
+72 328 Td (10. REAL‑TIME UPDATES \(WHAT, HOW, WHY\)) Tj
+72 314 Td (WHAT IT DOES) Tj
+72 300 Td (Updates to stock and related data can be pushed to clients via Pusher channels.) Tj
+72 286 Td () Tj
+72 272 Td (HOW IT WORKS) Tj
+72 258 Td (• A Pusher middleware listens for stock events and invalidates RTK Query tags.) Tj
+72 244 Td () Tj
+72 230 Td (WHY) Tj
+72 216 Td (Real‑time accuracy prevents stale data in fast‑moving environments \(e.g., sales counters) Tj
+72 202 Td (and warehouses\).) Tj
+72 188 Td () Tj
+72 174 Td (---) Tj
+72 160 Td () Tj
+72 146 Td (11. SETTINGS & CONFIGURATION \(WHAT, HOW, WHY\)) Tj
+72 132 Td (WHAT IT DOES) Tj
+72 118 Td (Settings \(currency, theme, tax rate\) drive consistent display and calculations across POS) Tj
+72 104 Td (and inventory.) Tj
+72 90 Td () Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Length 1609 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td (HOW IT WORKS) Tj
+72 706 Td (Settings are provided through a shared `Settings` context and consumed by pages like POS) Tj
+72 692 Td (and inventory.) Tj
+72 678 Td () Tj
+72 664 Td (WHY) Tj
+72 650 Td (Centralized settings reduce mistakes and keep outputs consistent across the app.) Tj
+72 636 Td () Tj
+72 622 Td (---) Tj
+72 608 Td () Tj
+72 594 Td (12. HOW TO RUN \(DEVELOPER QUICK START\)) Tj
+72 580 Td (• `npm install`) Tj
+72 566 Td (• `npm start`) Tj
+72 552 Td (• Navigate to `http://localhost:3000`) Tj
+72 538 Td () Tj
+72 524 Td (---) Tj
+72 510 Td () Tj
+72 496 Td (13. SUMMARY \(WHY THIS DESIGN WORKS\)) Tj
+72 482 Td (• Modular features allow operations, sales, and management to share a single system.) Tj
+72 468 Td (• Role‑based access ensures security and accountability.) Tj
+72 454 Td (• RTK Query + real‑time updates keep data fresh and reliable.) Tj
+72 440 Td (• POS and inventory are tightly linked to prevent overselling and maintain audit trails.) Tj
+72 426 Td () Tj
+72 412 Td (---) Tj
+72 398 Td () Tj
+72 384 Td (APPENDIX A: KEY FEATURE PATHS \(REFERENCE\)) Tj
+72 370 Td (• POS: `src/app/Components/pages/GeminiPos.js`) Tj
+72 356 Td (• Inventory: `src/app/Components/pages/InventorySample.js`) Tj
+72 342 Td (• Production hub: `src/app/Components/Production.js`) Tj
+72 328 Td (• Production modules: `src/app/Components/production/*`) Tj
+72 314 Td (• Stock API: `src/app/features/stock/stockSlice.js`) Tj
+72 300 Td (• Sales API: `src/app/features/api/salesSlice.js`) Tj
+72 286 Td (• Receipts: `src/app/Components/receipts/*`) Tj
+72 272 Td () Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 12 0 R /MediaBox [0 0 612 792] /Contents 2 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+8 0 obj
+<< /Type /Page /Parent 12 0 R /MediaBox [0 0 612 792] /Contents 3 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+9 0 obj
+<< /Type /Page /Parent 12 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+10 0 obj
+<< /Type /Page /Parent 12 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 12 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+12 0 obj
+<< /Type /Pages /Kids [ 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R ] /Count 5 >>
+endobj
+13 0 obj
+<< /Type /Catalog /Pages 12 0 R >>
+endobj
+xref
+0 14
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000002702 00000 n 
+0000005061 00000 n 
+0000007576 00000 n 
+0000009669 00000 n 
+0000011330 00000 n 
+0000011457 00000 n 
+0000011584 00000 n 
+0000011711 00000 n 
+0000011839 00000 n 
+0000011967 00000 n 
+0000012053 00000 n 
+trailer
+<< /Size 14 /Root 13 0 R >>
+startxref
+12104
+%%EOF
