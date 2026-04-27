@@ -1,0 +1,15 @@
+# ----------------------------------
+# PUSHER CREDENTIALS
+# ----------------------------------
+# Replace with your actual key and cluster from your Pusher dashboard
+REACT_APP_PUSHER_KEY='d777a95d804aba1fe498'
+REACT_APP_PUSHER_CLUSTER='mt1'
+
+# ----------------------------------
+# BACKEND API URL
+# ----------------------------------
+# Use this for local development
+# REACT_APP_API_URL=http://localhost/3000
+
+# For production, you might have another .env.production file or change this value
+# REACT_APP_API_URL=https://www.poweredstock.com/api/api

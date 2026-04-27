@@ -50,10 +50,14 @@ const RawMaterialModal = () => {
   const rawMaterials = useSelector(selectRawMaterials);
   const rawMaterialsList = useSelector(selectRawMaterialsIntake);
 
+
   const todayListIds = rawMaterialsList.filter(
-    (e) =>
-      format(new Date(e.dailyRawmaterialsDateCreated), "yyyy-MM-dd") === today
-  ).map(e=>e.materialId);
+    (e) => {
+      const date = e.dailyRawmaterialsDateCreated;
+      if (!date || isNaN(new Date(date))) return false;
+      return format(new Date(date), "yyyy-MM-dd") === today;
+    }
+  ).map(e => e.materialId);
 
   const filteredRawMaterials =  rawMaterials.filter(
       (e) => !todayListIds.includes(e.materialId)
@@ -143,8 +147,11 @@ const RawMaterialModal = () => {
   const filteredEntries = showAll
     ? rawMaterialsList
     : rawMaterialsList.filter(
-        (e) =>
-          format(new Date(e.dailyRawmaterialsDateCreated), "yyyy-MM-dd") === today 
+        (e) => {
+          const date = e.dailyRawmaterialsDateCreated;
+          if (!date || isNaN(new Date(date))) return false;
+          return format(new Date(date), "yyyy-MM-dd") === today;
+        }
       );
 
   const getMaterialName = (id) =>
@@ -246,7 +253,11 @@ const RawMaterialModal = () => {
                 <td>{entry.quantity}</td>
                 <td>{entry.totalCost}</td>
                 <td>{entry.initials}</td>
-                <td>{format(new Date(entry.dailyRawmaterialsDateCreated), "yyyy-MM-dd")}</td>
+                <td>{
+                  entry.dailyRawmaterialsDateCreated && !isNaN(new Date(entry.dailyRawmaterialsDateCreated))
+                    ? format(new Date(entry.dailyRawmaterialsDateCreated), "yyyy-MM-dd")
+                    : "N/A"
+                }</td>
                 <td>
                 {
                   format(new Date(entry.dailyRawmaterialsDateCreated), "yyyy-MM-dd") === today? <div><Button

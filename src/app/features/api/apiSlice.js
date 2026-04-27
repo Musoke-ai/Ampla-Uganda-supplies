@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { setCredentials } from "../../auth/authSlice";
 
 const baseQuery = fetchBaseQuery({
-  baseUrl: "http://localhost/mystock/api",
+  baseUrl: "http://localhost/AmplaBackUp/amplaerp/index.php/api",
   // baseUrl: 'https://www.poweredstock.com/api/api',
   credentials: "include",
   prepareHeaders: (headers, { getState }) => {

@@ -66,6 +66,7 @@ export default function Notifications() {
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
+        if (!dateString || isNaN(new Date(dateString))) return "N/A";
         const notificationDate = new Date(dateString);
         today.setHours(0, 0, 0, 0);
         yesterday.setHours(0, 0, 0, 0);

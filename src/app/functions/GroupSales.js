@@ -17,13 +17,17 @@ const salesData = [
 const formatSalesDates = (data) => {
   return data.map((sale) => ({
     ...sale,
-    saleDateCreated: format(parseISO(sale.saleDateCreated), "yyyy-MM-dd"),
+    saleDateCreated:
+      sale.saleDateCreated && !isNaN(Date.parse(sale.saleDateCreated))
+        ? format(parseISO(sale.saleDateCreated), "yyyy-MM-dd")
+        : "N/A",
   }));
 };
 
 // Grouping functions
 const groupByWeek = (data) => {
   return data.reduce((result, sale) => {
+    if (!sale.saleDateCreated || isNaN(Date.parse(sale.saleDateCreated))) return result;
     const saleDate = parseISO(sale.saleDateCreated);
     const weekStart = format(startOfWeek(saleDate), "yyyy-MM-dd");
     const weekEnd = format(endOfWeek(saleDate), "yyyy-MM-dd");
@@ -39,6 +43,7 @@ const groupByWeek = (data) => {
 
 const groupByMonth = (data) => {
   return data.reduce((result, sale) => {
+    if (!sale.saleDateCreated || isNaN(Date.parse(sale.saleDateCreated))) return result;
     const month = format(parseISO(sale.saleDateCreated), "yyyy-MM");
     if (!result[month]) {
       result[month] = [];
@@ -50,6 +55,7 @@ const groupByMonth = (data) => {
 
 const groupByYear = (data) => {
   return data.reduce((result, sale) => {
+    if (!sale.saleDateCreated || isNaN(Date.parse(sale.saleDateCreated))) return result;
     const year = format(parseISO(sale.saleDateCreated), "yyyy");
     if (!result[year]) {
       result[year] = [];

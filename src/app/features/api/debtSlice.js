@@ -25,7 +25,9 @@ export const extendedDebtApiSlice = apiSlice.injectEndpoints({
             query: () => '/retrievals/debts',
             transformResponse:  responseData => {
                 responseData = responseData.map((item) => {
-                    const entryDate = format((new Date(item.indebtDateCreated)), 'yyy.MM.dd');
+                                        const entryDate = item.indebtDateCreated && !isNaN(new Date(item.indebtDateCreated))
+                                            ? format(new Date(item.indebtDateCreated), 'yyy.MM.dd')
+                                            : "N/A";
                     // const dateDiff = formatDistance(formattedDate, entryDate);
                     return{ ...item,
                         indebtDateCreated: entryDate ,

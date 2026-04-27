@@ -98,7 +98,9 @@ const { settings } = useSettings();
         {filteredData.map((record) => (
           <tr key={record.historyId}>
             <td>
-              {format(new Date(record.historyDateCreated), "yyyy-MM-dd HH:mm:ss")}
+              {record.historyDateCreated && !isNaN(new Date(record.historyDateCreated))
+                ? format(new Date(record.historyDateCreated), "yyyy-MM-dd HH:mm:ss")
+                : "N/A"}
             </td>
             <td>{record.itemName}</td>
             <td>{record.itemModel}</td>
