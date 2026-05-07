@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { Table, Button, Modal, Form, InputGroup } from "react-bootstrap";
 
 import { useSelector } from "react-redux";
 import { selectEmployees } from "../../features/api/employeesSlice";
 import { useAddEmployeeMutation, useUpdateEmployeeMutation, useDeleteEmployeeMutation } from "../../features/api/employeesSlice";
+import { selectBranches, useGetBranchesQuery } from "../../features/api/branchesSlice";
 import { LinearProgress } from "@mui/material";
 import EmployeeDailyList from "./Process/EmployeeDailyList";
 import PermissionWrapper from "../../auth/PermissionWrapper";
@@ -13,9 +14,13 @@ import { ArrowUp, ArrowDown } from "react-bootstrap-icons";
 import { toast } from 'react-toastify';
 import { useSettings } from "../Settings";
 import { useTableSortSearch } from "../../hooks/useTableSortSearch";
+import {
+  paginateItems,
+  ProductionTableFooter,
+} from "./ProductionTableControls";
 
 // Define which fields in the employee object are searchable
-const searchableFields = ['empName', 'empRole', 'empContact', 'empEmail', 'empLocation'];
+const searchableFields = ['empName', 'empRole', 'empContact', 'empEmail', 'empLocation', 'branchName'];
 
 /**
  * EmployeeManagement component for handling CRUD operations for employees.
@@ -29,11 +34,14 @@ const currency = settings.currency!=='none'?settings?.currency:"";
 const theme = settings.theme;
 
   // Defines the initial state structure for an employee object.
-  const initialEmployeeState = { empID: "", empName: "", empRole: "", empContact: "", empEmail: "", empLocation: "", empSalary: "", empStatus: 1, startDate: "", endDate: "" };
+  const initialEmployeeState = { empID: "", branchId: "", empName: "", empRole: "", empContact: "", empEmail: "", empLocation: "", empSalary: "", empStatus: 1, startDate: "", endDate: "" };
+
+  useGetBranchesQuery();
 
   // --- Redux and RTK Query Hooks ---
   // Selectors to get data from the Redux store.
   const employees = useSelector(selectEmployees);
+  const branches = useSelector(selectBranches) ?? [];
   // RTK Query mutations for adding, updating, and deleting employees.
   // These hooks return a tuple: a trigger function and an object with metadata (isLoading, isError, etc.).
   const [addEmployee, {isLoading,isError,Error,isSuccess}] = useAddEmployeeMutation();
@@ -42,7 +50,21 @@ const theme = settings.theme;
   
   // --- Search and Sort Logic ---
   // Filter out any employees without a name before passing to the hook
-  const validEmployees = useMemo(() => employees.filter(e => e.empName && e.empName.length > 0), [employees]);
+  const branchMap = useMemo(
+    () => new Map(branches.map((branch) => [Number(branch.branchId), branch.branchName])),
+    [branches]
+  );
+
+  const validEmployees = useMemo(
+    () =>
+      employees
+        .filter((employee) => employee.empName && employee.empName.length > 0)
+        .map((employee) => ({
+          ...employee,
+          branchName: branchMap.get(Number(employee.branchId)) || "Unassigned",
+        })),
+    [branchMap, employees]
+  );
 
   // Apply the custom hook for search and sort functionality
   const {
@@ -69,6 +91,27 @@ const theme = settings.theme;
   const [originalEmployee, setOriginalEmployee] = useState(null);
   // State to track if the modal is in "edit" mode or "add" mode.
   const [isEditing, setIsEditing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortConfig, rowsPerPage]);
+
+  useEffect(() => {
+    const nextTotalPages = Math.max(1, Math.ceil(sortedEmployees.length / rowsPerPage));
+    if (currentPage > nextTotalPages) {
+      setCurrentPage(nextTotalPages);
+    }
+  }, [currentPage, rowsPerPage, sortedEmployees.length]);
+
+  const {
+    totalPages,
+    paginatedItems: paginatedEmployees,
+  } = useMemo(
+    () => paginateItems(sortedEmployees, currentPage, rowsPerPage),
+    [currentPage, rowsPerPage, sortedEmployees]
+  );
 
   /**
    * Opens the main modal for adding or editing an employee.
@@ -194,132 +237,171 @@ toast.success(_delete?.message || 'Employee deleted successfully');
   };
 
   return (
-    // Main container for the component
-    <div className="container mt-4">
-      <h2>Employee Management</h2>
-      <div className="d-flex flex-row justify-content-between">
-        <PermissionWrapper required={['employeescreate']} children={
-          <>
-      <Button variant="primary" onClick={() => handleShowModal()}>Add Employee</Button>
-      <Button variant="info" onClick={() => setShowDailyList(true)}>Daily List</Button>
-      </>
-        } />
+    <div className="container mt-4 production-section-shell">
+      <div className="production-section-header">
+        <div className="production-section-copy">
+          <h2>Employee Management</h2>
+          <p>Manage factory workers, payroll baselines, and the active daily attendance list.</p>
+        </div>
+        <div className="production-action-cluster">
+          <PermissionWrapper required={['employeescreate']} children={
+            <>
+              <Button variant="primary" onClick={() => handleShowModal()}>Add Employee</Button>
+              <Button variant="outline-primary" onClick={() => setShowDailyList(true)}>Daily List</Button>
+            </>
+          } />
+        </div>
       </div>
 
-      {/* Search Input */}
-      <div className="mt-3" style={{ maxWidth: '400px' }}>
-        <InputGroup>
-          <InputGroup.Text className={`${theme==='dark'?'text-white':'text-dark'}`}><Search /></InputGroup.Text>
-          <Form.Control
-            type="text"
-            placeholder="Search employees..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
+      <div className="production-filter-bar">
+        <div className="production-filter-search">
+          <InputGroup>
+            <InputGroup.Text className={`${theme==='dark'?'text-white':'text-dark'}`}><Search /></InputGroup.Text>
+            <Form.Control
+              type="text"
+              placeholder="Search employees, roles, contacts, email, or location"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </InputGroup>
+        </div>
+        <div className="production-stat-row">
+          <span className="production-stat-chip">Employees: {sortedEmployees.length}</span>
+          <span className="production-stat-chip">
+            Payroll: {currency}{sortedEmployees.reduce((prev, curr) => prev + (Number(curr.empSalary) || 0), 0).toLocaleString()}
+          </span>
+        </div>
       </div>
-     
-      {/* Employee Data Table */}
-      <Table striped bordered hover className="mt-3">
-        <thead className="table-dark">
+
+      <div className="production-table-card">
+        <div className="production-table-scroll">
+          <Table hover className="production-modern-table align-middle">
+            <thead>
           <tr>
-            <th onClick={() => requestSort('empID')} className="sortable-header"># {getSortIcon('empID')}</th>
-            <th onClick={() => requestSort('empName')} className="sortable-header">Name {getSortIcon('empName')}</th>
-            <th onClick={() => requestSort('empRole')} className="sortable-header">Role {getSortIcon('empRole')}</th>
-            <th onClick={() => requestSort('empContact')} className="sortable-header">Contact {getSortIcon('empContact')}</th>
-            <th onClick={() => requestSort('empEmail')} className="sortable-header">Email {getSortIcon('empEmail')}</th>
-            <th onClick={() => requestSort('empLocation')} className="sortable-header">Location {getSortIcon('empLocation')}</th>
-            <th onClick={() => requestSort('empSalary')} className="sortable-header">Daily Pay {getSortIcon('empSalary')}</th>
-            <th onClick={() => requestSort('empStatus')} className="sortable-header">Status {getSortIcon('empStatus')}</th>
+            <th onClick={() => requestSort('empID')} className="production-sortable"># {getSortIcon('empID')}</th>
+            <th onClick={() => requestSort('empName')} className="production-sortable">Name {getSortIcon('empName')}</th>
+            <th onClick={() => requestSort('branchName')} className="production-sortable">Branch {getSortIcon('branchName')}</th>
+            <th onClick={() => requestSort('empRole')} className="production-sortable">Role {getSortIcon('empRole')}</th>
+            <th onClick={() => requestSort('empContact')} className="production-sortable">Contact {getSortIcon('empContact')}</th>
+            <th onClick={() => requestSort('empEmail')} className="production-sortable">Email {getSortIcon('empEmail')}</th>
+            <th onClick={() => requestSort('empLocation')} className="production-sortable">Location {getSortIcon('empLocation')}</th>
+            <th onClick={() => requestSort('empSalary')} className="production-sortable">Daily Pay {getSortIcon('empSalary')}</th>
+            <th onClick={() => requestSort('empStatus')} className="production-sortable">Status {getSortIcon('empStatus')}</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {/* Conditionally render rows if employees exist, otherwise show a message */}
           {sortedEmployees.length > 0 ? (
             <>
- {sortedEmployees.map((emp, idx) => (
+ {paginatedEmployees.map((emp, idx) => (
             <tr key={emp.empID}>
-              <td>{idx+1}</td>
+              <td>{(currentPage - 1) * rowsPerPage + idx + 1}</td>
               <td>{emp?.empName}</td>
+              <td>{emp?.branchName}</td>
               <td>{emp?.empRole}</td>
               <td>{emp?.empContact}</td>
               <td>{emp?.empEmail}</td>
               <td>{emp?.empLocation}</td>
               <td>{currency}{emp?.empSalary}</td>
-              <td>{Number(emp?.empStatus) === 1?"active":"Inactive"}</td>
+              <td>
+                <span className={`production-badge-soft ${Number(emp?.empStatus) === 1 ? "production-badge-soft-success" : "production-badge-soft-muted"}`}>
+                  {Number(emp?.empStatus) === 1 ? "Active" : "Inactive"}
+                </span>
+              </td>
               <td className="d-flex flex-wrap gap-1">
-                {/* <Button variant="success" size="sm" onClick={() => { let status; Number(emp.empStatus) === 1?status=0:status=1;handleEmpStatus(status);}}>{isUpdateLoading?Number(emp?.empStatus) === 1?"Deactivating...":"Activating...":Number(emp?.empStatus) === 1?"Deactivate":"Activate"}</Button> */}
                 <PermissionWrapper required={['employeesupdate']} children={<Button variant="info" size="sm" className="text-white" onClick={() => handleShowModal(emp)}><Edit /></Button>} />
                 <PermissionWrapper required={['employeesdelete']} children={<Button variant="danger" size="sm"  className="text-white" onClick={() => handleShowAlert(emp)}><Delete/></Button>} />
               </td>
             </tr>
           ))}
-          {/* Footer row to display the total salary */}
-          <tr >
-            <td colSpan={6} className="fs-5 fw-bold" >Total:</td>
+          <tr className="production-total-row">
+            <td colSpan={7} className="fs-5 fw-bold" >Total:</td>
             <td className="fs-6 fw-bold">{currency}{sortedEmployees.reduce((prev, curr) => prev + Number(curr.empSalary) || 0, 0)}</td>
+            <td colSpan={2}></td>
           </tr>
             </>
           ) : (
-            <tr><td colSpan="9" className="text-center">No Employees Data</td></tr>
+            <tr><td colSpan="10" className="text-center">No Employees Data</td></tr>
           )
           }
         </tbody>
       </Table>
+        </div>
+        <ProductionTableFooter
+          totalItems={sortedEmployees.length}
+          currentPage={currentPage}
+          rowsPerPage={rowsPerPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          onRowsPerPageChange={setRowsPerPage}
+          itemLabel="employees"
+        />
+      </div>
 
-      {/* Add/Edit Employee Modal */}
-      <Modal show={showModal} onHide={handleCloseModal}>
+      <Modal show={showModal} onHide={handleCloseModal} backdrop="static" dialogClassName="production-modal-shell">
         <Modal.Header closeButton>
           <Modal.Title>{isEditing ? "Edit Employee" : "Add Employee"}</Modal.Title>
         </Modal.Header>
         {isLoading?<div><LinearProgress /></div>:""}
         <Modal.Body>
           <Form>
-            <Form.Group>
-              <Form.Label>Name</Form.Label>
-              <Form.Control type="text" name="empName" value={currentEmployee.empName} onChange={handleChange} />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Role</Form.Label>
-              <Form.Control type="text" name="empRole" value={currentEmployee.empRole} onChange={handleChange} />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Daily Pay</Form.Label>
-              <Form.Control type="number" name="empSalary" value={currentEmployee.empSalary} onChange={handleChange} />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Contact</Form.Label>
-              <Form.Control type="text" name="empContact" value={currentEmployee.empContact} onChange={handleChange} />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Email</Form.Label>
-              <Form.Control type="email" name="empEmail" value={currentEmployee.empEmail} onChange={handleChange} />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Location</Form.Label>
-              <Form.Control type="text" name="empLocation" value={currentEmployee.empLocation} onChange={handleChange} />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Start Date</Form.Label>
-              <Form.Control type="Date" name="startDate" value={currentEmployee.startDate} onChange={handleChange} />
-            </Form.Group>
-            {isEditing?<Form.Group>
-              <Form.Label>End Date</Form.Label>
-              <Form.Control type="Date" name="endDate" value={currentEmployee.endDate} onChange={handleChange} />
-            </Form.Group>:""}
+            <div className="production-form-grid">
+              <Form.Group>
+                <Form.Label>Branch</Form.Label>
+                <Form.Select name="branchId" value={currentEmployee.branchId || ""} onChange={handleChange}>
+                  <option value="">Select branch</option>
+                  {branches.map((branch) => (
+                    <option key={branch.branchId} value={branch.branchId}>
+                      {branch.branchName}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+              <Form.Group>
+                <Form.Label>Name</Form.Label>
+                <Form.Control type="text" name="empName" value={currentEmployee.empName} onChange={handleChange} />
+              </Form.Group>
+              <Form.Group>
+                <Form.Label>Role</Form.Label>
+                <Form.Control type="text" name="empRole" value={currentEmployee.empRole} onChange={handleChange} />
+              </Form.Group>
+              <Form.Group>
+                <Form.Label>Daily Pay</Form.Label>
+                <Form.Control type="number" name="empSalary" value={currentEmployee.empSalary} onChange={handleChange} />
+              </Form.Group>
+              <Form.Group>
+                <Form.Label>Contact</Form.Label>
+                <Form.Control type="text" name="empContact" value={currentEmployee.empContact} onChange={handleChange} />
+              </Form.Group>
+              <Form.Group>
+                <Form.Label>Email</Form.Label>
+                <Form.Control type="email" name="empEmail" value={currentEmployee.empEmail} onChange={handleChange} />
+              </Form.Group>
+              <Form.Group>
+                <Form.Label>Location</Form.Label>
+                <Form.Control type="text" name="empLocation" value={currentEmployee.empLocation} onChange={handleChange} />
+              </Form.Group>
+              <Form.Group>
+                <Form.Label>Start Date</Form.Label>
+                <Form.Control type="date" name="startDate" value={currentEmployee.startDate} onChange={handleChange} />
+              </Form.Group>
+              {isEditing ? <Form.Group>
+                <Form.Label>End Date</Form.Label>
+                <Form.Control type="date" name="endDate" value={currentEmployee.endDate} onChange={handleChange} />
+              </Form.Group> : null}
+            </div>
           </Form>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={handleCloseModal}>Cancel</Button>
-          <Button variant="primary" onClick={isEditing ? handleUpdateEmployee : handleAddEmployee} disabled={isLoading || isUpdateLoading || !hasChanges}>
+          <Button variant="primary" onClick={isEditing ? handleUpdateEmployee : handleAddEmployee} disabled={isLoading || isUpdateLoading || !hasChanges || !currentEmployee.branchId}>
             {isEditing ? (isUpdateLoading ? 'Updating...' : 'Update') : (isLoading ? 'Saving...' : 'Save')}
           </Button>
         </Modal.Footer>
       </Modal>
 
       {/* Daily List Modal */}
-      <Modal show={showDailyList} onHide={()=>setShowDailyList(false)} size="lg">
+      <Modal show={showDailyList} onHide={()=>setShowDailyList(false)} size="xl" backdrop="static" dialogClassName="production-modal-shell">
         <Modal.Header closeButton>
           <Modal.Title>Daily List</Modal.Title>
         </Modal.Header>
@@ -332,11 +414,14 @@ toast.success(_delete?.message || 'Employee deleted successfully');
       </Modal>
 
       {/* Delete Confirmation Modal */}
-      <Modal show={showAlert} onHide={handleCloseAlert}>
+      <Modal show={showAlert} onHide={handleCloseAlert} backdrop="static" dialogClassName="production-modal-shell">
         <Modal.Header closeButton>
-          <Modal.Title><div className="text-danger">You are about to delete an employee from the table!</div></Modal.Title>
+          <Modal.Title>Delete employee</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          <div className="production-modal-alert production-modal-alert-danger">
+            You are about to delete an employee from the table.
+          </div>
           {isDeleteLoading?<div>Deleting...</div>:""}
           {isDeleteError?<div>Something has gone wrong: {deleteError}</div>:""}
           {isDeleteSuccess?<div>{deleteData.message}</div>:""}

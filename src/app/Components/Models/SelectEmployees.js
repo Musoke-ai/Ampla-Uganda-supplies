@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import Fuse from 'fuse.js';
 import { Form, InputGroup, FormControl, ListGroup, Button } from 'react-bootstrap';
 import { useSelector } from 'react-redux';
+import { selectBranchScope } from '../../auth/authSlice';
 import { selectEmployees } from '../../features/api/employeesSlice';
 import { useAddEmployeeDailyListMutation, selectEmployeeDailyList } from '../../features/api/dailyEmployeesList';
 
@@ -21,24 +22,39 @@ const EmployeeSelector = ({
   onDetailsChange,
   onSubmit
 }) => {
+  const getDateKey = (value) => {
+    const parsedDate = value ? new Date(value) : null;
+    if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+      return null;
+    }
+
+    return parsedDate.toISOString().split("T")[0];
+  };
+
   const dailyList = useSelector(selectEmployeeDailyList);
   const _employees = useSelector(selectEmployees);
+  const branchScope = useSelector(selectBranchScope);
+  const currentBranchId = branchScope?.effective_branch_id ? String(branchScope.effective_branch_id) : "";
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [employeeDetails, setEmployeeDetails] = useState({});
   const [showActiveOnly, setShowActiveOnly] = useState(true);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getDateKey(new Date());
 
 const todayList = dailyList.filter(list => {
-  const createdDate = new Date(list.dailyEmployeeDateCreated).toISOString().split('T')[0];
-  return createdDate === today;
+  const createdDate = getDateKey(list.dailyEmployeeDateCreated);
+  return createdDate && createdDate === today;
 });
 
 const todayEmpIDs = todayList.map(list => list.empID); // Extract empID list
 console.log("IDs: "+todayEmpIDs);
 
-const employees = _employees.filter(emp => !todayEmpIDs.includes(emp.empID)); // Filter those not in today's list
+const employees = _employees.filter((emp) => {
+  const notAlreadyListed = !todayEmpIDs.includes(emp.empID);
+  const inBranch = currentBranchId ? String(emp.branchId || "") === currentBranchId : true;
+  return notAlreadyListed && inBranch;
+}); // Filter those not in today's list and outside the active branch
 console.log("Emps: "+employees.map(emp=>emp.empID));
 
   const [saveList, {isLoading, isError, error, isSuccess}] = useAddEmployeeDailyListMutation();
@@ -122,7 +138,7 @@ console.log("Emps: "+employees.map(emp=>emp.empID));
     // console.log("PayLoad: "+payload.map((emp) => {return emp.empName}));
     // onSubmit(payload);
     try{
-const saving = await saveList({...payload}).unwrap();
+const saving = await saveList({ branchId: currentBranchId, employees: payload }).unwrap();
 setSelectedIds([]);
 setEmployeeDetails({});
     }catch(error){
@@ -152,7 +168,7 @@ setEmployeeDetails({});
       </InputGroup>
 
       <ListGroup style={{ maxHeight: 400, overflowY: 'auto' }}>
-        {filtered?.filter(e=>e.empName.length!=0).map(emp => {
+        {filtered?.filter(e => e.empName.length !== 0).map(emp => {
           const { empID, empName } = emp;
           const isSelected = selectedIds.includes(empID);
           const details = employeeDetails[empID] || {

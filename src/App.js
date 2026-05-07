@@ -21,9 +21,10 @@ import Production from "./../src/app/Components/Production";
 import SplashScreen from "./app/Components/pages/SplashScreen";
 import InvoiceForm from "./app/documents/InvoiceForm";
 import Documents from "./app/Components/pages/Documents";
-import PackagePage from "./app/Components/payments/Packages";
+import BranchesPage from "./app/Components/pages/BranchesPage";
 import UserLanding from "./app/Components/pages/User/UserLanding";
 import Settings from "./app/Components/Settings";
+import AssistantWorkspace from "./app/Components/pages/AssistantWorkspace";
 
 // Auth and Utility Components
 import RequireAuth from "./app/auth/RequireAuth";
@@ -31,6 +32,53 @@ import PersistLogin from "./app/auth/PersistLogin";
 import MissingRoute from "./app/Components/MissingRoute";
 import AccessDenied from "./app/Components/pages/User/AccessDenied";
 
+const ALL_APP_ROLES = [
+  "superadmin",
+  "developer",
+  "admin",
+  "dashboard",
+  "rawmaterials",
+  "expenses",
+  "orders",
+  "employees",
+  "batches",
+  "categories",
+  "products",
+  "stock",
+  "customers",
+  "sales",
+  "creditsales",
+  "reports",
+  "salesdesk",
+  "history",
+  "settings",
+  "productionmanager",
+  "productionmanger",
+  "inventorymanager",
+  "accountant",
+];
+
+const ROLE_ACCESS = {
+  dashboard: ["admin", "dashboard"],
+  production: [
+    "admin",
+    "rawmaterials",
+    "expenses",
+    "orders",
+    "employees",
+    "productionmanager",
+    "productionmanger",
+  ],
+  inventory: ["admin", "products", "inventorymanager", "productionmanger"],
+  stock: ["admin", "stock", "inventorymanager", "productionmanager", "productionmanger"],
+  customers: ["admin", "customers", "accountant"],
+  sales: ["admin", "sales", "accountant"],
+  reports: ["admin", "reports", "accountant"],
+  pos: ["admin", "salesdesk", "accountant"],
+  history: ["admin", "history", "accountant"],
+  settings: ALL_APP_ROLES,
+  assistant: ALL_APP_ROLES,
+};
 
 function App() {
   return (
@@ -72,27 +120,27 @@ function App() {
           {/* Each feature route is wrapped in `RequireAuth` to check for specific user roles.
               This is a standard and secure pattern in React Router v6 for role-based access control. */}
 
-          <Route element={<RequireAuth allowedRoles={['admin', 'dashboard']} />}>
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.dashboard} />}>
             <Route path="dashboard" element={<Dashboard />} />
           </Route>
 
-          <Route element={<RequireAuth allowedRoles={['admin', 'rawmaterials', 'expenses', 'orders', 'employees']} />}>
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.production} />}>
             <Route path="production" element={<Production />} />
           </Route>
 
-          <Route element={<RequireAuth allowedRoles={['admin', 'products']} />}>
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.inventory} />}>
             <Route path="inventory" element={<InventoryPage />} />
           </Route>
 
-          <Route element={<RequireAuth allowedRoles={['admin', 'stock']} />}>
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.stock} />}>
             <Route path="stock" element={<ItemsExerpt />} />
           </Route>
 
-          <Route element={<RequireAuth allowedRoles={['admin', 'customers']} />}>
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.customers} />}>
             <Route path="customers" element={<CustomerPage />} />
           </Route>
 
-          <Route element={<RequireAuth allowedRoles={['admin', 'sales']} />}>
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.sales} />}>
             <Route path="sales" element={<SalesPage />} />
           </Route>
 
@@ -100,27 +148,31 @@ function App() {
             <Route path="debts" element={<CustomerPage />} />
           </Route>
 
-          <Route element={<RequireAuth allowedRoles={['admin', 'reports']} />}>
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.reports} />}>
             <Route path="reports" element={<ReportPage />} />
           </Route>
 
-          <Route element={<RequireAuth allowedRoles={['admin', 'salesdesk']} />}>
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.pos} />}>
             <Route path="pos" element={<PosPage />} />
           </Route>
 
-          <Route element={<RequireAuth allowedRoles={['admin', 'history']} />}>
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.history} />}>
             <Route path="history" element={<HistoryPage />} />
           </Route>
 
-          <Route element={<RequireAuth allowedRoles={['admin', 'settings']} />}>
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.settings} />}>
             <Route path="settings" element={<Settings />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.assistant} />}>
+            <Route path="assistant" element={<AssistantWorkspace />} />
           </Route>
 
           {/* Routes accessible only to 'admin' */}
           <Route element={<RequireAuth allowedRoles={['admin']} />}>
+            <Route path="branches" element={<BranchesPage />} />
             <Route path="documents" element={<Documents />} />
             <Route path="invoiceform" element={<InvoiceForm />} />
-            <Route path="packages" element={<PackagePage />} />
           </Route>
 
         </Route>

@@ -1,228 +1,452 @@
+import React, { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import {
-    useGetStokQuery,
-    selectStok,
-} from "../api/stockSlice";
-// Assuming 'selectAllItems' is exported from your stock slice, which is standard
-// when using createEntityAdapter. Add this selector to your slice if it doesn't exist.
-import { selectStockById, selectStock } from '../stock/stockSlice';
-import React, { useState } from 'react';
-import StockEntry from "../../Components/StockEntry";
-import Box from '@mui/material/Box';
-import { LinearProgress, Tab } from "@mui/material";
+import { Box, Button, Chip, LinearProgress, Stack, Tab, TextField, Typography } from "@mui/material";
 import { TabContext, TabList, TabPanel } from "@mui/lab";
+import { CalendarMonth, Download, Inventory2, Print, QueryStats } from "@mui/icons-material";
 import format from "date-fns/format";
 import jsPDF from "jspdf";
-import autoTable from 'jspdf-autotable';
-import { Print, FileDownload, ContactlessOutlined } from "@mui/icons-material";
-import { Card, Button, Row, Col, Form } from "react-bootstrap";
-import 'bootstrap/dist/css/bootstrap.min.css';
+import autoTable from "jspdf-autotable";
+
+import { useGetStokQuery, selectStok } from "../api/stockSlice";
+import { selectStock } from "../stock/stockSlice";
+import { selectBranches, useGetBranchesQuery } from "../api/branchesSlice";
+import StockEntry from "../../Components/StockEntry";
 import PermissionWrapper from "../../auth/PermissionWrapper";
-import { useSettings } from "../../Components/Settings";
+import "../../Components/StockWorkspace.css";
+
+const palette = {
+  bg: "#f8fbf8",
+  surface: "#ffffff",
+  border: "#e7efe9",
+  text: "#15202b",
+  muted: "#6f7d8c",
+  green: "#2f8f57",
+  greenSoft: "#e8f5ec",
+  blue: "#2f80ed",
+  blueSoft: "#e8f1ff",
+  amber: "#f59e0b",
+  amberSoft: "#fff4df",
+  shadow: "0 12px 32px rgba(15, 23, 42, 0.05)",
+};
+
+function MetricCard({ icon, title, value, note, accent, color }) {
+  return (
+    <div
+      className="stock-metric-card"
+      style={{
+        backgroundColor: palette.surface,
+        border: `1px solid ${palette.border}`,
+        boxShadow: palette.shadow,
+      }}
+    >
+      <div className="stock-metric-icon" style={{ backgroundColor: accent, color }}>
+        {icon}
+      </div>
+      <div>
+        <div className="stock-metric-title">{title}</div>
+        <div className="stock-metric-value">{value}</div>
+        <div className="stock-metric-note">{note}</div>
+      </div>
+    </div>
+  );
+}
 
 const ItemsExcerpt = () => {
+  useGetBranchesQuery();
+  const { isLoading: isStockQueryLoading } = useGetStokQuery();
+  const [value, setValue] = useState("1");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-    const { settings } = useSettings();
+  const stock = useSelector(selectStok) ?? [];
+  const items = useSelector(selectStock) ?? [];
+  const branches = useSelector(selectBranches) ?? [];
 
-    const {
-        isLoading: isStockQueryLoading,
-    } = useGetStokQuery();
+  const itemsMap = useMemo(
+    () => new Map(items.map((item) => [Number(item.itemId), item.itemName])),
+    [items]
+  );
 
-    const [value, setValue] = useState('1');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+  const branchMap = useMemo(
+    () => new Map(branches.map((branch) => [Number(branch.branchId), branch.branchName])),
+    [branches]
+  );
 
-    const stock = useSelector(selectStok);
-    // 1. Get all items from the store once and create a lookup map for efficiency.
-    const items = useSelector(selectStock);
-    console.log("Stock: ", items[0]);
-    const itemsMap = new Map(items.map(item => [Number(item.itemId), item.itemName]));
-    console.log("Items: ", itemsMap.get(108));
+  const stockDates = useMemo(
+    () =>
+      [...new Set(stock.map((item) => item?.stockCreated?.split(" ")[0]).filter(Boolean))].sort(
+        (a, b) => new Date(b) - new Date(a)
+      ),
+    [stock]
+  );
 
-    const isDataAvailable = stock.length > 0;
-
-    const stockDates = [...new Set(stock.map(item => item?.stockCreated?.split(" ")[0]))];
-
-    const filteredStockDates = stockDates.filter(date => {
-        if (!date) return false;
+  const filteredStockDates = useMemo(
+    () =>
+      stockDates.filter((date) => {
         if (startDate && new Date(date) < new Date(startDate)) return false;
         if (endDate && new Date(date) > new Date(endDate)) return false;
         return true;
+      }),
+    [endDate, startDate, stockDates]
+  );
+
+  const groupedStock = useMemo(
+    () =>
+      filteredStockDates.map((date) => {
+        const entries = stock.filter((item) => item?.stockCreated?.split(" ")[0] === date);
+        const totalQuantity = entries.reduce(
+          (sum, item) => sum + (Number(item.stockItemQuantity) || 0),
+          0
+        );
+
+        return {
+          date,
+          entries,
+          totalQuantity,
+        };
+      }),
+    [filteredStockDates, stock]
+  );
+
+  const totals = useMemo(
+    () => ({
+      productionDays: stockDates.length,
+      filteredDays: filteredStockDates.length,
+      entries: stock.length,
+      quantity: stock.reduce((sum, item) => sum + (Number(item.stockItemQuantity) || 0), 0),
+    }),
+    [filteredStockDates.length, stock, stockDates.length]
+  );
+
+  const handlePrintOrExport = (action, stockDate = null) => {
+    const selectedDates = stockDate ? [stockDate] : filteredStockDates;
+    const dataToProcess = stock.filter((item) =>
+      selectedDates.includes(item?.stockCreated?.split(" ")[0])
+    );
+
+    if (!dataToProcess.length) return;
+
+    const doc = new jsPDF();
+    const tableHeaders = [["#", "Item", "Branch", "Previous Stock", "Reordered Qty", "Recorded On"]];
+    const tableData = dataToProcess.map((stockItem, index) => [
+      index + 1,
+      itemsMap.get(Number(stockItem?.stockItem)) || "N/A",
+      branchMap.get(Number(stockItem?.branchId)) || "Unassigned",
+      stockItem?.oldStock ?? 0,
+      stockItem?.stockItemQuantity ?? 0,
+      stockItem?.stockCreated ?? "N/A",
+    ]);
+
+    const title = stockDate
+      ? `Stock/Reorder Summary for ${format(new Date(stockDate), "EEE, dd MMM yyyy")}`
+      : "Stock/Reorder Summary Report";
+
+    doc.text(title, 14, 15);
+    autoTable(doc, {
+      head: tableHeaders,
+      body: tableData,
+      startY: 22,
+      styles: {
+        fontSize: 10,
+      },
+      headStyles: {
+        fillColor: [47, 143, 87],
+      },
     });
 
-    const handlePrintOrExport = (action, stockDate = null) => {
-        const doc = new jsPDF();
-        const tableData = [];
-        const tableHeaders = ["#", "Item", "Old Stock", "New Stock"];
+    if (action === "print") {
+      doc.autoPrint();
+      window.open(doc.output("bloburl"), "_blank");
+      return;
+    }
 
-        const dataToProcess = stockDate
-            ? stock.filter(item => item?.stockCreated?.split(" ")[0] === stockDate)
-            : stock;
+    const fileName = stockDate
+      ? `stock-reorder-summary-${stockDate}.pdf`
+      : "stock-reorder-summary-report.pdf";
+    doc.save(fileName);
+  };
 
-        dataToProcess.forEach((stockItem, index) => {
-            // 2. Use the map to find the item name. This fixes the error.
-            const itemName = itemsMap.get(Number(stockItem?.stockItem)) || 'N/A';
-            tableData.push([
-                index + 1,
-                itemName,
-                stockItem?.oldStock,
-                stockItem?.stockItemQuantity
-            ]);
-        });
+  return (
+    <div className="stock-workspace" style={{ backgroundColor: palette.bg, minHeight: "100vh" }}>
+      <div className="stock-shell">
+        <header className="stock-header">
+          <div>
+            <h2 className="stock-title">Stock/Reorder Workspace</h2>
+            <p className="stock-subtitle">
+              Review stock reorder history and add new stock intake entries from one clean workspace.
+            </p>
+          </div>
+        </header>
 
-        const title = stockDate
-            ? `Stock Data for ${format(new Date(stockDate), 'EEE-dd-yyyy')}`
-            : "Complete Stock Report";
-        doc.text(title, 14, 15);
-
-        autoTable(doc, {
-            head: [tableHeaders],
-            body: tableData,
-            startY: 20,
-        });
-
-        if (action === 'print') {
-            doc.autoPrint();
-            window.open(doc.output('bloburl'), '_blank');
-        } else {
-            const fileName = stockDate ? `stock-${stockDate}.pdf` : 'full-stock-report.pdf';
-            doc.save(fileName);
-        }
-    };
-
-    // 3. Simplified component, receives itemName as a prop. No more hooks here.
-    const StockExcerpt = ({ stockItem, index, itemName }) => {
-        return (
-            <tr>
-                <td>{index}</td>
-                <td>{itemName}</td>
-                <td>{stockItem?.oldStock}</td>
-                <td>{stockItem?.stockItemQuantity}</td>
-            </tr>
-        );
-    };
-
-    const StockItems = ({ stockDate }) => {
-        return stock
-            .filter(item => item?.stockCreated?.split(" ")[0] === stockDate)
-            .map((item, index) => {
-                // 4. Find the item name here and pass it down.
-                const itemName = itemsMap.get(Number(item?.stockItem)) || 'N/A';
-                return <StockExcerpt key={item.id} stockItem={item} index={index + 1} itemName={itemName} />
-            });
-    };
-
-    const Total = ({ stockDate }) => {
-        const itemsToSum = stock.filter(item => item?.stockCreated?.split(" ")[0] === stockDate);
-        return itemsToSum.reduce((prev, curr) => prev + Number(curr.stockItemQuantity), 0);
-    };
-
-    const handleValueChange = (event, newValue) => {
-        setValue(newValue);
-    };
-
-    return (
-        <div className="container-fluid mt-4">
-            <TabContext value={value}>
-                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                    <TabList aria-label="stock Tabs" onChange={handleValueChange}>
-                        <Tab label="Production Summary" value='1' className={`${settings.theme==='dark'?'text-white':'text-dark'}`} />               
-<Tab label="New Production Stock" value='2' className={`${settings.theme==='dark'?'text-white':'text-dark'}`} />                    
-                    </TabList>
-                </Box>
-                <TabPanel value="1">
-                    {isStockQueryLoading && <LinearProgress />}
-                    <div className="p-2">
-                        {isDataAvailable ? (
-                            <>
-                                <Card className="mb-2 shadow-sm" style={{height:'130px'}}>
-                                    <Card.Body>
-                                        <Card.Title>Filter and Export</Card.Title>
-                                        <Row className="align-items-end">
-                                            <Col md={4}>
-                                                <Form.Group>
-                                                    <Form.Label>Start Date</Form.Label>
-                                                    <Form.Control type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                                                </Form.Group>
-                                            </Col>
-                                            <Col md={4}>
-                                                <Form.Group>
-                                                    <Form.Label>End Date</Form.Label>
-                                                    <Form.Control type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                                                </Form.Group>
-                                            </Col>
-                                            <Col md={4} className="d-flex justify-content-start justify-content-md-end mt-3 mt-md-0">
-                                                <Button variant="secondary" className="me-2" onClick={() => handlePrintOrExport('print')}>
-                                                    <Print fontSize="small" className="me-1" /> Print Filtered
-                                                </Button>
-                                                <Button variant="primary" onClick={() => handlePrintOrExport('export')}>
-                                                    <FileDownload fontSize="small" className="me-1" /> Export Filtered
-                                                </Button>
-                                            </Col>
-                                        </Row>
-                                    </Card.Body>
-                                </Card>
-
-                                <Row>
-                                    {filteredStockDates.length > 0 ? filteredStockDates.map((date) => (
-                                        <Col key={date} md={12} className="mb-4">
-                                            <Card className="shadow-sm">
-                                                <Card.Header className={`d-flex justify-content-between align-items-center ${settings.theme === 'dark'?'bg-dark':'bg-light'}`} >
-                                                    <strong className="fw-bold fs-6">Production Date: {format(new Date(date), 'EEE, dd-MMM-yyyy')}</strong>
-                                                    <div>
-                                                        <Button variant="outline-secondary" size="sm" className="me-2" onClick={() => handlePrintOrExport('print', date)}>
-                                                            <Print fontSize="small" />
-                                                        </Button>
-                                                        <Button variant="outline-primary" size="sm" onClick={() => handlePrintOrExport('export', date)}>
-                                                            <FileDownload fontSize="small" />
-                                                        </Button>
-                                                    </div>
-                                                </Card.Header>
-                                                <Card.Body>
-                                                    <div className="table-responsive" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                                        <table className="table table-striped table-hover">
-                                                            <thead className={`${settings.theme === 'dark'?'table-dark': 'table-light'}`} >
-                                                                <tr >
-                                                                    <th >#</th>
-                                                                    <th >Item</th>
-                                                                    <th >Old Stock</th>
-                                                                    <th >New Stock</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                <StockItems stockDate={date} />
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </Card.Body>
-                                                <Card.Footer>
-                                                    <h6 className="mb-0"><strong>Total New Quantity:</strong> {<Total stockDate={date} />}</h6>
-                                                </Card.Footer>
-                                            </Card>
-                                        </Col>
-                                    )) : <div className="text-center bg-white rounded p-4 shadow-sm">No stock data available for the selected date range.</div>}
-                                </Row>
-                            </>
-                        ) : (
-                            <div className="d-flex justify-content-center align-items-center text-center bg-white rounded p-4 shadow-sm">
-                                No Stock Data Available
-                            </div>
-                        )}
-                    </div>
-                </TabPanel>
-                <PermissionWrapper
-                required={['stockcreate']}
-                children={
-   <TabPanel value="2">
-                    <StockEntry />
-                </TabPanel>
-                }
-                />
-             
-            </TabContext>
+        <div className="stock-metrics-grid">
+          <MetricCard
+            icon={<CalendarMonth fontSize="small" />}
+            title="Reorder Days"
+            value={totals.productionDays}
+            note="All recorded stock intake dates"
+            accent={palette.greenSoft}
+            color={palette.green}
+          />
+          <MetricCard
+            icon={<QueryStats fontSize="small" />}
+            title="Filtered Days"
+            value={totals.filteredDays}
+            note="Visible in the current date range"
+            accent={palette.blueSoft}
+            color={palette.blue}
+          />
+          <MetricCard
+            icon={<Inventory2 fontSize="small" />}
+            title="Stock Entries"
+            value={totals.entries}
+            note="Saved stock reorder records"
+            accent={palette.amberSoft}
+            color={palette.amber}
+          />
+          <MetricCard
+            icon={<Download fontSize="small" />}
+            title="Total Reordered Qty"
+            value={totals.quantity}
+            note="Quantity added across all reorder records"
+            accent={palette.greenSoft}
+            color={palette.green}
+          />
         </div>
-    );
+
+        <TabContext value={value}>
+          <Box className="stock-tabs-shell">
+            <TabList
+              onChange={(_, nextValue) => setValue(nextValue)}
+              aria-label="stock tabs"
+              sx={{
+                minHeight: 56,
+                px: 1,
+                "& .MuiTabs-indicator": {
+                  display: "none",
+                },
+                "& .MuiTab-root": {
+                  textTransform: "none",
+                  fontWeight: 700,
+                  borderRadius: "14px",
+                  minHeight: 44,
+                  color: palette.muted,
+                  mx: 0.5,
+                  my: 0.75,
+                },
+                "& .Mui-selected": {
+                  color: `${palette.green} !important`,
+                  backgroundColor: palette.greenSoft,
+                },
+              }}
+            >
+              <Tab label="Stock/Reorder Summary" value="1" />
+              <Tab label="New Stock Reorder" value="2" />
+            </TabList>
+          </Box>
+
+          <TabPanel value="1" sx={{ px: 0, pt: 3 }}>
+            {isStockQueryLoading && (
+              <div className="stock-progress-shell">
+                <LinearProgress />
+              </div>
+            )}
+
+            <div className="stock-filter-card">
+              <div>
+                <h3 className="stock-section-title">Filter and Export</h3>
+                <p className="stock-section-copy">
+                  Narrow the production history by date, then print or export the exact range you need.
+                </p>
+              </div>
+
+              <div className="stock-filter-grid">
+                <TextField
+                  label="Start Date"
+                  type="date"
+                  value={startDate}
+                  onChange={(event) => setStartDate(event.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
+                <TextField
+                  label="End Date"
+                  type="date"
+                  value={endDate}
+                  onChange={(event) => setEndDate(event.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} className="stock-filter-actions">
+                  <Button
+                    variant="outlined"
+                    startIcon={<Print />}
+                    onClick={() => handlePrintOrExport("print")}
+                    disabled={!groupedStock.length}
+                    sx={stockGhostButtonStyle}
+                  >
+                    Print Filtered
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<Download />}
+                    onClick={() => handlePrintOrExport("export")}
+                    disabled={!groupedStock.length}
+                    sx={stockPrimaryButtonStyle}
+                  >
+                    Export Filtered
+                  </Button>
+                </Stack>
+              </div>
+            </div>
+
+            {!stock.length && !isStockQueryLoading ? (
+              <div className="stock-empty-card">
+                <h3>No Reorder History Available</h3>
+                <p>Stock reorder history will appear here after the first saved stock entry.</p>
+              </div>
+            ) : groupedStock.length ? (
+              <div className="stock-summary-list">
+                {groupedStock.map(({ date, entries, totalQuantity }) => (
+                  <article key={date} className="stock-date-card">
+                    <div className="stock-date-card-header">
+                      <div>
+                        <h3 className="stock-date-title">
+                          {format(new Date(date), "EEE, dd MMM yyyy")}
+                        </h3>
+                        <p className="stock-date-copy">
+                          Review all stock intake recorded for this day.
+                        </p>
+                      </div>
+                      <div className="stock-date-actions">
+                        <Chip
+                          label={`${entries.length} item${entries.length === 1 ? "" : "s"}`}
+                          sx={stockChipStyle(palette.greenSoft, palette.green)}
+                        />
+                        <Chip
+                          label={`Qty ${totalQuantity}`}
+                          sx={stockChipStyle(palette.blueSoft, palette.blue)}
+                        />
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => handlePrintOrExport("print", date)}
+                          sx={stockIconButtonStyle}
+                        >
+                          <Print fontSize="small" />
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => handlePrintOrExport("export", date)}
+                          sx={stockIconButtonStyle}
+                        >
+                          <Download fontSize="small" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="stock-table-wrap">
+                      <table className="stock-modern-table">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>Item</th>
+                            <th>Branch</th>
+                            <th>Previous Stock</th>
+                            <th>Reordered Qty</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {entries.map((entry, index) => (
+                            <tr key={entry.stockId || `${date}-${index}`}>
+                              <td>{index + 1}</td>
+                              <td>{itemsMap.get(Number(entry.stockItem)) || "N/A"}</td>
+                              <td>{branchMap.get(Number(entry.branchId)) || "Unassigned"}</td>
+                              <td>{entry.oldStock ?? 0}</td>
+                              <td>{entry.stockItemQuantity ?? 0}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="stock-date-footer">
+                      <strong>Total Reordered Qty:</strong> {totalQuantity}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="stock-empty-card">
+                <h3>No stock data in this range</h3>
+                <p>Try adjusting the date filter to see saved stock reorder records.</p>
+              </div>
+            )}
+          </TabPanel>
+
+          <PermissionWrapper
+            required={["stockcreate"]}
+            children={
+              <TabPanel value="2" sx={{ px: 0, pt: 3 }}>
+                <StockEntry />
+              </TabPanel>
+            }
+          />
+        </TabContext>
+      </div>
+    </div>
+  );
 };
 
-export default ItemsExcerpt;
+const stockPrimaryButtonStyle = {
+  minHeight: 46,
+  borderRadius: "14px",
+  px: 2.25,
+  textTransform: "none",
+  fontWeight: 700,
+  backgroundColor: palette.green,
+  boxShadow: "0 12px 24px rgba(47, 143, 87, 0.18)",
+  "&:hover": {
+    backgroundColor: "#27794a",
+    boxShadow: "0 14px 28px rgba(47, 143, 87, 0.24)",
+  },
+};
 
+const stockGhostButtonStyle = {
+  minHeight: 46,
+  borderRadius: "14px",
+  px: 2.25,
+  textTransform: "none",
+  fontWeight: 700,
+  borderColor: palette.border,
+  color: palette.text,
+  backgroundColor: "#ffffff",
+  "&:hover": {
+    borderColor: palette.green,
+    backgroundColor: palette.greenSoft,
+  },
+};
+
+const stockIconButtonStyle = {
+  minWidth: 42,
+  width: 42,
+  height: 42,
+  borderRadius: "12px",
+  borderColor: palette.border,
+  color: palette.text,
+  backgroundColor: "#ffffff",
+  "&:hover": {
+    borderColor: palette.green,
+    backgroundColor: palette.greenSoft,
+  },
+};
+
+const stockChipStyle = (backgroundColor, color) => ({
+  height: 32,
+  borderRadius: "999px",
+  backgroundColor,
+  color,
+  fontWeight: 700,
+});
+
+export default ItemsExcerpt;

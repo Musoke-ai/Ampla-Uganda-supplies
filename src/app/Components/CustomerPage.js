@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 // Note: You must have react-bootstrap and react-bootstrap-icons installed in your project
 // npm install react-bootstrap bootstrap react-bootstrap-icons jspdf jspdf-autotable react-redux
 import {
@@ -26,13 +26,13 @@ import {
   Download,
   Printer,
   Person,
+  Search,
 } from "react-bootstrap-icons";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import PermissionWrapper from "../auth/PermissionWrapper";
 import { useUpdateOrderMutation } from "../features/api/orderSlice";
 import { toast } from "react-toastify";
-import KpiCard from "./production/Kpi";
 
 import { useSettings } from "./Settings";
 
@@ -41,6 +41,7 @@ import { selectSales } from "../features/api/salesSlice";
 import { selectStock } from "../features/stock/stockSlice";
 import { selectOrders } from "../features/api/orderSlice";
 import { selectDebt, usePayDebtMutation } from "../features/api/debtSlice";
+import { selectBranches, useGetBranchesQuery } from "../features/api/branchesSlice";
 import {
   selectCustomers as selectRawCustomers,
   useDeleteCustomerMutation,
@@ -48,6 +49,24 @@ import {
 } from "../features/api/customers";
 
 import AddCustomer from "./Models/AddCustomer";
+import "./CustomerPage.css";
+
+const palette = {
+  bg: "#f8fbf8",
+  surface: "#ffffff",
+  border: "#e7efe9",
+  text: "#15202b",
+  muted: "#6f7d8c",
+  green: "#2f8f57",
+  greenSoft: "#e8f5ec",
+  blue: "#2f80ed",
+  blueSoft: "#e8f1ff",
+  amber: "#f59e0b",
+  amberSoft: "#fff4df",
+  red: "#ef4444",
+  redSoft: "#ffebeb",
+  shadow: "0 12px 32px rgba(15, 23, 42, 0.05)",
+};
 
 // --- Helper Functions ---
 const calculateCustomerDues = (customerId, details) => {
@@ -110,6 +129,133 @@ const exportToCsv = (filename, rows) => {
     document.body.removeChild(link);
   }
 };
+
+const toolbarButtonStyle = {
+  minHeight: 44,
+  padding: "0.65rem 1.1rem",
+  borderRadius: 16,
+  border: `1px solid ${palette.border}`,
+  backgroundColor: "#ffffff",
+  color: palette.text,
+  fontWeight: 700,
+  boxShadow: "none",
+};
+
+const primaryButtonStyle = {
+  minHeight: 44,
+  padding: "0.65rem 1.15rem",
+  borderRadius: 16,
+  border: "none",
+  backgroundColor: palette.green,
+  color: "#ffffff",
+  fontWeight: 800,
+  boxShadow: "0 12px 24px rgba(47, 143, 87, 0.18)",
+};
+
+const sectionCardStyle = {
+  borderRadius: 28,
+  backgroundColor: palette.surface,
+  boxShadow: palette.shadow,
+  border: `1px solid ${palette.border}`,
+};
+
+const searchGroupStyle = {
+  borderRadius: 18,
+  overflow: "hidden",
+  border: `1px solid ${palette.border}`,
+  backgroundColor: "#ffffff",
+};
+
+const searchAdornmentStyle = {
+  backgroundColor: "#ffffff",
+  border: "none",
+  color: palette.muted,
+};
+
+const searchInputStyle = {
+  border: "none",
+  boxShadow: "none",
+  minHeight: 46,
+};
+
+const headerCellStyle = {
+  color: palette.text,
+  fontWeight: 800,
+  fontSize: 14,
+  whiteSpace: "nowrap",
+  backgroundColor: "#ffffff",
+  paddingTop: 18,
+  paddingBottom: 18,
+};
+
+const bodyCellStyle = {
+  color: palette.text,
+  fontSize: 14,
+  paddingTop: 18,
+  paddingBottom: 18,
+  verticalAlign: "middle",
+};
+
+const actionIconButtonStyle = (color) => ({
+  width: 38,
+  height: 38,
+  padding: 0,
+  borderRadius: 12,
+  border: `1px solid ${palette.border}`,
+  color,
+  backgroundColor: "#ffffff",
+});
+
+function CustomerMetricCard({ icon, title, value, note, accent, color }) {
+  return (
+    <div
+      className="customer-metric-card"
+      style={{
+        backgroundColor: palette.surface,
+        border: `1px solid ${palette.border}`,
+        boxShadow: palette.shadow,
+      }}
+    >
+      <div className="customer-metric-icon" style={{ backgroundColor: accent, color }}>
+        {icon}
+      </div>
+      <div>
+        <div className="customer-metric-title">{title}</div>
+        <div className="customer-metric-value">{value}</div>
+        <div className="customer-metric-note">{note}</div>
+      </div>
+    </div>
+  );
+}
+
+function CustomerPagination({ currentPage, totalPages, onPageChange }) {
+  if (totalPages <= 1) return null;
+
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
+    .slice(Math.max(0, currentPage - 3), Math.max(0, currentPage - 3) + 5);
+
+  return (
+    <Pagination className="mb-0">
+      <Pagination.Prev
+        disabled={currentPage === 1}
+        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+      />
+      {pages.map((pageNumber) => (
+        <Pagination.Item
+          key={pageNumber}
+          active={pageNumber === currentPage}
+          onClick={() => onPageChange(pageNumber)}
+        >
+          {pageNumber}
+        </Pagination.Item>
+      ))}
+      <Pagination.Next
+        disabled={currentPage === totalPages}
+        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+      />
+    </Pagination>
+  );
+}
 
 // --- Sub-Components ---
 
@@ -180,7 +326,16 @@ const SaleDetailModal = ({ show, onHide, saleGroup, customerName }) => {
   };
 
   return (
-    <Modal show={show} onHide={onHide} centered size="lg">
+    <Modal
+      show={show}
+      onHide={onHide}
+      centered
+      size="lg"
+      className="customer-page-modal"
+      dialogClassName="customer-modal-dialog"
+      contentClassName="customer-modal-content"
+      backdropClassName="customer-page-backdrop"
+    >
       <Modal.Header closeButton>
         <Modal.Title>Sale Details (SR_ID: {receiptId})</Modal.Title>
       </Modal.Header>
@@ -296,7 +451,15 @@ const OrderDetailModal = ({ show, onHide, order, customerName }) => {
   };
 
   return (
-    <Modal show={show} onHide={onHide} centered>
+    <Modal
+      show={show}
+      onHide={onHide}
+      centered
+      className="customer-page-modal"
+      dialogClassName="customer-modal-dialog"
+      contentClassName="customer-modal-content"
+      backdropClassName="customer-page-backdrop"
+    >
       <Modal.Header closeButton>
         <Modal.Title>Order Details (ID: {order.id})</Modal.Title>
       </Modal.Header>
@@ -409,7 +572,15 @@ const PaymentModal = ({ show, onHide, paymentInfo, onMakePayment }) => {
   if (!paymentInfo) return null;
 
   return (
-    <Modal show={show} onHide={onHide} centered>
+    <Modal
+      show={show}
+      onHide={onHide}
+      centered
+      className="customer-page-modal"
+      dialogClassName="customer-modal-dialog"
+      contentClassName="customer-modal-content"
+      backdropClassName="customer-page-backdrop"
+    >
       <Modal.Header closeButton>
         <Modal.Title>{paymentInfo.title}</Modal.Title>
       </Modal.Header>
@@ -460,6 +631,8 @@ const PaymentModal = ({ show, onHide, paymentInfo, onMakePayment }) => {
 };
 
 const EditCustomerModal = ({ show, onHide, customer, onSave }) => {
+  useGetBranchesQuery();
+  const branches = useSelector(selectBranches) ?? [];
   const [upDateCustomer, { data, isLoading, isSuccess, isError, error }] =
     useUpdateCustomerMutation();
   const [formData, setFormData] = useState(customer);
@@ -474,6 +647,7 @@ const EditCustomerModal = ({ show, onHide, customer, onSave }) => {
     try {
       await upDateCustomer({
         cust_id: formData.id,
+        branch_id: formData.branchId,
         cust_name: formData.name,
         cust_contact: formData.phone,
         cust_email: formData.email,
@@ -489,12 +663,35 @@ const EditCustomerModal = ({ show, onHide, customer, onSave }) => {
   // const handleSubmit = async (e) => { e.preventDefault(); await onSave(formData); onHide(); };
   if (!customer) return null;
   return (
-    <Modal show={show} onHide={onHide} centered>
+    <Modal
+      show={show}
+      onHide={onHide}
+      centered
+      className="customer-page-modal"
+      dialogClassName="customer-modal-dialog"
+      contentClassName="customer-modal-content"
+      backdropClassName="customer-page-backdrop"
+    >
       <Modal.Header closeButton>
         <Modal.Title>Edit Customer</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <Form>
+          <Form.Group className="mb-3">
+            <Form.Label>Branch</Form.Label>
+            <Form.Select
+              name="branchId"
+              value={formData?.branchId || ""}
+              onChange={handleChange}
+            >
+              <option value="">Select branch</option>
+              {branches.map((branch) => (
+                <option key={branch.branchId} value={branch.branchId}>
+                  {branch.branchName}
+                </option>
+              ))}
+            </Form.Select>
+          </Form.Group>
           {/* <Form.Group className="mb-3"><Form.Label>Name</Form.Label><Form.Control type="text" name="id" value={formData?.id || ''} onChange={handleChange} required /></Form.Group> */}
           <Form.Group className="mb-3">
             <Form.Label>Name</Form.Label>
@@ -601,7 +798,15 @@ const DeleteCustomerModal = ({
   };
   // const handleDelete = async () => { await onDelete(customer.id); onHide(); };
   return (
-    <Modal show={show} onHide={onHide} centered>
+    <Modal
+      show={show}
+      onHide={onHide}
+      centered
+      className="customer-page-modal"
+      dialogClassName="customer-modal-dialog"
+      contentClassName="customer-modal-content"
+      backdropClassName="customer-page-backdrop"
+    >
       <Modal.Header closeButton>
         <Modal.Title>Confirm Deletion</Modal.Title>
       </Modal.Header>
@@ -642,6 +847,12 @@ const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
   const [showOrderDetail, setShowOrderDetail] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("sales");
+  const [salesPage, setSalesPage] = useState(1);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [duesPage, setDuesPage] = useState(1);
+
+  const detailRowsPerPage = 6;
 
   const groupedSales = useMemo(() => {
     const groups = details.sales.reduce((acc, sale) => {
@@ -777,325 +988,303 @@ const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
     setShowOrderDetail(true);
   };
 
+  useEffect(() => {
+    setSalesPage(1);
+    setOrdersPage(1);
+    setDuesPage(1);
+  }, [searchTerm]);
+
+  const salesTotalPages = Math.max(1, Math.ceil(filteredGroupedSales.length / detailRowsPerPage));
+  const ordersTotalPages = Math.max(1, Math.ceil(filteredOrders.length / detailRowsPerPage));
+  const duesTotalPages = Math.max(1, Math.ceil(filteredDues.length / detailRowsPerPage));
+
+  const paginatedGroupedSales = filteredGroupedSales.slice(
+    (salesPage - 1) * detailRowsPerPage,
+    salesPage * detailRowsPerPage
+  );
+  const paginatedOrders = filteredOrders.slice(
+    (ordersPage - 1) * detailRowsPerPage,
+    ordersPage * detailRowsPerPage
+  );
+  const paginatedDues = filteredDues.slice(
+    (duesPage - 1) * detailRowsPerPage,
+    duesPage * detailRowsPerPage
+  );
+
   return (
     <>
-      <Container className="mt-2 mb-2 g-0 p-2 d-flex flex-column gap-5">
-        <Row className="d-flex justify-content-between">
-<Col xs={12} sm={6} lg={4} xl={4}>
-            <Button
-              variant="link"
-              onClick={onBack}
-              className="mb-3 p-0 d-flex align-items-center"
-            >
+      <Container fluid className="customer-page-shell">
+        <div className="customer-page-stack">
+          <div className="customer-back-row">
+            <Button variant="link" onClick={onBack} className="customer-back-link">
               <ArrowLeft size={16} className="me-2" />
-              Back to List
+              Back to Customer List
             </Button>
-          </Col>
+          </div>
 
-          <Col xs={12} sm={6} lg={8} xl={8}>
-          <div> <h2 className="mb-1">{customer.name}</h2>
-            <p className="text-muted mb-4">{customer.email}</p></div>
-          </Col>
-        </Row>
-        <Row className="mb-1 mt-2 ">
-          {/*  */}
-          <Col xs={12} sm={6} lg={4} xl={4}>
-            <KpiCard
+          <div className="customer-hero-card" style={sectionCardStyle}>
+            <div>
+              <h2 className="customer-page-title">{customer.name}</h2>
+              <p className="customer-page-subtitle">
+                {customer.email} {customer.phone ? `• ${customer.phone}` : ""}
+              </p>
+            </div>
+            <div className="customer-hero-meta">
+              <span>{customer.address}</span>
+            </div>
+          </div>
+
+          <div className="customer-metrics-grid">
+            <CustomerMetricCard
+              icon={<Download size={18} />}
               title="Total Sales"
-              bg="warning-subtle"
-              value={`${currency}${totalSales}`}
-              icon={
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  fill="currentColor"
-                  className="bi bi-cash-stack text-warning"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M1 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1H1zm7 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-                  <path d="M0 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1V5zm3 0a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h10a2 2 0 0 1 2-2V7a2 2 0 0 1-2-2H3z" />
-                </svg>
-              }
+              value={`${currency}${totalSales.toFixed(2)}`}
+              note="All grouped sales for this customer"
+              accent={palette.greenSoft}
+              color={palette.green}
             />
-          </Col>
-          {/* {kpis.revenue?.toLocaleString() */}
-          <Col xs={12} sm={6} lg={4} xl={4}>
-            <KpiCard
+            <CustomerMetricCard
+              icon={<Person size={18} />}
               title="Total Orders"
-              bg="info-subtle"
-              value={currency+totalOrders}
-              icon={
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  fill="currentColor"
-                  className="bi bi-journal-check text-info"
-                  viewBox="0 0 16 16"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10.854 6.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 8.793l2.646-2.647a.5.5 0 0 1 .708 0z"
-                  />
-                  <path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2z" />
-                  <path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H1zm0 3v-.5a.5.5 0 0 1 1 0V8h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H1zm0 3v-.5a.5.5 0 0 1 1 0v.5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H1z" />
-                </svg>
-              }
+              value={`${currency}${totalOrders.toFixed(2)}`}
+              note="Combined order value"
+              accent={palette.blueSoft}
+              color={palette.blue}
             />
-          </Col>
-          <Col xs={12} sm={6} lg={4} xl={4}>
-            <KpiCard
-              title="Total Dues"
-              bg="danger-subtle"
-              value={currency+totalDues}
-              icon={
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  fill="currentColor"
-                  className="bi bi-hourglass-split text-danger"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M2.5 15a.5.5 0 1 1 0-1h11a.5.5 0 0 1 0 1h-11zm2-13v1c0 .537.12 1.045.337 1.5h6.326c.216-.455.337-.963.337-1.5V2h-7zm3 6.25a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zM2 2.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-1z" />
-                </svg>
-              }
+            <CustomerMetricCard
+              icon={<Trash size={18} />}
+              title="Outstanding Dues"
+              value={`${currency}${totalDues.toFixed(2)}`}
+              note="Orders and sales balances still unpaid"
+              accent={palette.redSoft}
+              color={palette.red}
             />
-          </Col>
-        </Row>
+          </div>
 
-        <Row className="mt-5 ">
-          <Col>
-            <Form.Group className="mb-3">
-              <InputGroup>
-                <InputGroup.Text>
-                  <i className="bi bi-search"></i>
+          <div className="customer-toolbar-card" style={sectionCardStyle}>
+            <div className="customer-toolbar-copy">
+              <h3 className="customer-section-title">Customer Activity</h3>
+              <p className="customer-section-subtitle">
+                Search across sales, orders, and dues for this customer.
+              </p>
+            </div>
+            <div className="customer-toolbar-search">
+              <InputGroup style={searchGroupStyle}>
+                <InputGroup.Text style={searchAdornmentStyle}>
+                  <Search />
                 </InputGroup.Text>
                 <Form.Control
-                  placeholder="Search by ID, date, status, or product name..."
+                  placeholder="Search by invoice, order ID, date, status, or product..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  style={searchInputStyle}
                 />
               </InputGroup>
-            </Form.Group>
+            </div>
+          </div>
 
+          <div className="customer-detail-panel" style={sectionCardStyle}>
             <Tabs
-              defaultActiveKey="sales"
+              activeKey={activeTab}
+              onSelect={(key) => setActiveTab(key || "sales")}
               id="customer-details-tabs"
-              className="mb-3"
+              className="customer-modern-tabs"
             >
-              <Tab eventKey="sales" title="Sales">
-                <Table striped bordered hover responsive>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Invoice ID (SR_ID)</th>
-                      <th>Date</th>
-                      <th>Total Amount</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredGroupedSales.map((group, index) => (
-                      <tr key={group.SR_ID}>
-                        <td>{index + 1}</td>
-                        <td>{group.SR_ID}</td>
-                        <td>{group.date}</td>
-                        <td>
-                          {currency}
-                          {group.totalAmount.toFixed(2)}
-                        </td>
-                        <td>
-                          <Badge
-                            bg={group.status === "paid" ? "success" : "danger"}
-                          >
-                            {group.status}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Button
-                            variant="info"
-                            size="sm"
-                            onClick={() => handleViewSale(group)}
-                          >
-                            <Eye className="me-1" />
-                            View
-                          </Button>
-                        </td>
+              <Tab eventKey="sales" title={`Sales (${filteredGroupedSales.length})`}>
+                <div className="customer-table-wrap">
+                  <Table hover className="align-middle mb-0 customer-modern-table">
+                    <thead>
+                      <tr>
+                        <th style={headerCellStyle}>#</th>
+                        <th style={headerCellStyle}>Invoice ID</th>
+                        <th style={headerCellStyle}>Date</th>
+                        <th style={headerCellStyle}>Total Amount</th>
+                        <th style={headerCellStyle}>Status</th>
+                        <th style={{ ...headerCellStyle, textAlign: "center" }}>Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <th colSpan="3" className="text-end">
-                        Total
-                      </th>
-                      <th colSpan="3">
-                        {currency}
-                        {salesTotal.toFixed(2)}
-                      </th>
-                    </tr>
-                  </tfoot>
-                </Table>
-              </Tab>
-              <Tab eventKey="orders" title="Orders">
-                <Table striped bordered hover responsive>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Order ID</th>
-                      <th>Date</th>
-                      <th>Total</th>
-                      <th>Balance</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOrders.map((o, index) => {
-                      const balance = o.totalAmount - o.depositedAmount;
-                      return (
-                        <tr key={o.id}>
-                          <td>{index + 1}</td>
-                          <td>{o.id}</td>
-                          <td>{o.date}</td>
-                          <td>
-                            {currency}
-                            {o.totalAmount.toFixed(2)}
+                    </thead>
+                    <tbody>
+                      {paginatedGroupedSales.map((group, index) => (
+                        <tr key={group.SR_ID}>
+                          <td style={bodyCellStyle}>{(salesPage - 1) * detailRowsPerPage + index + 1}</td>
+                          <td style={bodyCellStyle}>{group.SR_ID}</td>
+                          <td style={bodyCellStyle}>{group.date}</td>
+                          <td style={bodyCellStyle}>{currency}{group.totalAmount.toFixed(2)}</td>
+                          <td style={bodyCellStyle}>
+                            <span className={group.status === "paid" ? "customer-badge customer-badge-solid-green" : "customer-badge customer-badge-solid-red"}>
+                              {group.status}
+                            </span>
                           </td>
-                          <td>
-                            {currency}
-                            {balance.toFixed(2)}
-                          </td>
-                          <td className="d-flex gap-2">
+                          <td style={{ ...bodyCellStyle, textAlign: "center" }}>
                             <Button
-                              variant="info"
-                              size="sm"
-                              onClick={() => handleViewOrder(o)}
+                              variant="light"
+                              style={actionIconButtonStyle(palette.blue)}
+                              onClick={() => handleViewSale(group)}
                             >
                               <Eye />
                             </Button>
-                            {balance > 0 && (
-                              <Button
-                                variant="success"
-                                size="sm"
-                                onClick={() => openPaymentModal(o.id, "order")}
-                              >
-                                Pay
-                              </Button>
-                            )}
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <th colSpan="3" className="text-end">
-                        Totals
-                      </th>
-                      <th>
-                        {currency}
-                        {totalOrdersAmount.toFixed(2)}
-                      </th>
-                      <th colSpan="2">
-                        {currency}
-                        {totalOrdersBalance.toFixed(2)}
-                      </th>
-                    </tr>
-                  </tfoot>
-                </Table>
+                      ))}
+                    </tbody>
+                  </Table>
+                </div>
+                <div className="customer-table-footer">
+                  <div className="customer-table-summary">
+                    Filtered sales total: <strong>{currency}{salesTotal.toFixed(2)}</strong>
+                  </div>
+                  <CustomerPagination
+                    currentPage={salesPage}
+                    totalPages={salesTotalPages}
+                    onPageChange={setSalesPage}
+                  />
+                </div>
               </Tab>
-              <Tab eventKey="dues" title="Dues">
-                <Table striped bordered hover responsive>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Invoice ID (SR_ID)</th>
-                      <th>Date</th>
-                      <th>Total Amount</th>
-                      <th>Amount Paid</th>
-                      <th>Balance</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredDues.map((d, index) => {
-                      const balance = d.totalAmount - d.paidAmount;
-                      return (
-                        <tr key={d.id}>
-                          <td>{index + 1}</td>
-                          <td>{d.SR_ID}</td>
-                          <td>{d.date}</td>
-                          <td>${d.totalAmount.toFixed(2)}</td>
-                          <td>
-                            {currency}
-                            {d.paidAmount.toFixed(2)}
-                          </td>
-                          <td>
-                            {currency}
-                            {balance.toFixed(2)}
-                          </td>
-                          <td>
-                            {balance > 0 ? (
-                              <Button
-                                variant="success"
-                                size="sm"
-                                onClick={() => openPaymentModal(d.id, "due")}
-                              >
-                                Pay Due
-                              </Button>
-                            ) : (
-                              "Cleared"
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <th colSpan="3" className="text-end">
-                        Totals
-                      </th>
-                      <th>
-                        {currency}
-                        {duesTotals.totalAmount.toFixed(2)}
-                      </th>
-                      <th>
-                        {currency}
-                        {duesTotals.paidAmount.toFixed(2)}
-                      </th>
-                      <th colSpan="2">
-                        {currency}
-                        {duesTotals.balance.toFixed(2)}
-                      </th>
-                    </tr>
-                  </tfoot>
-                </Table>
+
+              <Tab eventKey="orders" title={`Orders (${filteredOrders.length})`}>
+                <div className="customer-table-wrap">
+                  <Table hover className="align-middle mb-0 customer-modern-table">
+                    <thead>
+                      <tr>
+                        <th style={headerCellStyle}>#</th>
+                        <th style={headerCellStyle}>Order ID</th>
+                        <th style={headerCellStyle}>Date</th>
+                        <th style={headerCellStyle}>Total</th>
+                        <th style={headerCellStyle}>Balance</th>
+                        <th style={{ ...headerCellStyle, textAlign: "center" }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedOrders.map((o, index) => {
+                        const balance = o.totalAmount - o.depositedAmount;
+                        return (
+                          <tr key={o.id}>
+                            <td style={bodyCellStyle}>{(ordersPage - 1) * detailRowsPerPage + index + 1}</td>
+                            <td style={bodyCellStyle}>{o.id}</td>
+                            <td style={bodyCellStyle}>{o.date}</td>
+                            <td style={bodyCellStyle}>{currency}{o.totalAmount.toFixed(2)}</td>
+                            <td style={bodyCellStyle}>{currency}{balance.toFixed(2)}</td>
+                            <td style={{ ...bodyCellStyle, textAlign: "center" }}>
+                              <div className="customer-action-row">
+                                <Button
+                                  variant="light"
+                                  style={actionIconButtonStyle(palette.blue)}
+                                  onClick={() => handleViewOrder(o)}
+                                >
+                                  <Eye />
+                                </Button>
+                                {balance > 0 && (
+                                  <Button
+                                    variant="light"
+                                    style={actionIconButtonStyle(palette.green)}
+                                    onClick={() => openPaymentModal(o.id, "order")}
+                                  >
+                                    Pay
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </Table>
+                </div>
+                <div className="customer-table-footer">
+                  <div className="customer-table-summary">
+                    Orders total: <strong>{currency}{totalOrdersAmount.toFixed(2)}</strong>
+                    <span className="customer-summary-spacer" />
+                    Balance: <strong>{currency}{totalOrdersBalance.toFixed(2)}</strong>
+                  </div>
+                  <CustomerPagination
+                    currentPage={ordersPage}
+                    totalPages={ordersTotalPages}
+                    onPageChange={setOrdersPage}
+                  />
+                </div>
+              </Tab>
+
+              <Tab eventKey="dues" title={`Dues (${filteredDues.length})`}>
+                <div className="customer-table-wrap">
+                  <Table hover className="align-middle mb-0 customer-modern-table">
+                    <thead>
+                      <tr>
+                        <th style={headerCellStyle}>#</th>
+                        <th style={headerCellStyle}>Invoice ID</th>
+                        <th style={headerCellStyle}>Date</th>
+                        <th style={headerCellStyle}>Total Amount</th>
+                        <th style={headerCellStyle}>Amount Paid</th>
+                        <th style={headerCellStyle}>Balance</th>
+                        <th style={{ ...headerCellStyle, textAlign: "center" }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedDues.map((d, index) => {
+                        const balance = d.totalAmount - d.paidAmount;
+                        return (
+                          <tr key={d.id}>
+                            <td style={bodyCellStyle}>{(duesPage - 1) * detailRowsPerPage + index + 1}</td>
+                            <td style={bodyCellStyle}>{d.SR_ID}</td>
+                            <td style={bodyCellStyle}>{d.date}</td>
+                            <td style={bodyCellStyle}>{currency}{d.totalAmount.toFixed(2)}</td>
+                            <td style={bodyCellStyle}>{currency}{d.paidAmount.toFixed(2)}</td>
+                            <td style={bodyCellStyle}>{currency}{balance.toFixed(2)}</td>
+                            <td style={{ ...bodyCellStyle, textAlign: "center" }}>
+                              {balance > 0 ? (
+                                <Button
+                                  variant="light"
+                                  style={actionIconButtonStyle(palette.green)}
+                                  onClick={() => openPaymentModal(d.id, "due")}
+                                >
+                                  Pay
+                                </Button>
+                              ) : (
+                                <span className="customer-badge customer-badge-green">Cleared</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </Table>
+                </div>
+                <div className="customer-table-footer">
+                  <div className="customer-table-summary">
+                    Dues total: <strong>{currency}{duesTotals.totalAmount.toFixed(2)}</strong>
+                    <span className="customer-summary-spacer" />
+                    Paid: <strong>{currency}{duesTotals.paidAmount.toFixed(2)}</strong>
+                    <span className="customer-summary-spacer" />
+                    Balance: <strong>{currency}{duesTotals.balance.toFixed(2)}</strong>
+                  </div>
+                  <CustomerPagination
+                    currentPage={duesPage}
+                    totalPages={duesTotalPages}
+                    onPageChange={setDuesPage}
+                  />
+                </div>
               </Tab>
             </Tabs>
-            <PaymentModal
-              show={!!paymentInfo}
-              onHide={() => setPaymentInfo(null)}
-              paymentInfo={paymentInfo}
-              onMakePayment={onMakePayment}
-            />
-            <SaleDetailModal
-              show={showSaleDetail}
-              onHide={() => setShowSaleDetail(false)}
-              saleGroup={selectedSaleGroup}
-              customerName={customer.name}
-            />
-            <OrderDetailModal
-              show={showOrderDetail}
-              onHide={() => setShowOrderDetail(false)}
-              order={selectedOrder}
-              customerName={customer.name}
-            />
-          </Col>
-        </Row>
+          </div>
+        </div>
+
+        <PaymentModal
+          show={!!paymentInfo}
+          onHide={() => setPaymentInfo(null)}
+          paymentInfo={paymentInfo}
+          onMakePayment={onMakePayment}
+        />
+        <SaleDetailModal
+          show={showSaleDetail}
+          onHide={() => setShowSaleDetail(false)}
+          saleGroup={selectedSaleGroup}
+          customerName={customer.name}
+        />
+        <OrderDetailModal
+          show={showOrderDetail}
+          onHide={() => setShowOrderDetail(false)}
+          order={selectedOrder}
+          customerName={customer.name}
+        />
       </Container>
     </>
   );
@@ -1179,11 +1368,20 @@ const CustomerListPage = ({
     setSortConfig({ key, direction });
   };
 
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) return "↕";
+    return sortConfig.direction === "ascending" ? "↑" : "↓";
+  };
+
   const handleRowsPerPageChange = (e) => {
     const value = e.target.value;
     setRowsPerPage(value === "all" ? "all" : Number(value));
     setCurrentPage(1);
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const handleExport = (format) => {
     const headers = [
@@ -1215,253 +1413,239 @@ const CustomerListPage = ({
     }
   };
 
+  const totals = useMemo(
+    () => ({
+      totalCustomers: sortedCustomers.length,
+      paidUp: sortedCustomers.filter((customer) => customer.dues === 0).length,
+      totalSales: sortedCustomers.reduce((sum, customer) => sum + (Number(customer.totalSales) || 0), 0),
+      totalDues: sortedCustomers.reduce((sum, customer) => sum + (Number(customer.dues) || 0), 0),
+    }),
+    [sortedCustomers]
+  );
+
   return (
     <>
-      <Row className="mb-4 align-items-center">
-        <Col md={4}>
-          <h5>Customer Management</h5>
-        </Col>
-        <Col md={8}>
-          <Row className="g-2">
-            <Col>
-              <InputGroup>
-                <Form.Control
-                  placeholder="Search..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </InputGroup>
-            </Col>
-            <Col>
-              <Form.Select
-                style={{ height: "35px" }}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all">All Statuses</option>
-                <option value="paid">Paid Up</option>
-                <option value="due">Has Dues</option>
-              </Form.Select>
-            </Col>
-            <Col>
-              <Form.Select
-                style={{ height: "35px" }}
-                value={rowsPerPage}
-                onChange={handleRowsPerPageChange}
-              >
-                <option value="5">5 Rows</option>
-                <option value="10">10 Rows</option>
-                <option value="25">25 Rows</option>
-                <option value="all">All Rows</option>
-              </Form.Select>
-            </Col>
-          </Row>
-        </Col>
-      </Row>
-
-      <div className="mb-3 d-flex justify-content-end gap-2">
-        <Button
-          variant="outline-secondary"
-          size="sm"
-          onClick={() => window.print()}
-        >
-          <Printer className="me-2" />
-          Print
-        </Button>
-        <Dropdown>
-          <Dropdown.Toggle
-            variant="outline-secondary"
-            size="sm"
-            id="dropdown-basic"
-          >
-            <Download className="me-2" />
-            Export
-          </Dropdown.Toggle>
-          <Dropdown.Menu>
-            <Dropdown.Item onClick={() => handleExport("pdf")}>
-              Export as PDF
-            </Dropdown.Item>
-            <Dropdown.Item onClick={() => handleExport("csv")}>
-              Export as CSV
-            </Dropdown.Item>
-          </Dropdown.Menu>
-        </Dropdown>
-        <PermissionWrapper
-          required={["customerscreate"]}
-          children={
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => setShowModal(true)}
-            >
-              <Person className="me-2" />
-              Add
+      <div className="customer-page-stack">
+        <header className="customer-list-hero">
+          <div>
+            <h2 className="customer-page-title">Customer Management</h2>
+            <p className="customer-page-subtitle">
+              Track customer relationships, balances, and activity from one organized workspace.
+            </p>
+          </div>
+          <div className="customer-header-actions">
+            <Button variant="light" onClick={() => window.print()} style={toolbarButtonStyle}>
+              <Printer className="me-2" />
+              Print
             </Button>
-          }
-        />
+            <Dropdown>
+              <Dropdown.Toggle variant="light" id="customer-export" style={toolbarButtonStyle}>
+                <Download className="me-2" />
+                Export
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => handleExport("pdf")}>Export as PDF</Dropdown.Item>
+                <Dropdown.Item onClick={() => handleExport("csv")}>Export as CSV</Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+            <PermissionWrapper
+              required={["customerscreate"]}
+              children={
+                <Button onClick={() => setShowModal(true)} style={primaryButtonStyle}>
+                  <Person className="me-2" />
+                  Add Customer
+                </Button>
+              }
+            />
+          </div>
+        </header>
 
-        <AddCustomer showModal={showModal} handleModalToggle={setShowModal} />
+        <div className="customer-metrics-grid">
+          <CustomerMetricCard
+            icon={<Person size={18} />}
+            title="Visible Customers"
+            value={totals.totalCustomers}
+            note="Customers matching your current filters"
+            accent={palette.greenSoft}
+            color={palette.green}
+          />
+          <CustomerMetricCard
+            icon={<Eye size={18} />}
+            title="Paid Up"
+            value={totals.paidUp}
+            note="Customers with no outstanding balance"
+            accent={palette.blueSoft}
+            color={palette.blue}
+          />
+          <CustomerMetricCard
+            icon={<Download size={18} />}
+            title="Total Sales"
+            value={`${currency}${totals.totalSales.toFixed(2)}`}
+            note="Combined sales across visible customers"
+            accent={palette.amberSoft}
+            color={palette.amber}
+          />
+          <CustomerMetricCard
+            icon={<Trash size={18} />}
+            title="Outstanding Dues"
+            value={`${currency}${totals.totalDues.toFixed(2)}`}
+            note="Total unpaid balances in view"
+            accent={palette.redSoft}
+            color={palette.red}
+          />
+        </div>
+
+        <div className="customer-toolbar-card" style={sectionCardStyle}>
+          <div className="customer-toolbar-copy">
+            <h3 className="customer-section-title">Filter Customers</h3>
+            <p className="customer-section-subtitle">
+              Search the list, narrow by balance status, and control table density.
+            </p>
+          </div>
+          <div className="customer-filter-grid">
+            <InputGroup style={searchGroupStyle}>
+              <InputGroup.Text style={searchAdornmentStyle}>
+                <Search />
+              </InputGroup.Text>
+              <Form.Control
+                placeholder="Search by name or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={searchInputStyle}
+              />
+            </InputGroup>
+            <Form.Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="customer-modern-select">
+              <option value="all">All Statuses</option>
+              <option value="paid">Paid Up</option>
+              <option value="due">Has Dues</option>
+            </Form.Select>
+            <Form.Select value={rowsPerPage} onChange={handleRowsPerPageChange} className="customer-modern-select">
+              <option value="5">5 Rows</option>
+              <option value="10">10 Rows</option>
+              <option value="25">25 Rows</option>
+              <option value="all">All Rows</option>
+            </Form.Select>
+          </div>
+        </div>
+
+        <div className="customer-detail-panel" style={sectionCardStyle}>
+          <div className="customer-table-wrap">
+            <Table hover className="align-middle mb-0 customer-modern-table">
+              <thead>
+                <tr>
+                  <th style={headerCellStyle}>#</th>
+                  <th style={{ ...headerCellStyle, cursor: "pointer" }} onClick={() => requestSort("name")}>
+                    Name {getSortIcon("name")}
+                  </th>
+                  <th style={{ ...headerCellStyle, cursor: "pointer" }} onClick={() => requestSort("email")}>
+                    Email {getSortIcon("email")}
+                  </th>
+                  <th style={{ ...headerCellStyle, cursor: "pointer" }} onClick={() => requestSort("branchName")}>
+                    Branch {getSortIcon("branchName")}
+                  </th>
+                  <th style={{ ...headerCellStyle, cursor: "pointer" }} onClick={() => requestSort("address")}>
+                    Address {getSortIcon("address")}
+                  </th>
+                  <th style={{ ...headerCellStyle, cursor: "pointer" }} onClick={() => requestSort("phone")}>
+                    Phone {getSortIcon("phone")}
+                  </th>
+                  <th style={{ ...headerCellStyle, cursor: "pointer" }} onClick={() => requestSort("totalSales")}>
+                    Total Sales {getSortIcon("totalSales")}
+                  </th>
+                  <th style={{ ...headerCellStyle, cursor: "pointer" }} onClick={() => requestSort("totalOrders")}>
+                    Orders {getSortIcon("totalOrders")}
+                  </th>
+                  <th style={{ ...headerCellStyle, cursor: "pointer" }} onClick={() => requestSort("dues")}>
+                    Dues {getSortIcon("dues")}
+                  </th>
+                  <th style={{ ...headerCellStyle, textAlign: "center" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedCustomers.map((c, index) => (
+                  <tr key={c.id}>
+                    <td style={bodyCellStyle}>
+                      {(currentPage - 1) * (rowsPerPage === "all" ? 0 : rowsPerPage) + index + 1}
+                    </td>
+                    <td style={bodyCellStyle}>
+                      <div className="customer-name-cell">
+                        <strong>{c.name}</strong>
+                      </div>
+                    </td>
+                    <td style={bodyCellStyle}>{c.email}</td>
+                    <td style={bodyCellStyle}>{c.branchName}</td>
+                    <td style={bodyCellStyle}>{c.address}</td>
+                    <td style={bodyCellStyle}>{c.phone}</td>
+                    <td style={bodyCellStyle}>{currency}{c.totalSales.toFixed(2)}</td>
+                    <td style={bodyCellStyle}>{c.totalOrders}</td>
+                    <td style={bodyCellStyle}>
+                      <span className={c.dues > 0 ? "customer-badge customer-badge-red" : "customer-badge customer-badge-green"}>
+                        {currency}{c.dues.toFixed(2)}
+                      </span>
+                    </td>
+                    <td style={{ ...bodyCellStyle, textAlign: "center" }}>
+                      <div className="customer-action-row">
+                        <PermissionWrapper
+                          required={["customersview"]}
+                          children={
+                            <Button
+                              variant="light"
+                              style={actionIconButtonStyle(palette.blue)}
+                              onClick={() => onSelectCustomer(c)}
+                            >
+                              <Eye />
+                            </Button>
+                          }
+                        />
+                        <PermissionWrapper
+                          required={["customersupdate"]}
+                          children={
+                            <Button
+                              variant="light"
+                              style={actionIconButtonStyle(palette.amber)}
+                              onClick={() => setEditingCustomer(c)}
+                            >
+                              <Pencil />
+                            </Button>
+                          }
+                        />
+                        <PermissionWrapper
+                          required={["customersdelete"]}
+                          children={
+                            <Button
+                              variant="light"
+                              style={actionIconButtonStyle(palette.red)}
+                              onClick={() => setDeletingCustomer(c)}
+                            >
+                              <Trash />
+                            </Button>
+                          }
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+          <div className="customer-table-footer">
+            <div className="customer-table-summary">
+              Sales total: <strong>{currency}{totals.totalSales.toFixed(2)}</strong>
+              <span className="customer-summary-spacer" />
+              Dues total: <strong>{currency}{totals.totalDues.toFixed(2)}</strong>
+            </div>
+            {rowsPerPage !== "all" && (
+              <CustomerPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
-      <Table striped bordered hover responsive>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th
-              onClick={() => requestSort("name")}
-              style={{ cursor: "pointer" }}
-            >
-              Name
-            </th>
-            <th
-              onClick={() => requestSort("email")}
-              style={{ cursor: "pointer" }}
-            >
-              Email
-            </th>
-            <th
-              onClick={() => requestSort("address")}
-              style={{ cursor: "pointer" }}
-            >
-              Address
-            </th>
-            <th
-              onClick={() => requestSort("phone")}
-              style={{ cursor: "pointer" }}
-            >
-              Phone
-            </th>
-            <th
-              onClick={() => requestSort("totalSales")}
-              style={{ cursor: "pointer" }}
-            >
-              Total Sales
-            </th>
-            <th
-              onClick={() => requestSort("totalOrders")}
-              style={{ cursor: "pointer" }}
-            >
-              No. of Orders
-            </th>
-            <th
-              onClick={() => requestSort("dues")}
-              style={{ cursor: "pointer" }}
-            >
-              Dues
-            </th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {paginatedCustomers.map((c, index) => (
-            <tr key={c.id}>
-              <td>
-                {(currentPage - 1) * (rowsPerPage === "all" ? 0 : rowsPerPage) +
-                  index +
-                  1}
-              </td>
-              <td>{c.name}</td>
-              <td>{c.email}</td>
-              <td>{c.address}</td>
-              <td>{c.phone}</td>
-              <td className="text-end">
-                {currency}
-                {c.totalSales.toFixed(2)}
-              </td>
-              <td className="text-end">{c.totalOrders}</td>
-              <td className="text-end">
-                {currency}
-                {c.dues.toFixed(2)}
-              </td>
-              <td className="text-center">
-                <PermissionWrapper
-                  required={["customersview"]}
-                  children={
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      className="me-2"
-                      onClick={() => onSelectCustomer(c)}
-                    >
-                      <Eye />
-                    </Button>
-                  }
-                />
-                <PermissionWrapper
-                  required={["customersupdate"]}
-                  children={
-                    <Button
-                      variant="outline-warning"
-                      size="sm"
-                      className="me-2"
-                      onClick={() => setEditingCustomer(c)}
-                    >
-                      <Pencil />
-                    </Button>
-                  }
-                />
-                <PermissionWrapper
-                  required={["customersdelete"]}
-                  children={
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => setDeletingCustomer(c)}
-                    >
-                      <Trash />
-                    </Button>
-                  }
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <th colSpan="5">Totals</th>
-            <th className="text-end">
-              {currency}
-              {sortedCustomers
-                .reduce((sum, c) => sum + Number(c.totalSales) || 0, 0)
-                .toFixed(2)}
-            </th>
-            <th className="text-end">
-              {sortedCustomers.reduce(
-                (sum, c) => sum + Number(c.totalOrders) || 0,
-                0
-              )}
-            </th>
-            <th className="text-end">
-              {currency}
-              {sortedCustomers.reduce((sum, c) => sum + c.dues, 0).toFixed(2)}
-            </th>
-            <th></th>
-          </tr>
-        </tfoot>
-      </Table>
-      {rowsPerPage !== "all" && totalPages > 1 && (
-        <div className="d-flex justify-content-center">
-          <Pagination>
-            <Pagination.Prev
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            />
-            {[...Array(totalPages).keys()].map((num) => (
-              <Pagination.Item
-                key={num + 1}
-                active={num + 1 === currentPage}
-                onClick={() => setCurrentPage(num + 1)}
-              >
-                {num + 1}
-              </Pagination.Item>
-            ))}
-            <Pagination.Next
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            />
-          </Pagination>
-        </div>
-      )}
+      <AddCustomer showModal={showModal} handleModalToggle={setShowModal} />
       <EditCustomerModal
         show={!!editingCustomer}
         onHide={() => setEditingCustomer(null)}
@@ -1481,7 +1665,9 @@ const CustomerListPage = ({
 
 // --- Main Exported Component ---
 export default function CustomerPage() {
+  useGetBranchesQuery();
   // Get raw data from Redux store
+  const branches = useSelector(selectBranches) ?? [];
   const rawCustomersData = useSelector(selectRawCustomers);
   const rawSalesData = useSelector(selectSales);
   const rawOrdersData = useSelector(selectOrders);
@@ -1513,6 +1699,10 @@ export default function CustomerPage() {
 
   // Process data from Redux store when it changes
   useEffect(() => {
+    const branchMap = new Map(
+      (branches || []).map((branch) => [parseInt(branch.branchId, 10), branch.branchName])
+    );
+
     // Ensure data is an array before mapping to prevent errors
     const inventoryMap = new Map(
       (rawInventoryData || []).map((item) => [
@@ -1523,6 +1713,8 @@ export default function CustomerPage() {
 
     const processedCustomers = (rawCustomersData || []).map((c) => ({
       id: parseInt(c.custId, 10),
+      branchId: c.branchId ? parseInt(c.branchId, 10) : "",
+      branchName: branchMap.get(parseInt(c.branchId, 10)) || "Unassigned",
       name: c.custName,
       email: c.custEmail,
       phone: c.custContact,
@@ -1585,6 +1777,7 @@ export default function CustomerPage() {
     setCustomers(processedCustomers);
     setCustomerDetails(processedDetails);
   }, [
+    branches,
     rawCustomersData,
     rawSalesData,
     rawOrdersData,
@@ -1660,7 +1853,7 @@ export default function CustomerPage() {
         onClose={() => setToast({ ...toast, show: false })}
       />
       {selectedCustomer ? (
-        <Container fluid="lg" className="py-4">
+        <Container fluid="lg" className="customer-page-shell py-4">
           <CustomerDetailPage
             customer={selectedCustomer}
             details={customerDetails[selectedCustomer.id]}
@@ -1669,7 +1862,7 @@ export default function CustomerPage() {
           />
         </Container>
       ) : (
-        <Container fluid="lg" className="py-4">
+        <Container fluid="lg" className="customer-page-shell py-4">
           <CustomerListPage
             customers={customers}
             customerDetails={customerDetails}

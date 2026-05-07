@@ -18,7 +18,7 @@ export const extendedApiSlice = apiSlice.injectEndpoints({
         getStock: builder.query({
             query: () => '/retrievals',
             transformResponse:  responseData => {
-            return stockAdapter.setAll(initialState, responseData)
+            return stockAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : [])
            },
            providesTags: [commonTags.inventory],
         //    providesTags: (result, error, arg) => [
@@ -31,7 +31,7 @@ export const extendedApiSlice = apiSlice.injectEndpoints({
         getStockById: builder.query({
             query: id => `retrievals/${id}`,
             transformResponse: responseData => {
-                return stockAdapter.setAll(initialState, responseData);
+                return stockAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : responseData ? [responseData] : []);
             },
             providesTags: [commonTags.inventory],
             // providesTags: (result, error, arg) => [

@@ -1,0 +1,240 @@
+.inventory-page {
+  position: relative;
+}
+
+.inventory-page .row {
+  height: auto;
+  min-height: 0;
+}
+
+.inventory-page .card,
+.inventory-page .table-responsive,
+.inventory-page .dropdown,
+.inventory-page .input-group {
+  position: relative;
+}
+
+.inventory-page .table {
+  margin-bottom: 0;
+}
+
+.inventory-page .pagination {
+  flex-wrap: wrap;
+}
+
+.inventory-page .dropdown-menu {
+  z-index: 1055;
+}
+
+.inventory-page-modal .row {
+  height: auto;
+  min-height: 0;
+}
+
+.inventory-modal-dialog {
+  max-width: min(1100px, calc(100vw - 2rem));
+  margin: 1rem auto;
+}
+
+.inventory-modal-content {
+  border: 0;
+  border-radius: 28px;
+  overflow: hidden;
+  background: #f8fbf8;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+}
+
+.inventory-modal-header {
+  align-items: flex-start;
+  padding: 1.4rem 1.5rem 1rem;
+  border-bottom: 1px solid #e7efe9;
+  background:
+    linear-gradient(135deg, rgba(232, 245, 236, 0.95), rgba(255, 255, 255, 0.98)),
+    #ffffff;
+}
+
+.inventory-modal-header .btn-close {
+  margin-top: 0.1rem;
+}
+
+.inventory-modal-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.inventory-modal-body {
+  padding: 1.25rem 1.5rem 1rem;
+  background:
+    radial-gradient(circle at top right, rgba(232, 245, 236, 0.8), transparent 36%),
+    #f8fbf8;
+}
+
+.inventory-form-section {
+  overflow: hidden;
+}
+
+.inventory-form-section-title {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+}
+
+.inventory-page-modal .form-label {
+  margin-bottom: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #15202b;
+}
+
+.inventory-page-modal .form-control,
+.inventory-page-modal .form-select,
+.inventory-page-modal .input-group-text {
+  min-height: 48px;
+  border-radius: 14px;
+  border-color: #d9e7dd;
+  background-color: #ffffff;
+}
+
+.inventory-page-modal textarea.form-control {
+  min-height: 120px;
+}
+
+.inventory-page-modal .input-group {
+  flex-wrap: nowrap;
+}
+
+.inventory-page-modal .input-group > .form-control,
+.inventory-page-modal .input-group > .form-select {
+  min-width: 0;
+}
+
+.inventory-modal-footer {
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid #e7efe9;
+  background-color: #ffffff;
+}
+
+.inventory-modal-footer .btn {
+  min-height: 48px;
+  border-radius: 14px;
+  padding-inline: 1.15rem;
+  font-weight: 700;
+}
+
+@media (max-width: 991.98px) {
+  .inventory-page .table {
+    min-width: 980px !important;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .inventory-modal-dialog {
+    max-width: calc(100vw - 1rem);
+    margin: 0.5rem auto;
+  }
+
+  .inventory-modal-header,
+  .inventory-modal-body,
+  .inventory-modal-footer {
+    padding-inline: 1rem;
+  }
+
+  .inventory-form-section {
+    border-radius: 18px !important;
+    padding: 0.9rem 0.9rem 0.25rem !important;
+  }
+
+  .inventory-modal-footer {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .inventory-modal-footer .btn {
+    width: 100%;
+  }
+}
+
+body.ampla-dark-theme .inventory-page {
+  background-color: var(--ampla-app-bg, #0c1210) !important;
+  color: var(--ampla-text-color, #edf3ef) !important;
+}
+
+body.ampla-dark-theme .inventory-page h1,
+body.ampla-dark-theme .inventory-page h2,
+body.ampla-dark-theme .inventory-page h3,
+body.ampla-dark-theme .inventory-page h4,
+body.ampla-dark-theme .inventory-page h5,
+body.ampla-dark-theme .inventory-page h6,
+body.ampla-dark-theme .inventory-page strong,
+body.ampla-dark-theme .inventory-page td,
+body.ampla-dark-theme .inventory-page th {
+  color: var(--ampla-text-color, #edf3ef) !important;
+}
+
+body.ampla-dark-theme .inventory-page p,
+body.ampla-dark-theme .inventory-page small {
+  color: var(--ampla-muted-color, #9fb0a7) !important;
+}
+
+body.ampla-dark-theme .inventory-page .card,
+body.ampla-dark-theme .inventory-page .dropdown-menu,
+body.ampla-dark-theme .inventory-form-section,
+body.ampla-dark-theme .inventory-modal-content,
+body.ampla-dark-theme .inventory-modal-body,
+body.ampla-dark-theme .inventory-modal-footer {
+  background: var(--ampla-surface-bg, #111917) !important;
+  background-color: var(--ampla-surface-bg, #111917) !important;
+  color: var(--ampla-text-color, #edf3ef) !important;
+  border-color: var(--ampla-border-color, rgba(255,255,255,0.12)) !important;
+  box-shadow: var(--ampla-shadow, 0 16px 36px rgba(0,0,0,0.24)) !important;
+}
+
+body.ampla-dark-theme .inventory-modal-header {
+  background:
+    linear-gradient(135deg, rgba(var(--ampla-accent-rgb, 47, 143, 87), 0.14), rgba(255,255,255,0.025)),
+    var(--ampla-surface-bg, #111917) !important;
+  border-color: var(--ampla-border-color, rgba(255,255,255,0.12)) !important;
+}
+
+body.ampla-dark-theme .inventory-page .table thead th {
+  background-color: var(--ampla-surface-soft, #16211e) !important;
+  color: var(--ampla-muted-color, #9fb0a7) !important;
+}
+
+body.ampla-dark-theme .inventory-page .table tbody tr:nth-child(odd) td {
+  background-color: rgba(255,255,255,0.035) !important;
+}
+
+body.ampla-dark-theme .inventory-page .btn-light,
+body.ampla-dark-theme .inventory-page .dropdown-toggle {
+  background-color: var(--ampla-surface-soft, #16211e) !important;
+  color: var(--ampla-text-color, #edf3ef) !important;
+  border-color: var(--ampla-border-color, rgba(255,255,255,0.12)) !important;
+}
+
+body.ampla-dark-theme .inventory-page-modal .form-control,
+body.ampla-dark-theme .inventory-page-modal .form-select,
+body.ampla-dark-theme .inventory-page-modal .input-group-text,
+body.ampla-dark-theme .inventory-page-modal textarea.form-control {
+  background-color: var(--ampla-input-bg, #101715) !important;
+  color: var(--ampla-text-color, #edf3ef) !important;
+  border-color: var(--ampla-border-color, rgba(255,255,255,0.12)) !important;
+}
+
+body.ampla-dark-theme .inventory-page-modal .form-control::placeholder,
+body.ampla-dark-theme .inventory-page-modal textarea.form-control::placeholder {
+  color: var(--ampla-muted-color, #9fb0a7) !important;
+}
+
+body.ampla-dark-theme .inventory-page-modal .form-select option {
+  background-color: var(--ampla-surface-bg, #111917) !important;
+  color: var(--ampla-text-color, #edf3ef) !important;
+}
+
+body.ampla-dark-theme .inventory-page-modal .btn-light,
+body.ampla-dark-theme .inventory-page-modal .btn-outline-secondary {
+  background-color: var(--ampla-surface-soft, #16211e) !important;
+  color: var(--ampla-text-color, #edf3ef) !important;
+  border-color: var(--ampla-border-color, rgba(255,255,255,0.12)) !important;
+}

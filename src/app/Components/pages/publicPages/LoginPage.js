@@ -96,7 +96,7 @@ const LoginPage = () => {
               />
             </Form.Group>
           </Form>
-          <p>Forget your password <a href="http://localhost/mystock/index.php/login/magic-link">Use a Login Link</a></p>
+          <p>Forget your password <Link to="/magic-login">Use a Login Link</Link></p>
         </Modal.Body>
         <Modal.Footer className="bg-dark text-light">
           <Button variant="secondary" onClick={handleClose}>

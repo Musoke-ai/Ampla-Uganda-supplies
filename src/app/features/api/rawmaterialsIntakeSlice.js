@@ -19,7 +19,7 @@ export const extendedRawMaterialsIntakeApiSlice = apiSlice.injectEndpoints({
             query: () => '/getRawMaterialsLists',
             transformResponse:  responseData => {
                  console.log('Intake response:', responseData); 
-            return rawMaterialsIntakeAdapter.setAll(initialState, responseData)
+            return rawMaterialsIntakeAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : [])
            },
            providesTags: [commonTags.inventory],
         }),

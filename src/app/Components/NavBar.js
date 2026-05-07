@@ -15,6 +15,7 @@ import UserAvatar from "./production/UserProfile";
 import { useSettings } from "./Settings";
 import ConnectionStatus from './alerts/ConnectionStatus';
 
+const amplaLogo = `${process.env.PUBLIC_URL || ""}/logos/ampla_logo.png`;
 
 // =================================================================================
 // Main NavBar Component (Simplified)
@@ -51,7 +52,15 @@ const handleLogout = async () => {
     return (
         <div className="navBar z-2 d-flex justify-content-between align-items-center" style={{ backgroundColor: settings.theme === 'dark' ? '#111111' : settings.navbarColor, padding: '0 1rem', height: '60px' }}>
             {/* Business Name */}
-            <div className="logo">
+            <div className="logo d-flex align-items-center gap-2">
+                <img
+                    src={amplaLogo}
+                    alt="Ampla Uganda"
+                    width={38}
+                    height={38}
+                    className="rounded shadow-sm"
+                    style={{ objectFit: "cover" }}
+                />
                 <div className="text-light fw-bold fs-5">{profile?.busName || "Business Name"}</div>
             </div>
 

@@ -1,476 +1,566 @@
-import React, { useState, useEffect } from 'react';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import { Container, Row, Col, Card, Table, Button, Form, InputGroup, FormControl } from 'react-bootstrap';
-import { BoxArrowUpRight, PeopleFill, CartFill } from 'react-bootstrap-icons';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
-import { useSelector } from 'react-redux';
-import { selectCustomers } from '../../features/api/customers';
-import { selectSales } from '../../features/api/salesSlice';
-import { selectStock } from '../../features/stock/stockSlice';
-import PermissionWrapper from '../../auth/PermissionWrapper';
+import React, { useMemo, useState } from "react";
+import {
+  Button,
+  Card,
+  Col,
+  Container,
+  Dropdown,
+  Form,
+  InputGroup,
+  Pagination,
+  Row,
+  Table,
+} from "react-bootstrap";
+import {
+  ArrowUpRight,
+  BoxSeam,
+  CartFill,
+  Download,
+  PeopleFill,
+  Printer,
+  Search,
+} from "react-bootstrap-icons";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
+import { useSelector } from "react-redux";
 
-import { useSettings } from '../Settings';
+import { selectCustomers } from "../../features/api/customers";
+import { selectSales } from "../../features/api/salesSlice";
+import { selectStock } from "../../features/stock/stockSlice";
+import PermissionWrapper from "../../auth/PermissionWrapper";
+import { useSettings } from "../Settings";
+import "./WorkspacePages.css";
+
+const palette = {
+  bg: "#f8fbf8",
+  surface: "#ffffff",
+  border: "#e7efe9",
+  text: "#15202b",
+  muted: "#6f7d8c",
+  green: "#2f8f57",
+  greenSoft: "#e8f5ec",
+  blue: "#2f80ed",
+  blueSoft: "#e8f1ff",
+  amber: "#f59e0b",
+  amberSoft: "#fff4df",
+  shadow: "0 12px 32px rgba(15, 23, 42, 0.05)",
+};
+
+const sectionCardStyle = {
+  borderRadius: 28,
+  backgroundColor: palette.surface,
+  boxShadow: palette.shadow,
+  border: `1px solid ${palette.border}`,
+};
+
+const toolbarButtonStyle = {
+  minHeight: 44,
+  padding: "0.65rem 1.1rem",
+  borderRadius: 16,
+  border: `1px solid ${palette.border}`,
+  backgroundColor: "#ffffff",
+  color: palette.text,
+  fontWeight: 700,
+  boxShadow: "none",
+};
+
+const controlInputStyle = {
+  minHeight: 46,
+  borderRadius: 16,
+  borderColor: palette.border,
+};
+
+const headerCellStyle = {
+  color: palette.text,
+  fontWeight: 800,
+  fontSize: 14,
+  whiteSpace: "nowrap",
+  backgroundColor: "#ffffff",
+  paddingTop: 18,
+  paddingBottom: 18,
+};
+
+const bodyCellStyle = {
+  color: palette.text,
+  fontSize: 14,
+  paddingTop: 18,
+  paddingBottom: 18,
+  verticalAlign: "middle",
+};
+
+function MetricCard({ icon, title, value, note, accent, color }) {
+  return (
+    <div className="workspace-metric-card" style={sectionCardStyle}>
+      <div className="workspace-metric-icon" style={{ backgroundColor: accent, color }}>
+        {icon}
+      </div>
+      <div className="workspace-metric-body">
+        <div className="workspace-metric-title">{title}</div>
+        <div className="workspace-metric-value">{value}</div>
+        <div className="workspace-metric-note">{note}</div>
+      </div>
+    </div>
+  );
+}
+
+function PagePagination({ currentPage, totalPages, onPageChange }) {
+  if (totalPages <= 1) return null;
+
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1).slice(
+    Math.max(0, currentPage - 3),
+    Math.max(0, currentPage - 3) + 5
+  );
+
+  return (
+    <Pagination className="mb-0">
+      <Pagination.Prev
+        disabled={currentPage === 1}
+        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+      />
+      {pages.map((pageNumber) => (
+        <Pagination.Item
+          key={pageNumber}
+          active={pageNumber === currentPage}
+          onClick={() => onPageChange(pageNumber)}
+        >
+          {pageNumber}
+        </Pagination.Item>
+      ))}
+      <Pagination.Next
+        disabled={currentPage === totalPages}
+        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+      />
+    </Pagination>
+  );
+}
 
 const SalesPage = () => {
+  const { settings } = useSettings();
+  const currency = settings?.currency !== "none" ? settings?.currency : "";
 
-    const { settings } = useSettings();
+  const customers = useSelector(selectCustomers) ?? [];
+  const sales = useSelector(selectSales) ?? [];
+  const inventory = useSelector(selectStock) ?? [];
 
-    const customers = useSelector(selectCustomers);
-    const sales = useSelector(selectSales);
-    const inventory = useSelector(selectStock);
+  const [filter, setFilter] = useState("");
+  const [viewBy, setViewBy] = useState("product");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [aggregatePage, setAggregatePage] = useState(1);
+  const [dailyPage, setDailyPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(8);
 
-    const [loading, setLoading] = useState(false);
+  const formatMoney = (value) =>
+    `${currency} ${Number(value || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })}`;
 
-    // State for filters and view options
-    const [filter, setFilter] = useState('');
-    const [viewBy, setViewBy] = useState('product');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+  const processedData = useMemo(
+    () =>
+      sales.map((sale) => {
+        const customer = customers.find((item) => String(item.custId) === String(sale.custId));
+        const product = inventory.find((item) => String(item.itemId) === String(sale.saleItemId));
+        const quantity = Number(sale.saleQuantity) || 0;
+        const price = Number(sale.salePrice) || 0;
 
-    // Memoized calculations for performance
-    const processedData = React.useMemo(() => {
-        return sales.map(sale => {
-            const customer = customers.find(c => c.custId === sale.custId);
-            const product = inventory.find(i => i.itemId === sale.saleItemId);
-            return {
-                ...sale,
-                customerName: customer ? customer?.custName : 'Unknown',
-                productName: product ? product?.itemName : 'Unknown',
-                price: product ? parseFloat(sale?.salePrice) : 0,
-                totalSale: product ? parseFloat(sale.salePrice) * parseInt(sale.saleQuantity, 10) : 0
-            };
-        });
-    }, [sales, customers, inventory]);
-
-    const filteredData = React.useMemo(() => {
-        return processedData.filter(item => {
-            const itemDate = new Date(item.saleDateCreated);
-            const start = startDate ? new Date(startDate) : null;
-            const end = endDate ? new Date(endDate) : null;
-            
-            // Adjust start and end dates to be inclusive
-            if(start) start.setHours(0, 0, 0, 0);
-            if(end) end.setHours(23, 59, 59, 999);
-
-            const isDateInRange = (!start || itemDate >= start) && (!end || itemDate <= end);
-            
-            const isTextMatch = item.productName.toLowerCase().includes(filter.toLowerCase()) ||
-                                item.customerName.toLowerCase().includes(filter.toLowerCase());
-
-            return isDateInRange && isTextMatch;
-        });
-    }, [processedData, filter, startDate, endDate]);
-
-    const groupedData = React.useMemo(() => {
-        const groups = filteredData.reduce((acc, item) => {
-            const key = item['saleDateCreated'];
-            if (!acc[key]) {
-                acc[key] = [];
-            }
-            acc[key].push(item);
-            return acc;
-        }, {});
-        return Object.entries(groups).sort(([a], [b]) => new Date(b) - new Date(a));
-    }, [filteredData]);
-
-    const aggregatedViewData = React.useMemo(() => {
-        const aggregation = filteredData.reduce((acc, item) => {
-            const key = viewBy === 'product' ? item.productName : item.customerName;
-            if (!acc[key]) {
-                acc[key] = { totalQuantity: 0, totalRevenue: 0, salesCount: 0 };
-            }
-            acc[key].totalQuantity += parseInt(item.saleQuantity, 10);
-            acc[key].totalRevenue += Number(item.salePrice) || 0 * Number(item.saleQuantity) || 0;
-            acc[key].salesCount++;
-            // parseInt(item.saleQuantity)*
-            return acc;
-        }, {});
-        return Object.entries(aggregation).map(([name, data]) => ({ name, ...data }));
-    }, [filteredData, viewBy]);
-
-    // KPI Calculations
-    const totalQuantitySold = React.useMemo(() => filteredData.reduce((sum, item) => sum + parseInt(item.saleQuantity || 0, 10), 0), [filteredData]);
-    const totalRevenue = React.useMemo(() => filteredData.reduce((sum, item) => sum + item.totalSale || 0, 0), [filteredData]);
-    const totalCustomers = React.useMemo(() => new Set(filteredData.map(s => s.custId)).size, [filteredData]);
-
-    // Product and Customer Insights (calculated on all data, not filtered)
-    const productSales = React.useMemo(() => {
-        const productAggregation = processedData.reduce((acc, item) => {
-            const key = item.productName;
-            if (!acc[key]) {
-                acc[key] = { name: key, totalQuantity: 0 };
-            }
-            acc[key].totalQuantity += parseInt(item.quantitySold, 10);
-            return acc;
-        }, {});
-        const salesByProduct = Object.values(productAggregation);
-        salesByProduct.sort((a, b) => b.totalQuantity - a.totalQuantity);
         return {
-            mostSelling: salesByProduct[0],
-            leastSelling: salesByProduct[salesByProduct.length - 1]
+          ...sale,
+          customerName: customer?.custName || "Unknown",
+          productName: product?.itemName || "Unknown",
+          quantity,
+          price,
+          totalSale: quantity * price,
         };
-    }, [processedData]);
+      }),
+    [customers, inventory, sales]
+  );
 
-    const customerSales = React.useMemo(() => {
-        const customerAggregation = processedData.reduce((acc, item) => {
-            const key = item.customerName;
-            if (!acc[key]) {
-                acc[key] = { name: key, totalRevenue: 0 };
-            }
-            acc[key].totalRevenue += item.totalSale;
-            return acc;
-        }, {});
-        const salesByCustomer = Object.values(customerAggregation);
-        salesByCustomer.sort((a, b) => b.totalRevenue - a.totalRevenue);
-        return {
-            mostValuable: salesByCustomer[0],
-            leastValuable: salesByCustomer[salesByCustomer.length - 1]
-        };
-    }, [processedData]);
+  const filteredData = useMemo(
+    () =>
+      processedData.filter((item) => {
+        const itemDate = new Date(item.saleDateCreated);
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+        if (start) start.setHours(0, 0, 0, 0);
+        if (end) end.setHours(23, 59, 59, 999);
 
-    // Export and Print functions
-    const exportToPDF = (data, title) => {
-        const doc = new jsPDF();
-        doc.text(title, 14, 16);
-        const tableColumn = ["Date", "Customer", "Product", "Quantity", "Price", "Total"];
-        const tableRows = [];
+        const isDateInRange = (!start || itemDate >= start) && (!end || itemDate <= end);
+        const normalizedFilter = filter.toLowerCase();
+        const isTextMatch =
+          item.productName.toLowerCase().includes(normalizedFilter) ||
+          item.customerName.toLowerCase().includes(normalizedFilter);
 
-        data.forEach(item => {
-            const rowData = [
-                item.saleDateCreated,
-                item.customerName,
-                item.productName,
-                item.quantitySold,
-                `$${item.price.toFixed(2)}`,
-                `$${item.totalSale.toFixed(2)}`
-            ];
-            tableRows.push(rowData);
-        });
+        return isDateInRange && isTextMatch;
+      }),
+    [processedData, filter, startDate, endDate]
+  );
 
-        doc.autoTable({
-            head: [tableColumn],
-            body: tableRows,
-            startY: 20,
-        });
-        doc.save(`${title.replace(/\s/g, '_')}.pdf`);
-    };
+  const aggregatedViewData = useMemo(() => {
+    const aggregation = filteredData.reduce((acc, item) => {
+      const key = viewBy === "product" ? item.productName : item.customerName;
+      if (!acc[key]) {
+        acc[key] = { totalQuantity: 0, totalRevenue: 0, salesCount: 0 };
+      }
+      acc[key].totalQuantity += item.quantity;
+      acc[key].totalRevenue += item.totalSale;
+      acc[key].salesCount += 1;
+      return acc;
+    }, {});
 
-    const printData = () => {
-        window.print();
-    };
+    return Object.entries(aggregation)
+      .map(([name, values]) => ({ name, ...values }))
+      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+  }, [filteredData, viewBy]);
 
-    if (loading) {
-        return <div className="d-flex justify-content-center align-items-center" style={{ height: "100vh" }}><h2>Loading Dashboard...</h2></div>;
-    }
+  const groupedData = useMemo(() => {
+    const groups = filteredData.reduce((acc, item) => {
+      const key = item.saleDateCreated?.split(" ")[0] || item.saleDateCreated;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {});
 
-    return (
-        <Container fluid className={`p-4 ${settings.theme==='dark'?'bg-dark':'bg-light'}`}>
-            <h4 className="mb-4 fw-bolder">Sales </h4>
+    return Object.entries(groups).sort(([a], [b]) => new Date(b) - new Date(a));
+  }, [filteredData]);
 
-            {/* KPI Cards */}
-            <Row className="mb-4" style={{height:"100px"}}>
-                <Col md={4}>
-                    <Card className={`shadow-sm ${settings.theme==='dark'?'bg-dark':'bg-primary'} text-white`} style={{ height: '120px' }}>
-                        <Card.Body className="d-flex justify-content-between align-items-center">
-                            <div>
-                                <Card.Title>Total Quantity Sold</Card.Title>
-                                <Card.Text className="fs-2">{totalQuantitySold}</Card.Text>
-                            </div>
-                            <CartFill size={50} />
-                        </Card.Body>
-                    </Card>
-                </Col>
-                <Col md={4}>
-                    <Card className={`shadow-sm ${settings.theme==='dark'?'bg-dark':'bg-success'} text-white`} style={{ height: '120px' }}>
-                        <Card.Body className="d-flex justify-content-between align-items-center">
-                            <div>
-                                <Card.Title>Total Revenue</Card.Title>
-                                <Card.Text className="fs-2">{settings?.currency!=='none'?settings?.currency:""}{totalRevenue.toFixed(2)}</Card.Text>
-                            </div>
-                            <BoxArrowUpRight size={50} />
-                        </Card.Body>
-                    </Card>
-                </Col>
-                <Col md={4}>
-                    <Card className={`shadow-sm ${settings.theme==='dark'?'bg-dark':'bg-info'} text-white`} style={{ height: '120px' }}>
-                        <Card.Body className="d-flex justify-content-between align-items-center">
-                           <div>
-                                <Card.Title>Total Customers</Card.Title>
-                                <Card.Text className="fs-2">{totalCustomers}</Card.Text>
-                            </div>
-                            <PeopleFill size={50} />
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
+  const totalQuantitySold = useMemo(
+    () => filteredData.reduce((sum, item) => sum + item.quantity, 0),
+    [filteredData]
+  );
+  const totalRevenue = useMemo(
+    () => filteredData.reduce((sum, item) => sum + item.totalSale, 0),
+    [filteredData]
+  );
+  const totalCustomers = useMemo(
+    () => new Set(filteredData.map((item) => item.custId)).size,
+    [filteredData]
+  );
 
-            {/* Insights */}
-            {/* <Row className="mb-4" style={{ height: '150px' }}>
-                <Col md={6}>
-                    <Card >
-                        <Card.Header>Product Insights</Card.Header>
-                        <Card.Body>
-                           {productSales.mostSelling && <p className="text-success"><strong>Most Selling:</strong> {productSales.mostSelling.name} ({productSales.mostSelling.totalQuantity} units)</p>}
-                           {productSales.leastSelling && <p className="text-danger"><strong>Least Selling:</strong> {productSales.leastSelling.name} ({productSales.leastSelling.totalQuantity} units)</p>}
-                        </Card.Body>
-                    </Card>
-                </Col>
-                <Col md={6}>
-                    <Card style={{ height: '150px' }}>
-                        <Card.Header>Customer Insights</Card.Header>
-                        <Card.Body>
-                            {customerSales.mostValuable && <p className="text-success"><strong>Most Valuable:</strong> {customerSales.mostValuable.name} (${customerSales.mostValuable.totalRevenue.toFixed(2)})</p>}
-                            {customerSales.leastValuable && <p className="text-danger"><strong>Least Valuable:</strong> {customerSales.leastValuable.name} (${customerSales.leastValuable.totalRevenue.toFixed(2)})</p>}
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row> */}
+  const topProduct = useMemo(() => aggregatedViewData[0], [aggregatedViewData]);
+  const totalTransactions = filteredData.length;
 
-            {/* Controls and Filters */}
-            <Card className="p-3 mb-4 mt-5 " style={{height:'100px'}}>
-                <Container>
-                <Row >
-                    <Col md={3} >
-                        <Form.Group>
-                            <Form.Label>Filter by Product or Customer</Form.Label>
-                             <FormControl
-                                placeholder="Start typing..."
-                                value={filter}
-                                onChange={e => setFilter(e.target.value)}
-                            />
-                        </Form.Group>
-                    </Col>
-                     <Col md={3} >
-                        <Form.Group>
-                            <Form.Label>View By</Form.Label>
-                            <Form.Select value={viewBy} onChange={e => setViewBy(e.target.value)} style={{height:'40px'}}>
-                                <option value="product">Product</option>
-                                <option value="customer">Customer</option>
-                                <option value="daily">Daily Sales</option>
-                            </Form.Select>
-                        </Form.Group>
-                    </Col>
-                 
-                    <Col md={3}>
-                        <Form.Group>
-                            <Form.Label>Start Date</Form.Label>
-                            <Form.Control type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                        </Form.Group>
-                    </Col>
-                    <Col md={3}>
-                        <Form.Group>
-                            <Form.Label>End Date</Form.Label>
-                            <Form.Control type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                        </Form.Group>
-                    </Col>
-                     
-                </Row>
-                </Container>
-            </Card>
+  const aggregateTotalPages = Math.max(1, Math.ceil(aggregatedViewData.length / rowsPerPage));
+  const paginatedAggregateData = aggregatedViewData.slice(
+    (aggregatePage - 1) * rowsPerPage,
+    aggregatePage * rowsPerPage
+  );
 
-            {/* Data Display */}
-            {viewBy === 'product' || viewBy === 'customer' ? (
-                <Card>
-                    <Card.Header>
-                        <div className='d-flex align-items-center justify-content-between w-100'>
-                            <div> {viewBy === 'product' ? 'Product-wise Sales' : 'Customer-wise Sales'}</div>
-                            <div className='d-flex gap-2'> 
-                        <Button variant="primary" className="btn btn-sm " onClick={() => exportToPDF(filteredData, 'Filtered Sales Data')}>Export All</Button>
-                        <Button variant="secondary" className=" btn btn-sm " onClick={printData}>Print View</Button>
-                   </div>
-                        </div>
-                       
-                        </Card.Header>
-                    <Table striped bordered hover responsive>
-                        <thead>
-                            <tr>
-                                <th>{viewBy === 'product' ? 'Product Name' : 'Customer Name'}</th>
-                                <th>Total Quantity Sold</th>
-                                <th>Total Revenue</th>
-                                <th>Number of Sales</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {aggregatedViewData.map((item, index) => (
-                                <tr key={index}>
-                                    <td>{item.name}</td>
-                                    <td>{item.totalQuantity}</td>
-                                    <td>{settings?.currency!=='none'?settings?.currency:""}{item.totalRevenue }</td>
-                                    <td>{item.salesCount}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <th>Total</th>
-                                <th>{aggregatedViewData.reduce((sum, item) => sum + Number(item.totalQuantity) || 0, 0)}</th>
-                                <th>{settings?.currency!=='none'?settings?.currency:""}{ aggregatedViewData.reduce((sum, item) => sum + Number(item.totalRevenue) || 0, 0) }</th>
-                                <th>{aggregatedViewData.reduce((sum, item) => sum + Number(item.salesCount) || 0, 0)}</th>
-                            </tr>
-                        </tfoot>
+  const dailyTotalPages = Math.max(1, Math.ceil(groupedData.length / rowsPerPage));
+  const paginatedGroupedData = groupedData.slice(
+    (dailyPage - 1) * rowsPerPage,
+    dailyPage * rowsPerPage
+  );
+
+  const exportToPDF = (data, title) => {
+    const doc = new jsPDF();
+    doc.text(title, 14, 16);
+
+    doc.autoTable({
+      startY: 22,
+      head: [["Date", "Customer", "Product", "Quantity", "Price", "Total"]],
+      body: data.map((item) => [
+        item.saleDateCreated,
+        item.customerName,
+        item.productName,
+        item.quantity,
+        formatMoney(item.price),
+        formatMoney(item.totalSale),
+      ]),
+      headStyles: {
+        fillColor: [47, 143, 87],
+      },
+    });
+
+    doc.save(`${title.replace(/\s/g, "_")}.pdf`);
+  };
+
+  const exportAggregateToPDF = () => {
+    const doc = new jsPDF();
+    doc.text(viewBy === "product" ? "Product-wise Sales" : "Customer-wise Sales", 14, 16);
+
+    doc.autoTable({
+      startY: 22,
+      head: [[viewBy === "product" ? "Product Name" : "Customer Name", "Total Quantity", "Total Revenue", "Sales Count"]],
+      body: aggregatedViewData.map((item) => [
+        item.name,
+        item.totalQuantity,
+        formatMoney(item.totalRevenue),
+        item.salesCount,
+      ]),
+      headStyles: {
+        fillColor: [47, 143, 87],
+      },
+    });
+
+    doc.save(`${viewBy}-sales-summary.pdf`);
+  };
+
+  const printData = () => window.print();
+
+  const handleViewChange = (event) => {
+    setViewBy(event.target.value);
+    setAggregatePage(1);
+  };
+
+  const handleRowsPerPageChange = (event) => {
+    setRowsPerPage(Number(event.target.value));
+    setAggregatePage(1);
+    setDailyPage(1);
+  };
+
+  React.useEffect(() => {
+    setAggregatePage(1);
+    setDailyPage(1);
+  }, [filter, startDate, endDate, viewBy]);
+
+  return (
+    <Container fluid className="workspace-page-shell">
+      <div className="workspace-page-stack">
+        <header className="workspace-page-hero">
+          <div>
+            <h2 className="workspace-page-title">Sales Workspace</h2>
+            <p className="workspace-page-subtitle">
+              Monitor revenue, compare customer and product performance, and review daily sales from one place.
+            </p>
+          </div>
+          <div className="workspace-page-actions">
+            <Button variant="light" onClick={printData} style={toolbarButtonStyle}>
+              <Printer className="me-2" />
+              Print
+            </Button>
+            <Dropdown>
+              <Dropdown.Toggle variant="light" id="sales-export" style={toolbarButtonStyle}>
+                <Download className="me-2" />
+                Export
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => exportToPDF(filteredData, "Filtered Sales Data")}>
+                  Export filtered sales
+                </Dropdown.Item>
+                <Dropdown.Item onClick={exportAggregateToPDF}>
+                  Export summary view
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+            <PermissionWrapper
+              required={["salesdesk", "admin"]}
+              children={
+                <Button variant="light" style={{ ...toolbarButtonStyle, borderColor: `${palette.green}33`, color: palette.green }}>
+                  Open Sales Desk
+                </Button>
+              }
+            />
+          </div>
+        </header>
+
+        <div className="workspace-metric-grid">
+          <MetricCard
+            icon={<CartFill size={18} />}
+            title="Quantity Sold"
+            value={totalQuantitySold}
+            note="Units sold in the current filter"
+            accent={palette.greenSoft}
+            color={palette.green}
+          />
+          <MetricCard
+            icon={<ArrowUpRight size={18} />}
+            title="Revenue"
+            value={formatMoney(totalRevenue)}
+            note="Total sales value in view"
+            accent={palette.blueSoft}
+            color={palette.blue}
+          />
+          <MetricCard
+            icon={<PeopleFill size={18} />}
+            title="Customers Reached"
+            value={totalCustomers}
+            note="Unique customers in filtered sales"
+            accent={palette.amberSoft}
+            color={palette.amber}
+          />
+          <MetricCard
+            icon={<BoxSeam size={18} />}
+            title="Transactions"
+            value={totalTransactions}
+            note={topProduct ? `Top ${viewBy}: ${topProduct.name}` : "No sales available"}
+            accent={palette.greenSoft}
+            color={palette.green}
+          />
+        </div>
+
+        <Card style={sectionCardStyle}>
+          <Card.Body className="p-3 p-lg-4">
+            <div className="workspace-toolbar-grid">
+              <InputGroup className="workspace-search-group">
+                <InputGroup.Text className="workspace-search-adornment">
+                  <Search />
+                </InputGroup.Text>
+                <Form.Control
+                  placeholder="Filter by product or customer..."
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value)}
+                  className="workspace-search-input"
+                />
+              </InputGroup>
+
+              <Form.Select value={viewBy} onChange={handleViewChange} style={controlInputStyle}>
+                <option value="product">Product View</option>
+                <option value="customer">Customer View</option>
+                <option value="daily">Daily Sales</option>
+              </Form.Select>
+
+              <Form.Control
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                style={controlInputStyle}
+              />
+
+              <Form.Control
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                style={controlInputStyle}
+              />
+
+              <Form.Select value={rowsPerPage} onChange={handleRowsPerPageChange} style={controlInputStyle}>
+                <option value="5">5 rows</option>
+                <option value="8">8 rows</option>
+                <option value="10">10 rows</option>
+                <option value="20">20 rows</option>
+              </Form.Select>
+            </div>
+          </Card.Body>
+        </Card>
+
+        {viewBy === "product" || viewBy === "customer" ? (
+          <Card style={sectionCardStyle}>
+            <Card.Body className="p-3 p-lg-4">
+              <div className="workspace-section-head">
+                <div>
+                  <h3 className="workspace-section-title">
+                    {viewBy === "product" ? "Product-wise Sales" : "Customer-wise Sales"}
+                  </h3>
+                  <p className="workspace-section-copy">
+                    Compare grouped sales performance by {viewBy === "product" ? "product" : "customer"}.
+                  </p>
+                </div>
+                <Button variant="light" onClick={exportAggregateToPDF} style={toolbarButtonStyle}>
+                  <Download className="me-2" />
+                  Export Summary
+                </Button>
+              </div>
+
+              <div className="workspace-table-wrap">
+                <Table hover className="align-middle mb-0 workspace-modern-table">
+                  <thead>
+                    <tr>
+                      <th style={headerCellStyle}>{viewBy === "product" ? "Product Name" : "Customer Name"}</th>
+                      <th style={headerCellStyle}>Total Quantity Sold</th>
+                      <th style={headerCellStyle}>Total Revenue</th>
+                      <th style={headerCellStyle}>Number of Sales</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedAggregateData.map((item, index) => (
+                      <tr key={`${item.name}-${index}`}>
+                        <td style={bodyCellStyle}>{item.name}</td>
+                        <td style={bodyCellStyle}>{item.totalQuantity}</td>
+                        <td style={bodyCellStyle}>{formatMoney(item.totalRevenue)}</td>
+                        <td style={bodyCellStyle}>{item.salesCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+
+              <div className="workspace-table-footer">
+                <div className="workspace-table-summary">
+                  Quantity total: <strong>{aggregatedViewData.reduce((sum, item) => sum + item.totalQuantity, 0)}</strong>
+                  <span className="workspace-summary-spacer" />
+                  Revenue total: <strong>{formatMoney(aggregatedViewData.reduce((sum, item) => sum + item.totalRevenue, 0))}</strong>
+                </div>
+                <PagePagination
+                  currentPage={aggregatePage}
+                  totalPages={aggregateTotalPages}
+                  onPageChange={setAggregatePage}
+                />
+              </div>
+            </Card.Body>
+          </Card>
+        ) : (
+          <div className="workspace-day-list">
+            {paginatedGroupedData.map(([group, items]) => (
+              <Card key={group} style={sectionCardStyle}>
+                <Card.Body className="p-3 p-lg-4">
+                  <div className="workspace-section-head">
+                    <div>
+                      <h3 className="workspace-section-title">{new Date(group).toDateString()}</h3>
+                      <p className="workspace-section-copy">
+                        {items.length} sale record{items.length === 1 ? "" : "s"} captured on this day.
+                      </p>
+                    </div>
+                    <Button
+                      variant="light"
+                      onClick={() => exportToPDF(items, `Sales_on_${group}`)}
+                      style={toolbarButtonStyle}
+                    >
+                      <Download className="me-2" />
+                      Export This Day
+                    </Button>
+                  </div>
+
+                  <div className="workspace-table-wrap">
+                    <Table hover className="align-middle mb-0 workspace-modern-table">
+                      <thead>
+                        <tr>
+                          <th style={headerCellStyle}>Sale ID</th>
+                          <th style={headerCellStyle}>Customer</th>
+                          <th style={headerCellStyle}>Product</th>
+                          <th style={headerCellStyle}>Quantity</th>
+                          <th style={headerCellStyle}>Price</th>
+                          <th style={headerCellStyle}>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((sale) => (
+                          <tr key={sale.saleId}>
+                            <td style={bodyCellStyle}>{sale.saleId}</td>
+                            <td style={bodyCellStyle}>{sale.customerName}</td>
+                            <td style={bodyCellStyle}>{sale.productName}</td>
+                            <td style={bodyCellStyle}>{sale.quantity}</td>
+                            <td style={bodyCellStyle}>{formatMoney(sale.price)}</td>
+                            <td style={bodyCellStyle}>{formatMoney(sale.totalSale)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
                     </Table>
-                </Card>
-            ) : (
-                groupedData.map(([group, items]) => (
-                    <Card key={group} className="mb-4">
-                        <Card.Header className="d-flex justify-content-between align-items-center">
-                            <span>{new Date(group).toDateString()}</span>
-                            <Button variant="outline-primary" size="sm" onClick={() => exportToPDF(items, `Sales_on_${group}`)}>Export this day</Button>
-                        </Card.Header>
-                        <Table striped bordered hover responsive>
-                            <thead>
-                                <tr>
-                                    <th>Sale ID</th>
-                                    <th>Customer</th>
-                                    <th>Product</th>
-                                    <th>Quantity</th>
-                                    <th>Price</th>
-                                    <th>Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {items.map(sale => (
-                                    <tr key={sale.saleId}>
-                                        <td>{sale.saleId}</td>
-                                        <td>{sale.customerName}</td>
-                                        <td>{sale.productName}</td>
-                                        <td>{sale.saleQuantity}</td>
-                                        <td>{settings?.currency!=='none'?settings?.currency:""}{sale.salePrice}</td>
-                                        <td>{settings?.currency!=='none'?settings?.currency:""}{sale.totalSale}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                             <tfoot>
-                                <tr>
-                                    <th colSpan="3">Total</th>
-                                    <th>{items.reduce((sum, item) => sum + parseInt(item.saleQuantity, 10) || 0, 0)}</th>
-                                    <th>{items.reduce((sum, item) => sum + parseFloat(item.salePrice) || 0, 0)}</th>
-                                    <th>{settings?.currency!=='none'?settings?.currency:""}{items.reduce((sum, item) => sum + item.totalSale, 0).toFixed(2)}</th>
-                                </tr>
-                            </tfoot>
-                        </Table>
-                    </Card>
-                ))
-            )}
-        </Container>
-    );
+                  </div>
+
+                  <div className="workspace-table-footer">
+                    <div className="workspace-table-summary">
+                      Quantity: <strong>{items.reduce((sum, item) => sum + item.quantity, 0)}</strong>
+                      <span className="workspace-summary-spacer" />
+                      Total: <strong>{formatMoney(items.reduce((sum, item) => sum + item.totalSale, 0))}</strong>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            ))}
+
+            <div className="workspace-pagination-row">
+              <PagePagination
+                currentPage={dailyPage}
+                totalPages={dailyTotalPages}
+                onPageChange={setDailyPage}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </Container>
+  );
 };
 
 export default SalesPage;
-
-
-
-
-
-
-
-
-
-
-
-
-
-// import React from 'react';
-// import {
-//     Box, Typography, Grid, Card, CardContent, Table, TableBody, TableCell, TableContainer,
-//     TableHead, TableRow, Paper, IconButton, Tooltip, Button, TextField
-// } from '@mui/material';
-// import { Search, Edit, Delete, Visibility } from '@mui/icons-material';
-// import {
-//     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend,
-//     ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar
-// } from 'recharts';
-
-// import { useSelector } from 'react-redux';
-// import { selectCustomers } from '../../features/api/customers';
-// import { selectSales } from '../../features/api/salesSlice';
-// import { calculateTotal, groupSalesBySRIDWithCustomer } from '../../dataAnalytics/functions';
-// // import RecentTransactions from '../tables/RescentTransactions';
-// // import CollapsibleTable from '../tables/SalesTable';
-// import SalesTable from '../tables/SalesTable';
-// import CurrencyFormat from 'react-currency-format';
-// import { formatCurrencyWithScale } from '../../dataAnalytics/functions';
-// import PermissionWrapper from '../../auth/PermissionWrapper';
-
-// import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-// import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-// import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-
-
-// const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-
-// const SalesPage = () => {
-
-// const salesData = useSelector(selectSales);
-// const customers = useSelector(selectCustomers);
-
-// const transactionDetails = groupSalesBySRIDWithCustomer(salesData, customers);
-// const salesSummary = calculateTotal(salesData);
-
-//     return (
-//         <Box sx={{ padding: '10px' }}>
-//             {/* Header */}
-//             <Grid container justifyContent="space-between" alignItems="center" sx={{ marginBottom: '20px' }}>
-//                 <Typography variant="h4">Sales Overview</Typography>
-//                 {/* <TextField variant="outlined" placeholder="Search sales..." InputProps={{ endAdornment: <Search /> }} /> */}
-//             </Grid>
-
-// {/* Sales Summary */}
-// <Grid container spacing={3} justifyContent="center" sx={{ marginBottom: '20px' }}>
-//     <Grid item xs={12} sm={3}>
-//         <Card sx={{ backgroundColor: '#e3f2fd', display: 'flex', alignItems: 'center' }}>
-//             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-//                 <ShoppingCartIcon color="primary" sx={{ fontSize: 40 }} />
-//                 <Box>
-//                     <Typography variant="h6">Total Sales</Typography>
-//                     <Typography variant="h4" color="primary">
-//                         {salesSummary?.totalQuantity}
-//                     </Typography>
-//                 </Box>
-//             </CardContent>
-//         </Card>
-//     </Grid>
-
-//     <Grid item xs={12} sm={3}>
-//         <Card sx={{ backgroundColor: '#fff3e0', display: 'flex', alignItems: 'center' }}>
-//             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-//                 <ReceiptLongIcon color="secondary" sx={{ fontSize: 40 }} />
-//                 <Box>
-//                     <Typography variant="h6">Transactions</Typography>
-//                     <Typography variant="h4" color="secondary">
-//                         {salesData?.length}
-//                     </Typography>
-//                 </Box>
-//             </CardContent>
-//         </Card>
-//     </Grid>
-
-//     <Grid item xs={12} sm={3}>
-//         <Card sx={{ backgroundColor: '#e8f5e9', display: 'flex', alignItems: 'center' }}>
-//             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-//                 <AttachMoneyIcon color="success" sx={{ fontSize: 40 }} />
-//                 <Box>
-//                     <Typography variant="h6">Total Revenue</Typography>
-//                     <Typography variant="h4" color="success.main">
-//                         {formatCurrencyWithScale(salesSummary?.totalCost).formatted}
-//                     </Typography>
-//                 </Box>
-//             </CardContent>
-//         </Card>
-//     </Grid>
-// </Grid>
-
-
-//             {/* Sales Trends Chart */}
-            
-
-//             {/* Sales Table */}
-//            {/* <RecentTransactions data={transactionDetails} limit={transactionDetails.length} /> */}
-//         {/* <CollapsibleTable salesData={salesData} /> */}
-//         <SalesTable data={transactionDetails} />
-//         </Box>
-//     );
-// };
-
-// export default SalesPage;

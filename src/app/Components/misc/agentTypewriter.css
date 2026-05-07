@@ -1,0 +1,26 @@
+.agent-typewriter {
+  width: 100%;
+}
+
+.agent-typewriter-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #15202b;
+  line-height: 1.72;
+}
+
+.agent-typewriter-cursor {
+  display: inline-block;
+  width: 0.62ch;
+  height: 1.05em;
+  margin-left: 0.08rem;
+  vertical-align: -0.12em;
+  border-right: 2px solid #2f8f57;
+  animation: agent-typewriter-blink 0.95s steps(1, end) infinite;
+}
+
+@keyframes agent-typewriter-blink {
+  50% {
+    opacity: 0;
+  }
+}

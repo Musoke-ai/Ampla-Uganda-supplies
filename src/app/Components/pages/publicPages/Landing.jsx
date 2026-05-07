@@ -5,11 +5,23 @@ import imgInvoice from '../../../../mystockimg/e-invoice.png';
 import imgSales from '../../../../mystockimg/debt-equity-ratio.webp';
 import imgStock from '../../../../mystockimg/tools-for-effective-inventory-management-1920x1274.jpg.webp';
 
+const amplaLogo = `${process.env.PUBLIC_URL || ""}/logos/ampla_logo.png`;
+
 const Landing = () => {
   return (
     <div >
-      
-      <h1 className="text-main text-center mt-5 ">poweredStock</h1>
+
+      <div className="d-flex flex-column align-items-center mt-5">
+        <img
+          src={amplaLogo}
+          alt="Ampla Uganda"
+          width={86}
+          height={86}
+          className="rounded shadow-sm mb-2"
+          style={{ objectFit: "cover" }}
+        />
+        <h1 className="text-main text-center">Ampla Uganda</h1>
+      </div>
       <h4 className="text-center mb-3 mb-2">Stop managing your stock, focus on making better sales.</h4>
 
       <div className="banner shadow-sm ">
@@ -22,17 +34,17 @@ Whether you're a small hardware store or a large enterprise, our system can help
      </div>
      <div style={{zIndex: 2}}>
      <p className=" fs-5 ps-2 text-white text-center" >
-  
+
   Track inventory levels in real time, Simply do stock replenishment, Set up debt payment alerts, Generate reports on inventory levels, sales, and more.
   </p>
   </div>
- 
+
   <div style={{zIndex: 2}} className="mt-2">
-  <Link className="nav-link  d-none d-lg-block d-xl-block" to="/signup"  > 
-            <button type="button" className="btn mainColor btn-outline-primary rounded fw-bold shadow-sm fs-4 text-center" style={{backgroundColor: "#1C4E80"}}> 
-             <span className="fw-bold text-white">Try poweredStock</span>
+  <Link className="nav-link  d-none d-lg-block d-xl-block" to="/signup"  >
+            <button type="button" className="btn mainColor btn-outline-primary rounded fw-bold shadow-sm fs-4 text-center" style={{backgroundColor: "#1C4E80"}}>
+             <span className="fw-bold text-white">Try Ampla Uganda</span>
              </button>
-             </Link>  
+             </Link>
              </div>
              </div>
       </div>
@@ -53,7 +65,7 @@ Whether you're a small hardware store or a large enterprise, our system can help
             <p className="fs-6 mb-4">Does it fit my business? 0776033533/0703299738</p>
             {/* <p><a href="#" className="fw-bold"></a></p> */}
             <p>
-            <Link className="nav-link  d-none d-lg-block d-xl-block" to="/signup" > <span className="fw-bold p-2 text-center d-flex justify-content-center align-items-center"><button type="button" className="btn btn-sm btn-dark text-white">Try powerdStock now</button></span> </Link>  
+            <Link className="nav-link  d-none d-lg-block d-xl-block" to="/signup" > <span className="fw-bold p-2 text-center d-flex justify-content-center align-items-center"><button type="button" className="btn btn-sm btn-dark text-white">Try Ampla Uganda now</button></span> </Link>
             </p>
         </div>
     </div>
@@ -65,7 +77,7 @@ Whether you're a small hardware store or a large enterprise, our system can help
 </p>
 <div className="container d-md-flex d-lg-flex flex-wrap  mt-3">
 
-    <div className="d-flex flex-column justify-content-center align-items-center col-12 col-lg-3 mt-1" 
+    <div className="d-flex flex-column justify-content-center align-items-center col-12 col-lg-3 mt-1"
     >
       <div>
       <Avatar   src={imgStock}
@@ -80,8 +92,8 @@ Whether you're a small hardware store or a large enterprise, our system can help
     </div>
   </div>
 
-  
-  <div className="d-flex flex-column justify-content-center align-items-center col-12 col-lg-3 mt-2" 
+
+  <div className="d-flex flex-column justify-content-center align-items-center col-12 col-lg-3 mt-2"
   // style={{width: "18rem"}}
   >
       <div>
@@ -91,14 +103,14 @@ Whether you're a small hardware store or a large enterprise, our system can help
       </div>
       <div>
       <h6 className="text-center mt-2">
-      Easily track your Sales and manage customer Debts 
+      Easily track your Sales and manage customer Debts
     </h6>
 
     </div>
 
   </div>
 
-  
+
   <div className="d-flex flex-column justify-content-center align-items-center col-12 col-lg-3 mt-2"
   // style={{width: "18rem"}}
   >
@@ -116,8 +128,8 @@ Whether you're a small hardware store or a large enterprise, our system can help
 
   </div>
 
-  
-  <div className="d-flex flex-column justify-content-center align-items-center col-12 col-lg-3 mt-2" 
+
+  <div className="d-flex flex-column justify-content-center align-items-center col-12 col-lg-3 mt-2"
   // style={{width: "18rem"}}
   >
       <div>
@@ -139,7 +151,7 @@ Whether you're a small hardware store or a large enterprise, our system can help
 
 {/* 3*/}
 <div className="mt-4">
-  <Link className="nav-link d-none d-lg-block d-xl-block" to="/signup" >  <span className="fw-bold text-white"><button className="rounded btn-sm mainColor text-white p-2 text-center" style={{border:"none"}}>Try poweredStock now</button></span> </Link>       
+  <Link className="nav-link d-none d-lg-block d-xl-block" to="/signup" >  <span className="fw-bold text-white"><button className="rounded btn-sm mainColor text-white p-2 text-center" style={{border:"none"}}>Try Ampla Uganda now</button></span> </Link>
 </div>
 
 {/* 4 */}
@@ -157,7 +169,7 @@ Whether you're a small hardware store or a large enterprise, our system can help
                <p className="fs-6">Orders ship faster and are more accurate, leading to satisfied customers and upheld service level agreements.</p>
             </ul>
             <p>
-            <Link className="nav-link  d-none d-lg-block d-xl-block" to="/signup" >  <span className="fw-bold text-white"><button className="rounded btn-sm mainColor text-white p-2 text-center" style={{border:"none"}}>Try poweredStock now</button></span> </Link> 
+            <Link className="nav-link  d-none d-lg-block d-xl-block" to="/signup" >  <span className="fw-bold text-white"><button className="rounded btn-sm mainColor text-white p-2 text-center" style={{border:"none"}}>Try Ampla Uganda now</button></span> </Link>
             </p>
         </div>
 </div>
@@ -169,12 +181,12 @@ Whether you're a small hardware store or a large enterprise, our system can help
             <p className="fs-5">Stock is usually one of the largest assets a company owns, which is why stock mismanagement is one of the top reasons small businesses fail.
             Inefficient asset stock management can decrease your profitability in several ways:</p>
             <p className="fs-6 mt-4 mb-4"><b className="text-danger">Too much stock.</b>Having more stock on hand than you need can cost you. You pay for more warehouse space, which is expensive, and perishable items can spoil or expire before you’re able to sell them</p>
-            <p className="fs-6 mb-4"><b className="text-danger">Longer lead time.</b>Staying ahead of the curve on retail trends helps you capitalise on the popular items customers want at the moment. If you’re slow to adapt to the changing market, however, customers will look 
+            <p className="fs-6 mb-4"><b className="text-danger">Longer lead time.</b>Staying ahead of the curve on retail trends helps you capitalise on the popular items customers want at the moment. If you’re slow to adapt to the changing market, however, customers will look
             elsewhere, and you’ll surrender market share.</p>
              <p className="fs-6"><b className="text-danger">Too little stock.</b>Customers will order from somewhere else if you don’t have what they want in stock. At the very least, stockouts will cost you sales. If they happen often, you’ll lose customers.</p>
              <br/><br/>
              <p>
-             <Link className="nav-link  d-none d-lg-block d-xl-block" to="/signup" >  <span className="fw-bold text-white"><button className="rounded btn-sm mainColor text-white p-2 text-center" style={{border:"none"}}>Try poweredStock now</button></span> </Link> 
+             <Link className="nav-link  d-none d-lg-block d-xl-block" to="/signup" >  <span className="fw-bold text-white"><button className="rounded btn-sm mainColor text-white p-2 text-center" style={{border:"none"}}>Try Ampla Uganda now</button></span> </Link>
             </p>
         </div>
 </div>

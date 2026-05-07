@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Button, Modal, Row, Col } from 'react-bootstrap';
+import { Form, Button } from 'react-bootstrap';
 import { useSelector } from 'react-redux';
 import { selectCustomers } from '../../features/api/customers';
 import AddCustomer from './AddCustomer';
@@ -9,10 +9,13 @@ import { PlusSquare } from 'react-bootstrap-icons';
 const CustomerSelection = ({
   setCustId,
   custId,
-  setCustomer
+  setCustomer,
+  customersOverride,
+  className = "",
 }) => {
 
-  const customers = useSelector(selectCustomers);
+  const allCustomers = useSelector(selectCustomers);
+  const customers = customersOverride ?? allCustomers;
 
   const [showModal, setShowModal] = useState(false);
 
@@ -20,38 +23,32 @@ const CustomerSelection = ({
 
   const handleCustomerSelect = (e) => {
     setCustId(e.target.value);
-    const customer = customers.filter(cust => Number(cust.custId) === Number(e.target.value));
-    console.log("cust1: "+customer);
+    const customer = customers.find((cust) => Number(cust.custId) === Number(e.target.value)) || null;
     setCustomer(customer);
   }
 
   return (
-    <div className="container mt-1 d-flex gap-2 w-100 align-items-center">
-      {/* <h6 className="mb-4 fw-bold">Select Customer for this Transaction</h6> */}
-      <div>
-<Form className='mb-1 mt-1'>
-        {/* Customer Selection */}
-        <Form.Group controlId="customerSelect">
-          {/* <Form.Label>Customer</Form.Label> */}
-          <Form.Select value={custId} onChange={handleCustomerSelect} className='w-100' style={{height:'40px'}}>
-            <option value="">Select a customer</option>
+    <div className={`customer-selection ${className}`.trim()}>
+      <div className="customer-selection__field">
+        <Form className='mb-0'>
+          <Form.Group controlId="customerSelect">
+            <Form.Select value={custId} onChange={handleCustomerSelect} className='w-100' style={{height:'44px'}}>
+              <option value="">Select a customer</option>
             {customers.map((customer) => (
               <option key={customer.custId} value={customer.custId}>
                 {customer.custName} - {customer.custContact}
               </option>
             ))}
-          </Form.Select>
-        </Form.Group>
-           </Form>
+            </Form.Select>
+          </Form.Group>
+        </Form>
       </div>
-        {/* Add New Customer Button */}
-        <div>
-          <Button variant="primary" onClick={handleModalToggle}>
-       <PlusSquare />
+      <div className="customer-selection__action">
+        <Button variant="primary" onClick={handleModalToggle} className="customer-selection__button">
+          <PlusSquare />
         </Button>
-        </div>
+      </div>
 
-      {/* Modal for Adding a New Customer */}
       <AddCustomer showModal={showModal} handleModalToggle={handleModalToggle} />
     </div>
   );

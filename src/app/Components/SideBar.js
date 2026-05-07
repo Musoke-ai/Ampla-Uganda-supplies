@@ -11,11 +11,12 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import { Avatar, Divider, Menu, MenuList } from "@mui/material";
 import { Add, Approval, Campaign, EditNote, History, HotTub, Inventory, InventorySharp, KeyboardArrowRight, ListRounded, MenuOpen, PointOfSale, Receipt, Report, RequestQuote, Scale, ShoppingCart } from "@mui/icons-material";
 import { ChevronDown, ChevronUp, List, MenuButton, MenuButtonFill, Pencil, Person, PersonFill, ReceiptCutoff } from "react-bootstrap-icons";
-import logo1 from '../../logos/psfavinobg.png';
 import Button from '@mui/material/Button';
 // import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import { Background } from "victory";
+
+const amplaLogo = `${process.env.PUBLIC_URL || ""}/logos/ampla_logo.png`;
 
 const SideBar = ({
   handleMenu,
@@ -47,7 +48,7 @@ const SideBar = ({
           <List size={25} />
         </div>
         <div>
-          <img src={logo1} width={50} height={50} className='shadow-sm mt-2 mb-2 rounded' />
+          <img src={amplaLogo} alt="Ampla Uganda" width={50} height={50} className='shadow-sm mt-2 mb-2 rounded' style={{ objectFit: "cover" }} />
         </div>
       </div>
 
@@ -90,11 +91,6 @@ const SideBar = ({
         </li>
       </ul>
       </div>
-
-      <button class="cta-button" style={{marginTop:"2rem"}}>
-      <Link to="packages" target="_blank" className="Link nav-link"> Upgrade Your Package</Link>
-   
-</button>
 
     </div>
 

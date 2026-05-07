@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { CircularProgress } from "@mui/material";
 import {
+  InputGroup,
   Container,
   Table,
   Button,
   Modal,
   Form,
-  Row,
-  Col,
   Badge,
   Card,
   Alert,
@@ -16,25 +15,27 @@ import {
 import { toast } from 'react-toastify';
 import { useRegisterMutation } from "../../auth/authApiSlice";
 import { useSelector } from "react-redux";
-import { useSettings } from "../Settings";
 import {
   selectAccounts,
-  useChangePasswordMutation,
   useEditAccountMutation,
   useDeleteUserMutation,
 } from "../../features/api/AccountsSlice";
-import { selectRoles } from "../../auth/authSlice";
-import { Lock, LockFill, PencilSquare, TrashFill } from "react-bootstrap-icons";
+import { Eye, EyeSlash, Lock, PencilSquare, TrashFill } from "react-bootstrap-icons";
 import jsPDF from 'jspdf';
+import {
+  paginateItems,
+  ProductionTableFooter,
+} from "./ProductionTableControls";
 // --- Data and Configuration ---
 const rolesConfig = [
   {
     name: "Production",
-    subRoles: ["Employees", "Raw Materials", "Expenses", "Orders"],
+    subRoles: ["Employees", "Raw Materials", "Expenses", "Orders", "Batches"],
   },
   "Dashboard",
   "Sales Desk",
   "Products",
+  "Categories",
   "Stock",
   "Customers",
   "Sales",
@@ -69,6 +70,8 @@ function transformUsers(usersData) {
       salesdesk: "Sales Desk",
       productionmanager: "Production Manager",
       inventorymanager: "Inventory Manager",
+      categories: "Categories",
+      batches: "Batches",
     };
     return specialNames[roleKey] || capitalize(roleKey);
   };
@@ -120,15 +123,15 @@ function transformUsers(usersData) {
 
 // --- Main App Component ---
 export default function AdminAccountManager() {
-  const { settings } = useSettings();
-  const theme = settings.theme;
   const accounts = useSelector(selectAccounts);
-  const [createUser, { isLoading, isSuccess }] = useRegisterMutation();
+  const [createUser, { isLoading }] = useRegisterMutation();
   const [updateUser, { isLoading: isUpdateLoading }] = useEditAccountMutation();
-  const [deleteUser, { isLoading: isDeleteLoading, isSuccess: isDeleteSuccess, isError: isDeleteError, error:deleteError }] = useDeleteUserMutation();
+  const [deleteUser, { isLoading: isDeleteLoading }] = useDeleteUserMutation();
 //   const initialUsers = transformUsers(accounts);
 const users = useMemo(() => transformUsers(accounts), [accounts]);
 const [isEdit, setIsEdit] = useState(false);
+const [currentPage, setCurrentPage] = useState(1);
+const [rowsPerPage, setRowsPerPage] = useState(10);
 
 //   const [users, setUsers] = useState(initialUsers);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -142,8 +145,24 @@ const [isEdit, setIsEdit] = useState(false);
 
   // State for the form modal
   const [formData, setFormData] = useState({});
-  const [validated, setValidated] = useState(false);
-  const [activeRoles, setActiveRoles] = useState([]);
+const [validated, setValidated] = useState(false);
+const [activeRoles, setActiveRoles] = useState([]);
+const [showPassword, setShowPassword] = useState(false);
+
+useEffect(() => {
+  const nextTotalPages = Math.max(1, Math.ceil(users.length / rowsPerPage));
+  if (currentPage > nextTotalPages) {
+    setCurrentPage(nextTotalPages);
+  }
+}, [currentPage, rowsPerPage, users.length]);
+
+const {
+  totalPages,
+  paginatedItems: paginatedUsers,
+} = useMemo(
+  () => paginateItems(users, currentPage, rowsPerPage),
+  [currentPage, rowsPerPage, users]
+);
 
 // --- Helper function to generate and download the PDF ---
 /**
@@ -236,6 +255,7 @@ const downloadAccountDetailsPdf = (userData) => {
       setFormData({ username: "", email: "", password: "", permissions: {} });
       setActiveRoles([]);
     }
+    setShowPassword(false);
     setValidated(false);
     setShowUserModal(true);
   };
@@ -246,6 +266,7 @@ const downloadAccountDetailsPdf = (userData) => {
     setCurrentUser(null);
     setFormData({});
     setActiveRoles([]);
+    setShowPassword(false);
   };
 
   const handleOpenConfirmModal = (user) => {
@@ -536,37 +557,44 @@ function extractAndModifyPermissions(permissions) {
 
   return (
     // <Container className="py-4" style={{ backgroundColor: "#f8f9fa" }}>
-    <Container className="py-4">
-      <header className="mb-4">
-        <h1 className="d-flex align-items-center gap-3">
-          <i className="bi bi-shield-check"></i> User Management
-        </h1>
-        <p className="text-muted">
-          Create and manage user accounts with role-based permissions.
-        </p>
-      </header>
+    <Container className="py-4 production-section-shell">
+      <div className="production-section-header">
+        <div className="production-section-copy">
+          <h1 className="d-flex align-items-center gap-3">
+            <i className="bi bi-shield-check"></i> User Management
+          </h1>
+          <p>Create and manage user accounts with role-based permissions.</p>
+        </div>
+        <Button variant="primary" onClick={() => handleOpenUserModal()}>
+          <i className="bi bi-person-plus-fill me-2"></i>Create New User
+        </Button>
+      </div>
 
-      <Card>
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h2 className="h5 mb-0 d-flex align-items-center gap-2">
-            <i className="bi bi-people"></i> Manage Users
-          </h2>
-          <Button variant="primary" onClick={() => handleOpenUserModal()}>
-            <i className="bi bi-person-plus-fill me-2"></i>Create New User
-          </Button>
-        </Card.Header>
-        <Card.Body>
-          <Table responsive striped hover className="align-middle">
+      <div className="production-filter-bar">
+        <div className="production-stat-row">
+          <span className="production-stat-chip">Users: {users.length}</span>
+          <span className="production-stat-chip">
+            Roles assigned: {users.reduce((total, user) => total + Object.keys(user.permissions).length, 0)}
+          </span>
+        </div>
+      </div>
+
+      <Card className="production-table-card border-0 shadow-none">
+        <Card.Body className="p-0">
+          <div className="production-table-scroll">
+            <Table responsive hover className="production-modern-table align-middle">
             <thead>
               <tr>
+                <th>#</th>
                 <th>User</th>
                 <th>Assigned Roles</th>
                 <th className="text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {paginatedUsers.map((user, index) => (
                 <tr key={user.id}>
+                  <td>{(currentPage - 1) * rowsPerPage + index + 1}</td>
                   <td>
                     <div className="d-flex align-items-center">
                       <div className="flex-shrink-0">
@@ -617,8 +645,23 @@ function extractAndModifyPermissions(permissions) {
                   </td>
                 </tr>
               ))}
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="text-center">No users found.</td>
+                </tr>
+              ) : null}
             </tbody>
           </Table>
+          </div>
+          <ProductionTableFooter
+            totalItems={users.length}
+            currentPage={currentPage}
+            rowsPerPage={rowsPerPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            onRowsPerPageChange={setRowsPerPage}
+            itemLabel="users"
+          />
         </Card.Body>
       </Card>
 
@@ -628,6 +671,7 @@ function extractAndModifyPermissions(permissions) {
         onHide={handleCloseUserModal}
         size="lg"
         backdrop="static"
+        dialogClassName="production-modal-shell"
       >
         <Form noValidate validated={validated} onSubmit={handleUserFormSubmit}>
           <Modal.Header closeButton>
@@ -641,132 +685,167 @@ function extractAndModifyPermissions(permissions) {
             </Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <Row>
-              <Col md={4} >
-                <Form.Group className="mb-3" controlId="username">
-                  <Form.Label>Username</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="username"
-                    autocomplete="new-username"
-                      readonly 
-  onfocus="this.removeAttribute('readonly');"
-                    value={formData.username || ""}
-                    onChange={handleFormInputChange}
-                    required
-                  />
-                  <Form.Control.Feedback type="invalid">
-                    Please provide a username.
-                  </Form.Control.Feedback>
-                </Form.Group>
-              </Col>
-              <Col md={4} >
-                <Form.Group className="mb-3" controlId="email">
-                  <Form.Label>Email</Form.Label>
-                  <Form.Control
-                    type="email"
-                    name="email"
-                    autocomplete="new-email"
-                      readonly 
-  onfocus="this.removeAttribute('readonly');"
-                    value={formData.email || ""}
-                    onChange={handleFormInputChange}
-                    required
-                  />
-                  <Form.Control.Feedback type="invalid">
-                    Please provide a valid email.
-                  </Form.Control.Feedback>
-                </Form.Group>
-              </Col>
-              <Col md={4} >
-                {!currentUser && (
-              <Form.Group className="mb-4" controlId="password">
-                <Form.Label>Password</Form.Label>
-                <Form.Control
-                  type="password"
-                  name="password"
-                  autocomplete="new-password"
-                    readonly 
-  onfocus="this.removeAttribute('readonly');"
-                  onChange={handleFormInputChange}
-                  required
-                />
-                <Form.Control.Feedback type="invalid">
-                  Please provide a password.
-                </Form.Control.Feedback>
-              </Form.Group>
-            )}
-              </Col>
-            </Row>
-          <Row>
- <div className="mt-4 mb-3">
-             <h3 className="h5 mb-3 mt-5">
-              <i className="bi bi-key-fill me-2"></i>Roles & Permissions
-            </h3>
-            </div>
-          </Row>
-          
-            <Accordion className="mt-4">
-              {rolesConfig.map((roleOrGroup, i) => {
-                const renderRoleContent = (roleName) => (
-                  <div key={roleName} className="mb-3">
-                    <Form.Check
-                      type="switch"
-                      id={`role-switch-${roleName}`}
-                      label={<strong>{roleName}</strong>}
-                      checked={activeRoles.includes(roleName)}
-                      onChange={(e) =>
-                        handleRoleToggle(roleName, e.target.checked)
-                      }
-                    />
-                    {activeRoles.includes(roleName) && (
-                      <Card className="mt-2">
-                        <Card.Body className="ps-4">
-                          <Row>
-                            {permissionsConfig.map((p) => (
-                              <Col key={p.name} sm={6} md={3}>
-                                <Form.Check
-                                  type="checkbox"
-                                  id={`check-${roleName}-${p.name}`}
-                                  label={p.name}
-                                  checked={
-                                    formData.permissions?.[roleName]?.includes(
-                                      p.name
-                                    ) || false
-                                  }
-                                  onChange={(e) =>
-                                    handlePermissionChange(
-                                      roleName,
-                                      p.name,
-                                      e.target.checked
-                                    )
-                                  }
-                                />
-                              </Col>
-                            ))}
-                          </Row>
-                        </Card.Body>
-                      </Card>
-                    )}
-                  </div>
-                );
+            <div className="production-modal-stack">
+              <div className="production-modal-hero">
+                <div>
+                  <h3>{currentUser ? "Update account access" : "Create a new workspace user"}</h3>
+                  <p>
+                    Set the account identity first, then choose the exact sections this user can view or manage.
+                  </p>
+                </div>
+                <div className="production-stat-row">
+                  <span className="production-stat-chip">Active roles: {activeRoles.length}</span>
+                  <span className="production-stat-chip">
+                    Permissions: {Object.values(formData.permissions || {}).reduce((total, perms) => total + perms.length, 0)}
+                  </span>
+                </div>
+              </div>
 
-                if (typeof roleOrGroup === "string") {
-                  return renderRoleContent(roleOrGroup);
-                } else {
-                  return (
-                    <Accordion.Item eventKey={i} key={i}>
-                      <Accordion.Header>{roleOrGroup.name}</Accordion.Header>
-                      <Accordion.Body>
-                        {roleOrGroup.subRoles.map((subRole) =>
-                          renderRoleContent(subRole)
-                        )}
-                      </Accordion.Body>
-                    </Accordion.Item>
-                  );
-                }
-              })}
-            </Accordion>
+              <div className="production-modal-section-card">
+                <div className="production-modal-section-head">
+                  <div>
+                    <h4>Account Details</h4>
+                    <p>These details identify the shared account inside the production workspace.</p>
+                  </div>
+                </div>
+                <div className="production-account-grid">
+                  <Form.Group controlId="username">
+                    <Form.Label>Username</Form.Label>
+                    <Form.Control
+                      type="text"
+                      name="username"
+                      autoComplete="new-username"
+                      readOnly
+                      onFocus={(event) => event.target.removeAttribute("readonly")}
+                      value={formData.username || ""}
+                      onChange={handleFormInputChange}
+                      required
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      Please provide a username.
+                    </Form.Control.Feedback>
+                  </Form.Group>
+
+                  <Form.Group controlId="email">
+                    <Form.Label>Email</Form.Label>
+                    <Form.Control
+                      type="email"
+                      name="email"
+                      autoComplete="new-email"
+                      readOnly
+                      onFocus={(event) => event.target.removeAttribute("readonly")}
+                      value={formData.email || ""}
+                      onChange={handleFormInputChange}
+                      required
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      Please provide a valid email.
+                    </Form.Control.Feedback>
+                  </Form.Group>
+
+                  {!currentUser ? (
+                    <Form.Group controlId="password" className="production-form-grid-single">
+                      <Form.Label>Password</Form.Label>
+                      <InputGroup className="production-password-group">
+                        <Form.Control
+                          type={showPassword ? "text" : "password"}
+                          name="password"
+                          autoComplete="new-password"
+                          readOnly
+                          onFocus={(event) => event.target.removeAttribute("readonly")}
+                          onChange={handleFormInputChange}
+                          required
+                        />
+                        <Button
+                          variant="outline-secondary"
+                          type="button"
+                          className="production-password-toggle"
+                          onClick={() => setShowPassword((value) => !value)}
+                        >
+                          {showPassword ? <><EyeSlash className="me-2" />Hide</> : <><Eye className="me-2" />Show</>}
+                        </Button>
+                      </InputGroup>
+                      <Form.Control.Feedback type="invalid">
+                        Please provide a password.
+                      </Form.Control.Feedback>
+                    </Form.Group>
+                  ) : (
+                    <div className="production-inline-note production-form-grid-single">
+                      Password changes are not part of this modal, so editing here will only update identity and access.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="production-modal-section-card">
+                <div className="production-modal-section-head">
+                  <div>
+                    <h4>Roles & Permissions</h4>
+                    <p>Turn on the sections this user should access, then choose which actions are allowed in each one.</p>
+                  </div>
+                </div>
+
+                <Accordion className="production-role-accordion">
+                  {rolesConfig.map((roleOrGroup, i) => {
+                    const renderRoleContent = (roleName) => {
+                      const isActive = activeRoles.includes(roleName);
+
+                      return (
+                        <div
+                          key={roleName}
+                          className={`production-role-card ${isActive ? "production-role-card-active" : ""}`}
+                        >
+                          <div className="production-role-card-head">
+                            <div>
+                              <h5>{roleName}</h5>
+                              {isActive ? <p>Permissions can be adjusted below.</p> : null}
+                            </div>
+                            <Form.Check
+                              type="switch"
+                              id={`role-switch-${roleName}`}
+                              label={isActive ? "Enabled" : "Disabled"}
+                              checked={isActive}
+                              onChange={(e) => handleRoleToggle(roleName, e.target.checked)}
+                            />
+                          </div>
+
+                          <div className="production-role-permissions">
+                            {permissionsConfig.map((permission) => (
+                              <Form.Check
+                                key={permission.name}
+                                type="checkbox"
+                                id={`check-${roleName}-${permission.name}`}
+                                label={permission.name}
+                                checked={formData.permissions?.[roleName]?.includes(permission.name) || false}
+                                onChange={(e) =>
+                                  handlePermissionChange(roleName, permission.name, e.target.checked)
+                                }
+                                disabled={!isActive}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    };
+
+                    if (typeof roleOrGroup === "string") {
+                      return renderRoleContent(roleOrGroup);
+                    }
+
+                    return (
+                      <Accordion.Item eventKey={i} key={i} className="production-role-group-card">
+                        <Accordion.Header>{roleOrGroup.name}</Accordion.Header>
+                        <Accordion.Body>
+                          <div className="production-role-grid">
+                            {roleOrGroup.subRoles.map((subRole) => renderRoleContent(subRole))}
+                          </div>
+                        </Accordion.Body>
+                      </Accordion.Item>
+                    );
+                  })}
+                </Accordion>
+              </div>
+            </div>
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={handleCloseUserModal}>
@@ -784,7 +863,7 @@ function extractAndModifyPermissions(permissions) {
       </Modal>
 
       {/* View Permissions Modal */}
-      <Modal show={showViewModal} onHide={handleCloseViewModal} centered>
+      <Modal show={showViewModal} onHide={handleCloseViewModal} centered dialogClassName="production-modal-shell">
         <Modal.Header closeButton>
           <Modal.Title>
             <i className="bi bi-shield-shaded me-2"></i>Permissions for{" "}
@@ -806,7 +885,7 @@ function extractAndModifyPermissions(permissions) {
       </Modal>
 
       {/* Confirmation Modal */}
-      <Modal show={showConfirmModal} onHide={handleCloseConfirmModal} centered>
+      <Modal show={showConfirmModal} onHide={handleCloseConfirmModal} centered backdrop="static" dialogClassName="production-modal-shell">
         <Modal.Header closeButton>
           <Modal.Title>
             <i className="bi bi-exclamation-triangle-fill text-danger me-2"></i>

@@ -1,4 +1,3 @@
-import PackagePage from "./Packages";
 import CustomersPage from "../CustomersComponent";
 const Customers = () => {
 

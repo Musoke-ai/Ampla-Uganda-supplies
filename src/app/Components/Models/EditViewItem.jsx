@@ -16,7 +16,7 @@ const EditViewItem = ({itemId}) => {
      isError,
      isLoading,
      isSuccess }] = useUpdateStockMutation();
-  const [deleteStock, { 
+  const [deleteStock, {
     data: deleteData,
     isLoading: isDeleteLoading,
     isSuccess: isDeleteDone,
@@ -77,7 +77,7 @@ setItemCategory(item?.itemCategoryId)
     setShow(false);
   }
   let category ='';
-  
+
   const onitemNameChanged = e => (setItemName(e.target.value));
   const onitemCategoryChanged = (e) => {
     category = Number(e.target.value);
@@ -128,7 +128,7 @@ if(Number(item_quantity) <= 0){
          item_notes,
          item_owner
        }).unwrap();
-   
+
        setItemName(item.itemName)
        setItemCategory(item.itemCategoryId)
        setItemModel(item.itemModel)
@@ -140,9 +140,9 @@ if(Number(item_quantity) <= 0){
        setItemMinPrice(item.itemLeastPrice)
        setItemNotes(item.itemNotes)
          setIsEditable(false)
-   
+
      } catch (err) {
-   
+
      }
     }
    }
@@ -161,7 +161,7 @@ if(Number(item_quantity) <= 0){
 
      } catch (err) {
      }
- 
+
    }
 
      //Setup notifaction popup
@@ -174,7 +174,7 @@ if(Number(item_quantity) <= 0){
        setIsOpen(true);
      };
 
-     
+
   useEffect(() => {
     if (isSuccess || isDeleteDone) {
       triggerNotification(true);
@@ -189,50 +189,50 @@ if(Number(item_quantity) <= 0){
 
   return (
     <div>
-   {!item ?  <div class="offcanvas offcanvas-end" tabindex="-1" id="viewItemDetails" aria-labelledby="viewItemDetails">
-  <div class="offcanvas-header shadow-sm " style={{backgroundColor: "#1C4E80"}}>
-    
-    <h5 class="text-danger" id="offcanvasRightLabel">Item Missing or Removed! </h5> 
-    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close" ></button>
+   {!item ?  <div className="offcanvas offcanvas-end inventory-item-offcanvas" tabIndex="-1" id="viewItemDetails" aria-labelledby="viewItemDetails">
+  <div className="offcanvas-header inventory-offcanvas-header shadow-sm ">
+
+    <h5 className="text-danger" id="offcanvasRightLabel">Item Missing or Removed! </h5>
+    <button type="button" className="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close" ></button>
   </div>
   {
-      isDeleteDone?<Alerts 
+      isDeleteDone?<Alerts
       heading="Deleting done!"
        message={deleteData['Messages']}
         variant='success'
-         autoHide={true} 
-         delay={7000} 
+         autoHide={true}
+         delay={7000}
          />
       :""
      }
   {
-      isErrorOnDelete?<Alerts 
+      isErrorOnDelete?<Alerts
       heading="Deleting failed!"
-       message={deleteData['Messages']} 
+       message={deleteData['Messages']}
        variant='success'
         autoHide={true}
          delay={7000} />
       :""
      }
-  </div>: 
- <div class="offcanvas offcanvas-end" tabindex="-1" id="viewItemDetails" aria-labelledby="viewItemDetails" on >
-  <div class="offcanvas-header shadow-sm text-light" style={{backgroundColor: "#1C4E80"}}>
-    
-    <h5 id="offcanvasRightLabel">Details for: 
-      <span class="fw-bold ms-1">{item.itemName}</span></h5>
-      {
-      !isEditable? <span><button type='button' aria-label='editButton' className='btn btn-md btn-white btn-outline-info' onClick={() => {handleEditClk();fillEditableFields();}} ><PencilFill /></button></span>  :
-   ""
-    }      
-    
+  </div>:
+ <div className="offcanvas offcanvas-end inventory-item-offcanvas" tabIndex="-1" id="viewItemDetails" aria-labelledby="viewItemDetails" on >
+  <div className="offcanvas-header inventory-offcanvas-header shadow-sm text-light">
 
-    <button type="button" class="btn-close text-white bg-white" data-bs-dismiss="offcanvas" aria-label="Close" onClick={resetItem} ></button>
+    <h5 id="offcanvasRightLabel">Details for:
+      <span className="fw-bold ms-1">{item.itemName}</span></h5>
+      {
+      !isEditable? <span><button type='button' aria-label='editButton' className='btn btn-md btn-white btn-outline-info inventory-offcanvas-edit-button' onClick={() => {handleEditClk();fillEditableFields();}} ><PencilFill /></button></span>  :
+   ""
+    }
+
+
+    <button type="button" className="btn-close text-white bg-white" data-bs-dismiss="offcanvas" aria-label="Close" onClick={resetItem} ></button>
   </div>
   {
          isDeleteLoading?
-          
+
 <LinearProgress  />
-          :""  
+          :""
     }
      {
           isLoading?
@@ -240,10 +240,10 @@ if(Number(item_quantity) <= 0){
   <LinearProgress  />
           :  ""
     }
-  <div class="offcanvas-body">
+  <div className="offcanvas-body inventory-offcanvas-body">
   <form>
- 
-    {isEditable? <fieldset> 
+
+    {isEditable? <fieldset>
       <div class="mb-3">
       <label for="name" class="form-label">Name</label>
       <input type="text" id="name" class="form-control" placeholder="Name" value={item_name} onChange={onitemNameChanged} />
@@ -261,10 +261,10 @@ if(Number(item_quantity) <= 0){
       <input type="number" id="quantity" class="form-control" placeholder="Quantity" value={item_quantity} onChange={onitemQuantityChanged} />
       {
         invalidQuantity? <p className='bg-warning'>
-        Invalid Quantity entered! 
+        Invalid Quantity entered!
       </p>:""
       }
-     
+
     </div>
     <div class="mb-3">
       <label for="condition" class="form-label">Condition</label>
@@ -307,16 +307,16 @@ if(Number(item_quantity) <= 0){
         }
       </select>
     </div>
-  </fieldset> : 
-  
-  <fieldset disabled> 
+  </fieldset> :
+
+  <fieldset disabled>
     <div class="mb-3">
       <label for="disabledTextInput" class="form-label">Model</label>
       <input type="text" id="disabledTextInput" class="form-control" placeholder="Disabled input" value={item?.itemModel} />
     </div>
     <div class="mb-3">
       <label for="disabledTextInput" class="form-label">Quality</label>
-      <input type="text" id="disabledTextInput" class="form-control" placeholder="Disabled input" 
+      <input type="text" id="disabledTextInput" class="form-control" placeholder="Disabled input"
       value={item?.itemQuality}
        />
     </div>
@@ -326,8 +326,8 @@ if(Number(item_quantity) <= 0){
     </div>
     <div class="mb-3">
       <label for="disabledTextInput" class="form-label">Condition</label>
-      <input type="text" id="disabledTextInput" class="form-control" placeholder="Disabled input" 
-      value={item?.itemCondition} 
+      <input type="text" id="disabledTextInput" class="form-control" placeholder="Disabled input"
+      value={item?.itemCondition}
       />
     </div>
     <div class="mb-3">
@@ -354,14 +354,14 @@ if(Number(item_quantity) <= 0){
       } />
     </div>
 </fieldset>
-  
+
   }
   <hr />
   <div class="d-flex flex-row justify-content-between align-items-center" >
     {isEditable? <button type="button" class="btn btn-primary" onClick={()=>{handleUpdateItem()}}>Save Changes</button>:
 ""
     }
-   
+
     {isEditable? <button type="button" class="btn btn-danger" onClick={() => {setShow(true);}}>Delete </button> : ""}
     </div>
 

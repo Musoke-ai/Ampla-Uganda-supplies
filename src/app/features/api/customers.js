@@ -18,7 +18,7 @@ export const extendedCustomersApiSlice = apiSlice.injectEndpoints({
         getCustomers: builder.query({
             query: () => '/getcustomers',
             transformResponse:  responseData => {
-            return customersAdapter.setAll(initialState, responseData)
+            return customersAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : [])
            },
            providesTags: [commonTags.inventory],
         }),

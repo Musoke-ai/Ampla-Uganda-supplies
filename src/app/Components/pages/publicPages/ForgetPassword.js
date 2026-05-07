@@ -4,6 +4,10 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+const AUTH_BASE_URL =
+  process.env.REACT_APP_AUTH_BASE_URL ||
+  'http://localhost/AmplaBackUp/amplaerp/index.php';
+
 const ForgetPassword = () => {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
@@ -16,7 +20,7 @@ const ForgetPassword = () => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost/mystock/forgot', { email });
+      const response = await axios.post(`${AUTH_BASE_URL}/forgot-password`, { email });
       setMessage(response.data.message);
     } catch (err) {
       setError(err.response?.data?.message || 'Something went wrong. Please try again.');

@@ -11,18 +11,23 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 // Initialize toast container (usually placed once in your App component)
 import { ToastContainer } from 'react-toastify';
 import { SettingsProvider } from './app/Components/Settings';
+import { CssBaseline, ThemeProvider } from '@mui/material';
+import amplaThemeModern from './app/theme/amplaThemeModern';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <BrowserRouter>
     <Provider store={store}>
+      <ThemeProvider theme={amplaThemeModern}>
+      <CssBaseline />
       <SettingsProvider>
       <ToastContainer />
       <Routes>
         <Route path="/*"element={<App />} />
       </Routes>
       </SettingsProvider>
+      </ThemeProvider>
     </Provider>
     </BrowserRouter>
   </React.StrictMode>

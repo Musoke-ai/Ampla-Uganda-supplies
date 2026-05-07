@@ -9,7 +9,7 @@ function CustomTabPanel(props) {
   const { children, value, index, ...others } =props;
 
   return (
-    <div 
+    <div
     role='tabpanel'
     hidden={value !== index}
     id={`simple-tabpanel-${index}`}
@@ -52,9 +52,9 @@ const Saved = () => {
      {/* <Header /> */}
       <div className='glassyCont' style={{position: 'sticky', top:"0"}}>
       <div className='d-flex  flex-column  justify-content-center align-items-center glassyBackground'>
-       <h1><div className='text-primary text-bold fs-3'>Help</div></h1> 
+       <h1><div className='text-primary text-bold fs-3'>Help</div></h1>
         <div>
-       <h4>Easily and quickly learn how to get started with poweredStock to keep track of your inventory.</h4> 
+       <h4>Easily and quickly learn how to get started with Ampla Uganda to keep track of your inventory.</h4>
         </div>
       </div>
       </div>
@@ -63,7 +63,7 @@ const Saved = () => {
 
   <Box sx={{width: '100%'}} className='d-flex justify-content-center align-items-center'
    style={{marginTop:'140px'}}>
-    <Tabs 
+    <Tabs
     value={value}
     onChange={handleChange}
     textColor='secondary'
@@ -83,14 +83,14 @@ const Saved = () => {
     {/* usage */}
     <CustomTabPanel value={value} index={0} >
   <p>
-    poweredStock hardware stock management system is a powerful tool that helps businesses of all sizes to track and manage their hardware inventory. With our system, you can easily Track inventory levels in real time, Simply do stock replenishment, Set up debt payment alerts, Generate reports on inventory levels, sales, and more. poweredStock is easy to use and can be customized to meet the specific needs of your business. Whether you're a small hardware store or a large enterprise, our system can help you to improve your inventory management and profitability.
+    Ampla Uganda hardware stock management system is a powerful tool that helps businesses of all sizes to track and manage their hardware inventory. With our system, you can easily Track inventory levels in real time, Simply do stock replenishment, Set up debt payment alerts, Generate reports on inventory levels, sales, and more. Ampla Uganda is easy to use and can be customized to meet the specific needs of your business. Whether you're a small hardware store or a large enterprise, our system can help you to improve your inventory management and profitability.
     </p>
-    <Link className="nav-link" to="/signup" >  <span className="fw-bold text-white"><button className="rounded btn-sm mainColor text-white p-2 text-center" style={{border:"none"}}>Try poweredStock now</button></span> </Link>
+    <Link className="nav-link" to="/signup" >  <span className="fw-bold text-white"><button className="rounded btn-sm mainColor text-white p-2 text-center" style={{border:"none"}}>Try Ampla Uganda now</button></span> </Link>
   </CustomTabPanel>
   {/* Does it fit my business */}
   <CustomTabPanel value={value} index={1} >
-  <p>poweredStock is a perfect solution for businesses which deal in tangible items that may or may not differ in terms of names, types, colors, brands and many more.<br/> It is not a good fit for businesses dealing in services or intangible items unless you are very sure it can help necessarily.</p>
-            <p class="fw-bold">All in all, you can first<a href="#" class="fw-bold"> Try Out poweredStock</a> first.</p>
+  <p>Ampla Uganda is a perfect solution for businesses which deal in tangible items that may or may not differ in terms of names, types, colors, brands and many more.<br/> It is not a good fit for businesses dealing in services or intangible items unless you are very sure it can help necessarily.</p>
+            <p class="fw-bold">All in all, you can first<a href="#" class="fw-bold"> Try Out Ampla Uganda</a> first.</p>
 
   </CustomTabPanel>
     { /* FAQS */}
@@ -99,7 +99,7 @@ const Saved = () => {
 
   <div className='accordion-item' style={{width:'700px'}}>
     <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
+      <button className='accordion-button collapsed ' type='button'
       style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q1'  aria-expanded='false' aria-controls='flush-q1'>
       <h6 id="qn" class="fw-bold">How can I add an item to my stock?</h6>
       </button>
@@ -113,7 +113,7 @@ const Saved = () => {
 
   <div className='accordion-item' style={{width:'700px'}}>
     <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
+      <button className='accordion-button collapsed ' type='button'
       style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q2'  aria-expanded='false' aria-controls='flush-q1'>
         <h6 id="qn" class="fw-bold">How do I sell an item?</h6>
       </button>
@@ -128,7 +128,7 @@ const Saved = () => {
 
   <div className='accordion-item' style={{width:'700px'}}>
     <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
+      <button className='accordion-button collapsed ' type='button'
       style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q3'  aria-expanded='false' aria-controls='flush-q1'>
         <h6 id="qn" class="fw-bold">How can I record a debt(when you lend an item to someone)?</h6>
       </button>
@@ -144,36 +144,36 @@ const Saved = () => {
 
   <div className='accordion-item' style={{width:'700px'}}>
     <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
+      <button className='accordion-button collapsed ' type='button'
       style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q4'  aria-expanded='false' aria-controls='flush-q1'>
          <h6 id="qn" class="fw-bold">How do I register my business?</h6>
       </button>
     </h2>
     <div id="q4" className='accordion-collapse collapse' data-bs-parent="faqs">
       <div className='accordion-body'>
-      <p class="ms-4">This is the first step you can take, Go to the top right corner of the top navigation, click on register business and continue with the onscreen instructions. Thank you for choosing poweredStock!</p>
+      <p class="ms-4">This is the first step you can take, Go to the top right corner of the top navigation, click on register business and continue with the onscreen instructions. Thank you for choosing Ampla Uganda!</p>
       </div>
     </div>
   </div>
 
-  
+
   <div className='accordion-item' style={{width:'700px'}}>
     <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
+      <button className='accordion-button collapsed ' type='button'
       style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q5'  aria-expanded='false' aria-controls='flush-q1'>
           <h6 id="qn" class="fw-bold">How do I login?</h6>
       </button>
     </h2>
     <div id="q5" className='accordion-collapse collapse' data-bs-parent="faqs">
       <div className='accordion-body'>
-      <p class="ms-4">Go to the top right corner of the top navigation, click on register business, then select login and continue with the onscreen instructions. Thank you for choosing poweredStock!</p>
+      <p class="ms-4">Go to the top right corner of the top navigation, click on register business, then select login and continue with the onscreen instructions. Thank you for choosing Ampla Uganda!</p>
       </div>
     </div>
   </div>
 
   <div className='accordion-item' style={{width:'700px'}}>
     <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
+      <button className='accordion-button collapsed ' type='button'
       style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q6'  aria-expanded='false' aria-controls='flush-q1'>
       <h6 id="qn" class="fw-bold">Can I view my sales?</h6>
       </button>
@@ -187,7 +187,7 @@ const Saved = () => {
 
   <div className='accordion-item' style={{width:'700px'}}>
     <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
+      <button className='accordion-button collapsed ' type='button'
       style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q7'  aria-expanded='false' aria-controls='flush-q1'>
      <h6 id="qn" class="fw-bold">How do I see those I demand?</h6>
       </button>
@@ -201,84 +201,42 @@ const Saved = () => {
 
   <div className='accordion-item' style={{width:'700px'}}>
     <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
-      style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q8'  aria-expanded='false' aria-controls='flush-q1'>
-     <h6 id="qn" class="fw-bold">How do I pay?</h6>
-      </button>
-    </h2>
-    <div id="q8" className='accordion-collapse collapse' data-bs-parent="faqs">
-      <div className='accordion-body'>
-      <p class="ms-4">Currently, you can only pay physically or via a call to us(0750147072/0785363423). In the near future, we are to add Payment using MoMo or cards to ease the process for you. Thank you for choosing poweredStock!</p>
-      </div>
-    </div>
-  </div>
-
-  <div className='accordion-item' style={{width:'700px'}}>
-    <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
-      style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q9'  aria-expanded='false' aria-controls='flush-q1'>
-    <h6 id="qn" class="fw-bold">I have money on my simcard, can I pay using mobile money?</h6>
-      </button>
-    </h2>
-    <div id="q9" className='accordion-collapse collapse' data-bs-parent="faqs">
-      <div className='accordion-body'>
-      <p class="ms-4">Not for now, but we are actively working hard to add the Pay By MoMo option to ease your payment process. Bare with us, please. Thank you for choosing poweredStock!</p>
-      </div>
-    </div>
-  </div>
-
-  <div className='accordion-item' style={{width:'700px'}}>
-    <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
-      style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q10'  aria-expanded='false' aria-controls='flush-q1'>
-   <h6 id="qn" class="fw-bold">Which poweredStock package should pay for?</h6>
-      </button>
-    </h2>
-    <div id="q10" className='accordion-collapse collapse' data-bs-parent="faqs">
-      <div className='accordion-body'>
-      <p class="ms-4">If you don't wish to get insights about the performance of your business stock, pay for Gold. But if you need to know and project the future perfomance of your business stock and more highlights about your stock, then pay for Diamond. Call 0750147072/0776033533 for more explanations. Thank you for choosing poweredStock!</p>
-      </div>
-    </div>
-  </div>
-
-  <div className='accordion-item' style={{width:'700px'}}>
-    <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
+      <button className='accordion-button collapsed ' type='button'
       style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q11'  aria-expanded='false' aria-controls='flush-q1'>
  <h6 id="qn" class="fw-bold">Can I get quick help?</h6>
       </button>
     </h2>
     <div id="q11" className='accordion-collapse collapse' data-bs-parent="faqs">
       <div className='accordion-body'>
-      <p class="ms-4">That's why we are always on air, 0750147072(call or WhatsApp) /0776033533(call only). Thank you for choosing poweredStock!</p>
+      <p class="ms-4">That's why we are always on air, 0750147072(call or WhatsApp) /0776033533(call only). Thank you for choosing Ampla Uganda!</p>
       </div>
     </div>
   </div>
 
   <div className='accordion-item' style={{width:'700px'}}>
     <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
+      <button className='accordion-button collapsed ' type='button'
       style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q12'  aria-expanded='false' aria-controls='flush-q1'>
    <h6 id="qn" class="fw-bold">What are the terms and conditions?</h6>
       </button>
     </h2>
     <div id="q12" className='accordion-collapse collapse' data-bs-parent="faqs">
       <div className='accordion-body'>
-      <p class="ms-4">In order to read and understand our terms and conditions, click <a href="">here</a>, please. Thank you for choosing poweredStock!</p>
+      <p class="ms-4">In order to read and understand our terms and conditions, click <a href="">here</a>, please. Thank you for choosing Ampla Uganda!</p>
       </div>
     </div>
   </div>
 
   <div className='accordion-item' style={{width:'700px'}}>
     <h2 className='accordion-header'  >
-      <button className='accordion-button collapsed ' type='button'  
+      <button className='accordion-button collapsed ' type='button'
       style={{width:'700px'}} data-bs-toggle='collapse' data-bs-target='#q13'  aria-expanded='false' aria-controls='flush-q1'>
    <h6 id="qn" class="fw-bold">Can I have a look at the privacy policy?</h6>
       </button>
     </h2>
     <div id="q13" className='accordion-collapse collapse' data-bs-parent="faqs">
       <div className='accordion-body'>
-      <p class="ms-4">Yes ofcourse, you can access the privacy policy by clicking <a href="" title="privacy policy">here</a>. Thank you for choosing poweredStock!</p>
+      <p class="ms-4">Yes ofcourse, you can access the privacy policy by clicking <a href="" title="privacy policy">here</a>. Thank you for choosing Ampla Uganda!</p>
       </div>
     </div>
   </div>

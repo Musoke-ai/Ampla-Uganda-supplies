@@ -1,4 +1,4 @@
-# Ampla / PoweredStock Project Documentation
+# Ampla Uganda Project Documentation
 
 ## Purpose and Audience
 This document explains what each major section of the application does, how it works at a high level, and why it exists. It is written for stakeholders, developers, and operators who need a clear map of the system’s features and flows.
@@ -6,7 +6,7 @@ This document explains what each major section of the application does, how it w
 ---
 
 ## 1. Project Overview (What & Why)
-The project is a React-based inventory and point‑of‑sale (POS) system that supports sales, customer management, stock control, and business operations such as production tracking and expenses. It integrates role‑based access control and real‑time updates for operational accuracy.
+The project is a React-based inventory and point-of-sale (POS) system for Ampla Uganda. It supports sales, customer management, stock control, and business operations such as production tracking and expenses. It integrates role-based access control and real-time updates for operational accuracy.
 
 Why this exists:
 - Small and growing businesses need to track stock, sales, customers, and production in one place.
@@ -21,7 +21,7 @@ The app is built with Create React App and uses React Router for page navigation
 Key structural layers:
 - **Routing Layer**: Defines public vs. protected routes and role‑restricted features.
 - **State/Data Layer**: Redux Toolkit slices + RTK Query for fetch/update.
-- **UI Layer**: React components (React‑Bootstrap, MUI, etc.).
+- **UI Layer**: React components. MUI is the primary standard for new UI work; React Bootstrap remains only for legacy screens during migration.
 
 ---
 
@@ -30,7 +30,7 @@ Key structural layers:
 Routes are split into:
 - **Public pages** (login, password reset).
 - **Protected pages** (dashboard, POS, inventory, customers, reports, production, etc.).
-- **Role‑restricted pages** (admin‑only pages like documents and packages).
+- **Role-restricted pages** (admin-only pages like documents).
 
 ### How it works
 - `PersistLogin` restores session state on reload.

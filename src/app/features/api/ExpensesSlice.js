@@ -18,7 +18,7 @@ export const extendedExpensesApiSlice = apiSlice.injectEndpoints({
         getExpenses: builder.query({
             query: () => '/expenses',
             transformResponse:  responseData => {
-            return expensesAdapter.setAll(initialState, responseData)
+            return expensesAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : [])
            },
            providesTags: [commonTags.inventory],
         }),

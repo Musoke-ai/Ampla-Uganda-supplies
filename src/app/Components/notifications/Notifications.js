@@ -7,12 +7,12 @@ import { Cancel } from '@mui/icons-material';
 // Mock data simulating an API response.
 const mockApiResponse = [
     { "type": "header", "version": "5.2.0", "comment": "Export to JSON plugin for PHPMyAdmin" },
-    { "type": "database", "name": "mystock" },
+    { "type": "database", "name": "ampla_uganda" },
     {
-        "type": "table", "name": "notifications", "database": "mystock", "data": [
+        "type": "table", "name": "notifications", "database": "ampla_uganda", "data": [
             { "id": "1", "title": "Low Stock", "message": "Low Stock for \"Cake Boards\" available 5pc", "created_at": "2025-08-04 14:31:51", "is_read": "0", "notification_type": "stock_warning", "severity_level": "warning" },
             { "id": "2", "title": "New Order Received", "message": "Order #12345 has been placed successfully.", "created_at": "2025-08-04 10:15:00", "is_read": "0", "notification_type": "new_order", "severity_level": "info" },
-            { "id": "3", "title": "Payment Failed", "message": "Payment for invoice #INV-007 failed.", "created_at": "2025-08-03 18:05:23", "is_read": "0", "notification_type": "payment_issue", "severity_level": "error" },
+            { "id": "3", "title": "Customer Payment Pending", "message": "Customer payment for invoice #INV-007 is pending.", "created_at": "2025-08-03 18:05:23", "is_read": "0", "notification_type": "payment_issue", "severity_level": "warning" },
             { "id": "4", "title": "System Update", "message": "A system update is scheduled for tonight at 11 PM.", "created_at": "2025-08-03 09:00:00", "is_read": "1", "notification_type": "system_message", "severity_level": "info" },
             { "id": "5", "title": "Low Stock", "message": "Low Stock for \"Sprinkles\" available 10pc", "created_at": "2025-07-31 11:20:10", "is_read": "1", "notification_type": "stock_warning", "severity_level": "warning" }
         ]

@@ -8,7 +8,8 @@ const authSlice = createSlice({
          users: null,
          roles: [],
          permissions: [],
-         userId: ""
+         userId: "",
+         branchScope: null,
     },
     reducers: {
         setCredentials: (state, action) => {
@@ -35,15 +36,23 @@ const authSlice = createSlice({
             const { data } = action.payload
           
             state.profile = data;
+            state.branchScope = data?.branchScope ?? state.branchScope;
+        },
+        setBranchScope: (state, action) => {
+            const { branchScope } = action.payload;
+            state.branchScope = branchScope;
         },
         logOut: (state, action) => {
             state.token = null;
             state.profile = null;
             state.roles = null;
+            state.permissions = [];
+            state.userId = "";
+            state.branchScope = null;
         },
     }
 })
-export const { setCredentials, logOut, setProfile, setRoles, setPermissions, setUserId } = authSlice.actions
+export const { setCredentials, logOut, setProfile, setRoles, setPermissions, setUserId, setBranchScope } = authSlice.actions
 
 export default authSlice.reducer
 
@@ -53,3 +62,4 @@ export const selectUsers = (state) => state.auth.users
 export const selectRoles = (state) => state.auth.roles
 export const selectPermissions = (state) => state.auth.permissions
 export const selectUserId = (state) => state.auth.userId
+export const selectBranchScope = (state) => state.auth.branchScope

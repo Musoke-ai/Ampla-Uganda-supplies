@@ -1,412 +1,934 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
-import Chart from 'chart.js/auto';
-import Litepicker from 'litepicker';
-import { format, parseISO } from 'date-fns';
+import React, { useEffect, useMemo, useRef } from "react";
+import Chart from "chart.js/auto";
+import { format, parseISO, isValid, subDays } from "date-fns";
+import { NavLink } from "react-router-dom";
+import { useSelector } from "react-redux";
+import {
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  Divider,
+  Grid,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  MenuItem,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import {
+  ArrowRight,
+  BoxSeam,
+  CashStack,
+  ChatDots,
+  ClipboardCheck,
+  ExclamationTriangle,
+  Eye,
+  FolderPlus,
+  PencilSquare,
+  PersonWorkspace,
+} from "react-bootstrap-icons";
 
-import { useSettings } from '../Settings';
-
-// import 'bootstrap/dist/css/bootstrap.min.css';
-import { Container, Row, Col, Card, Table, Navbar, ProgressBar, Badge } from 'react-bootstrap';
-import { useSelector } from 'react-redux';
 import { selectOrders } from "../../features/api/orderSlice";
-import { selectExpenses } from "../../features/api/ExpensesSlice";
-import { selectEmployees } from "../../features/api/employeesSlice";
 import { selectCustomers } from "../../features/api/customers";
 import { selectStock } from "../../features/stock/stockSlice";
 import { selectSales } from "../../features/api/salesSlice";
-import { selectDebt } from "../../features/api/debtSlice";
-import { selectRawMaterials } from "../../features/api/rawmaterialsSlice";
-import { NavLink } from 'react-router-dom';
+import { useSettings } from "../Settings";
 
-// --- Data using the exact column names from your CSV as keys ---
-// const stockItems = [
-//     { "S/N": 1, "Item Name": "Board 2", "itemStockPrice": 35.0, "itemLeastPrice": 40.0 },
-//     { "S/N": 2, "Item Name": "Cake Board", "itemStockPrice": 130.0, "itemLeastPrice": 150.0 },
-//     { "S/N": 3, "Item Name": "Hammer", "itemStockPrice": 12.50, "itemLeastPrice": 15.0 },
-//     { "S/N": 4, "Item Name": "Nails (1lb box)", "itemStockPrice": 4.75, "itemLeastPrice": 5.75 },
-//     { "S/N": 5, "Item Name": "Screwdriver Set", "itemStockPrice": 22.0, "itemLeastPrice": 25.5 }
-// ];
+const palette = {
+  bg: "#f8fbf8",
+  surface: "#ffffff",
+  border: "#edf2ee",
+  text: "#15202b",
+  muted: "#6f7d8c",
+  green: "#2f8f57",
+  greenSoft: "#e8f5ec",
+  greenWash: "#f1faf4",
+  orange: "#f59e0b",
+  orangeSoft: "#fff3df",
+  purple: "#7c3aed",
+  purpleSoft: "#f1e9ff",
+  red: "#ef4444",
+  redSoft: "#ffebeb",
+  shadow: "0 12px 32px rgba(15, 23, 42, 0.05)",
+};
 
-const stockStock = [
-    { "stock_item_id": 1, "quantity": 9 },
-    { "stock_item_id": 2, "quantity": 135 },
-    { "stock_item_id": 3, "quantity": 50 },
-    { "stock_item_id": 4, "quantity": 200 },
-    { "stock_item_id": 5, "quantity": 35 }
-];
+const cardStyle = {
+  borderRadius: 4,
+  border: `1px solid ${palette.border}`,
+  boxShadow: palette.shadow,
+  backgroundColor: palette.surface,
+};
 
-// --- Other Mock Data (replace with your actual data) ---
-// const customers = [
-//     { id: 1, CName: 'Mr. Daniels', CPhone: '0700000001' },
-//     { id: 2, CName: 'Mr. Abas Ssendagala', CPhone: '0700000002' },
-//     { id: 3, CName: 'Global Enterprises', CPhone: '0700000003' }
-// ];
-// const sales = [
-//     { id: 1, customer_id: 2, stock_item_id: 2, quantity: 10, total: 1500, created_at: '2025-07-18 10:00:00' },
-//     { id: 2, customer_id: 1, stock_item_id: 4, quantity: 20, total: 115, created_at: '2025-07-18 11:30:00' },
-//     { id: 3, customer_id: 3, stock_item_id: 3, quantity: 5, total: 75, created_at: '2025-07-17 15:00:00' }
-// ];
-// const dues = [
-//     {id: 1, customer_id: 3, amount: 200000, due_date: '2025-07-25'},
-//     {id: 2, customer_id: 1, amount: 150000, due_date: '2025-07-30'},
-// ];
-// const employees = [
-//     { EID: 53, EFirstName: 'John', ELastName: 'Doe'},
-//     { EID: 54, EFirstName: 'Jane', ELastName: 'Smith'},
-// ];
-// const rawMaterials = [
-//     { id: 1, name: 'Wood', quantity: 80 }, { id: 2, name: 'Steel', quantity: 50 },
-//     { id: 3, name: 'Varnish', quantity: 30 }, { id: 4, name: 'Screws', quantity: 500 },
-// ];
-// const dailyExpenses = [
-//     { id: 1, description: 'Office Supplies', amount: 75000, created_at: '2025-07-18 09:30:00'},
-//     { id: 2, description: 'Fuel for Delivery', amount: 120000, created_at: '2025-07-17 12:00:00'},
-// ];
+const formatMoney = (value) => `UGX ${Number(value || 0).toLocaleString()}`;
 
+const parseDate = (value) => {
+  if (!value) return null;
+  const parsed = parseISO(value);
+  if (isValid(parsed)) return parsed;
+  const fallback = new Date(value);
+  return isValid(fallback) ? fallback : null;
+};
 
-// --- Reusable Components ---
-const KpiCard = ({ href, icon, title, value, bg }) => (
-    <a href={href} className="text-decoration-none text-dark">
-        <Card className={`h-100 shadow-sm border-0 kpi-card ${bg ? `bg-${bg}` : '' }` }>
-            <Card.Body className="d-flex align-items-center">
-                <div className="flex-shrink-0 me-3">{icon}</div>
-                <div>
-                    <div className="text-muted small">{title}</div>
-                    <div className="h5 fw-bold mb-0">{value}</div>
-                </div>
-                <div className="ms-auto text-muted">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-arrow-right-circle" viewBox="0 0 16 16"><path fillRule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8zm15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z"/></svg>
-                </div>
-            </Card.Body>
-        </Card>
-    </a>
+const formatDateTime = (value) => {
+  const date = parseDate(value);
+  return date ? format(date, "MMM d, yyyy • h:mm a") : "Unknown time";
+};
+
+const formatDateOnly = (value) => {
+  const date = parseDate(value);
+  return date ? format(date, "MMM d, yyyy") : "Unknown date";
+};
+
+const SummaryCard = ({ title, value, note, icon, accent, textAccent, to }) => (
+  <Paper
+    component={NavLink}
+    to={to}
+    sx={{
+      ...cardStyle,
+      p: 2.25,
+      height: "100%",
+      display: "block",
+      textDecoration: "none",
+      transition: "transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease",
+      "&:hover": {
+        transform: "translateY(-2px)",
+        boxShadow: "0 18px 36px rgba(15, 23, 42, 0.08)",
+        borderColor: alpha(textAccent, 0.28),
+      },
+      "&:focus-visible": {
+        outline: `3px solid ${alpha(textAccent, 0.18)}`,
+        outlineOffset: 2,
+      },
+    }}
+  >
+    <Stack direction="row" spacing={1.75} alignItems="flex-start">
+      <Avatar
+        sx={{
+          width: 40,
+          height: 40,
+          bgcolor: accent,
+          color: textAccent,
+        }}
+      >
+        {icon}
+      </Avatar>
+      <Box>
+        <Typography variant="body2" sx={{ color: palette.muted }}>
+          {title}
+        </Typography>
+        <Typography
+          variant="h6"
+          sx={{ mt: 0.5, fontWeight: 800, color: palette.text, letterSpacing: "-0.02em" }}
+        >
+          {value}
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 1, color: textAccent }}>
+          {note}
+        </Typography>
+      </Box>
+    </Stack>
+  </Paper>
 );
 
-const SectionCard = ({ id, title, children }) => (
-    <Card id={id} className="shadow-sm border-0 mb-4">
-        <Card.Header as="h5">{title}</Card.Header>
-        <Card.Body>{children}</Card.Body>
-    </Card>
+const Panel = ({ title, action, children, sx = {} }) => (
+  <Paper sx={{ ...cardStyle, p: 2.25, ...sx }}>
+    <Stack
+      direction="row"
+      justifyContent="space-between"
+      alignItems="center"
+      sx={{ mb: 2 }}
+      spacing={1}
+    >
+      <Typography variant="h6" sx={{ fontWeight: 800, color: palette.text, fontSize: "1.05rem" }}>
+        {title}
+      </Typography>
+      {action}
+    </Stack>
+    {children}
+  </Paper>
 );
 
-// --- Main App Component ---
-export default function Dashboard() {
-    const stockItems = useSelector(selectStock);
-    const customers = useSelector(selectCustomers);
-    const dues = useSelector(selectDebt);
-    const sales = useSelector(selectSales);
-    const orders = useSelector(selectOrders);
-    const dailyExpenses = useSelector(selectExpenses);
-    const employees = useSelector(selectEmployees);
-    const rawMaterials = useSelector(selectRawMaterials);
+const Dashboard = () => {
+  const { settings } = useSettings();
+  const stockItems = useSelector(selectStock) ?? [];
+  const customers = useSelector(selectCustomers) ?? [];
+  const sales = useSelector(selectSales) ?? [];
+  const orders = useSelector(selectOrders) ?? [];
 
-    const { settings } = useSettings();
-    console.log("theme: ",settings.theme);
+  const salesChartRef = useRef(null);
+  const stockChartRef = useRef(null);
 
-    const [dateRange, setDateRange] = useState({
-        startDate: new Date(new Date().setDate(new Date().getDate() - 30)),
-        endDate: new Date(),
+  const lowStockThreshold = Number(settings?.lowLevelProducts) || 15;
+
+  const customerMap = useMemo(
+    () => new Map(customers.map((customer) => [customer.custId, customer.custName])),
+    [customers]
+  );
+  const productMap = useMemo(
+    () => new Map(stockItems.map((item) => [item.itemId, item.itemName])),
+    [stockItems]
+  );
+
+  const inventoryValue = useMemo(
+    () =>
+      stockItems.reduce(
+        (sum, item) => sum + (Number(item.itemQuantity) || 0) * (Number(item.itemLeastPrice) || 0),
+        0
+      ),
+    [stockItems]
+  );
+
+  const todaySales = useMemo(() => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    return sales
+      .filter((sale) => sale.saleDateCreated?.startsWith(today))
+      .reduce(
+        (sum, sale) => sum + (Number(sale.saleQuantity) || 0) * (Number(sale.salePrice) || 0),
+        0
+      );
+  }, [sales]);
+
+  const ordersInProduction = useMemo(
+    () =>
+      orders.filter(
+        (order) => (Number(order.quantityProduced) || 0) < (Number(order.quantity) || 0)
+      ).length,
+    [orders]
+  );
+
+  const lowStockItems = useMemo(
+    () =>
+      stockItems
+        .filter((item) => {
+          const qty = Number(item.itemQuantity) || 0;
+          return qty > 0 && qty <= lowStockThreshold;
+        })
+        .sort((a, b) => (Number(a.itemQuantity) || 0) - (Number(b.itemQuantity) || 0)),
+    [lowStockThreshold, stockItems]
+  );
+
+  const salesSeries = useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, index) => subDays(new Date(), 6 - index));
+    return days.map((day) => {
+      const key = format(day, "yyyy-MM-dd");
+      const value = sales
+        .filter((sale) => sale.saleDateCreated?.startsWith(key))
+        .reduce(
+          (sum, sale) => sum + (Number(sale.saleQuantity) || 0) * (Number(sale.salePrice) || 0),
+          0
+        );
+
+      return { label: format(day, "MMM d"), value };
     });
-    const [kpis, setKpis] = useState({});
-    const [filteredData, setFilteredData] = useState({ sales: [], expenses: [], orders: [] });
+  }, [sales]);
 
-    const datePickerRef = useRef();
-    const rawMaterialsChartRef = useRef(null);
-    const salesVsStockChartRef = useRef(null);
+  const topProducts = useMemo(() => {
+    const grouped = new Map();
+    sales.forEach((sale) => {
+      const key = sale.saleItemId;
+      const current = grouped.get(key) || { revenue: 0, units: 0 };
+      current.revenue += (Number(sale.saleQuantity) || 0) * (Number(sale.salePrice) || 0);
+      current.units += Number(sale.saleQuantity) || 0;
+      grouped.set(key, current);
+    });
 
-    // Initialize Date Picker
-    useEffect(() => {
-        const picker = new Litepicker({
-            element: datePickerRef.current,
-            singleMode: false,
-            format: 'MMM DD, YYYY',
-            setup: (picker) => {
-                picker.on('selected', (date1, date2) => {
-                    setDateRange({ startDate: date1.dateInstance, endDate: date2.dateInstance });
-                });
+    return Array.from(grouped.entries())
+      .map(([itemId, values]) => ({
+        itemId,
+        name: productMap.get(itemId) || `Product ${itemId}`,
+        revenue: values.revenue,
+        units: values.units,
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+  }, [productMap, sales]);
+
+  const stockSummary = useMemo(() => {
+    const inStock = stockItems.filter((item) => (Number(item.itemQuantity) || 0) > lowStockThreshold)
+      .length;
+    const lowStock = stockItems.filter((item) => {
+      const qty = Number(item.itemQuantity) || 0;
+      return qty > 0 && qty <= lowStockThreshold;
+    }).length;
+    const outOfStock = stockItems.filter((item) => (Number(item.itemQuantity) || 0) <= 0).length;
+    const inProduction = orders.filter(
+      (order) => (Number(order.quantityProduced) || 0) < (Number(order.quantity) || 0)
+    ).length;
+
+    return [
+      { label: "In Stock", value: inStock, color: palette.green },
+      { label: "Low Stock", value: lowStock, color: palette.orange },
+      { label: "Out of Stock", value: outOfStock, color: palette.red },
+      { label: "In Production", value: inProduction, color: palette.purple },
+    ];
+  }, [lowStockThreshold, orders, stockItems]);
+
+  const totalStockSummary = stockSummary.reduce((sum, item) => sum + item.value, 0);
+
+  const recentActivity = useMemo(() => {
+    const activity = [];
+
+    sales.slice(0, 4).forEach((sale) => {
+      activity.push({
+        id: `sale-${sale.saleId}`,
+        title: "Sale Recorded",
+        detail: `${sale.saleQuantity || 0} unit${Number(sale.saleQuantity) > 1 ? "s" : ""} sold`,
+        when: sale.saleDateCreated,
+        accent: palette.green,
+        initials: "S",
+      });
+    });
+
+    orders.slice(0, 3).forEach((order) => {
+      activity.push({
+        id: `order-${order.orderId}`,
+        title: "Order Updated",
+        detail: `${customerMap.get(order.custId) || "Customer"} order in progress`,
+        when: order.orderDateUpdated || order.orderDateCreated,
+        accent: palette.purple,
+        initials: "P",
+      });
+    });
+
+    stockItems.slice(0, 3).forEach((item) => {
+      activity.push({
+        id: `stock-${item.itemId}`,
+        title: "Stock Updated",
+        detail: `${item.itemName || "Product"} at ${item.itemQuantity || 0} units`,
+        when: item.itemDateUpdated || item.itemDateCreated,
+        accent: "#3b82f6",
+        initials: "SS",
+      });
+    });
+
+    return activity
+      .sort((a, b) => (parseDate(b.when)?.getTime() || 0) - (parseDate(a.when)?.getTime() || 0))
+      .slice(0, 4);
+  }, [customerMap, orders, sales, stockItems]);
+
+  const recentSales = useMemo(
+    () =>
+      [...sales]
+        .sort(
+          (a, b) =>
+            (parseDate(b.saleDateCreated)?.getTime() || 0) -
+            (parseDate(a.saleDateCreated)?.getTime() || 0)
+        )
+        .slice(0, 5)
+        .map((sale) => ({
+          id: sale.saleId,
+          customer: customerMap.get(sale.custId) || "Retail Walk-in",
+          items: Number(sale.saleQuantity) || 0,
+          total: (Number(sale.saleQuantity) || 0) * (Number(sale.salePrice) || 0),
+          status: "Paid",
+          date: sale.saleDateCreated,
+        })),
+    [customerMap, sales]
+  );
+
+  const upcomingTasks = useMemo(() => {
+    const stockTasks = lowStockItems.slice(0, 2).map((item, index) => ({
+      id: `task-stock-${item.itemId}`,
+      title: `Reorder ${item.itemName}`,
+      detail: `Qty left: ${item.itemQuantity}`,
+      level: index === 0 ? "High" : "Medium",
+    }));
+
+    const orderTask = ordersInProduction
+      ? [
+          {
+            id: "task-production",
+            title: "Review active production queue",
+            detail: `${ordersInProduction} order${ordersInProduction > 1 ? "s" : ""} still in progress`,
+            level: "Low",
+          },
+        ]
+      : [];
+
+    return [...stockTasks, ...orderTask].slice(0, 3);
+  }, [lowStockItems, ordersInProduction]);
+
+  useEffect(() => {
+    if (!salesChartRef.current) return undefined;
+
+    const chart = new Chart(salesChartRef.current, {
+      type: "line",
+      data: {
+        labels: salesSeries.map((entry) => entry.label),
+        datasets: [
+          {
+            data: salesSeries.map((entry) => entry.value),
+            borderColor: palette.green,
+            backgroundColor: alpha(palette.green, 0.1),
+            fill: true,
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 3.5,
+            pointHoverRadius: 4,
+            pointBackgroundColor: palette.green,
+            pointBorderWidth: 0,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: { color: palette.muted },
+          },
+          y: {
+            grid: { color: alpha("#64748b", 0.12) },
+            border: { display: false },
+            ticks: {
+              color: palette.muted,
+              callback: (value) => `${Number(value) / 1000}K`,
             },
-        });
-        picker.setDateRange(dateRange.startDate, dateRange.endDate);
-    }, []);
+          },
+        },
+      },
+    });
 
-    // Update data and KPIs when date range changes
-    useEffect(() => {
-        const filteredSales = sales.filter(s => new Date(s.saleDateCreated) >= dateRange.startDate && new Date(s.saleDateCreated) <= dateRange.endDate);
-        const filteredExpenses = dailyExpenses.filter(e => new Date(e.expenseDateCreated) >= dateRange.startDate && new Date(e.expenseDateCreated) <= dateRange.endDate);
-        const filteredOrders = orders.filter(e => new Date(e.orderDateCreated) >= dateRange.startDate && new Date(e.orderDateCreated) <= dateRange.endDate);
+    return () => chart.destroy();
+  }, [salesSeries]);
 
-        setFilteredData({ sales: filteredSales, expenses: filteredExpenses, orders: filteredOrders });
+  useEffect(() => {
+    if (!stockChartRef.current) return undefined;
 
-        const totalRevenue = filteredSales.reduce((sum, s) => sum + Number(s.saleQuantity)*Number(s.salePrice), 0);
-        let totalProfit = 0;
-        let totalCost = 0;
-        filteredSales.forEach(sale => {
-            const item = stockItems.find(i => i['itemId'] === sale.saleItemId);
-            if (item) {
-                const cost = item.itemStockPrice * sale.saleQuantity;
-                const profit = (item.itemLeastPrice * sale.saleQuantity) - cost;
-                
-                totalCost += cost;
-                totalProfit += profit;
+    const chart = new Chart(stockChartRef.current, {
+      type: "doughnut",
+      data: {
+        labels: stockSummary.map((item) => item.label),
+        datasets: [
+          {
+            data: stockSummary.map((item) => item.value),
+            backgroundColor: stockSummary.map((item) => item.color),
+            borderWidth: 0,
+            cutout: "68%",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+        },
+      },
+    });
+
+    return () => chart.destroy();
+  }, [stockSummary]);
+
+  return (
+    <Stack spacing={2}>
+      <Box>
+        <Typography variant="h4" sx={{ fontWeight: 800, color: palette.text }}>
+          Dashboard
+        </Typography>
+        <Typography variant="body1" sx={{ color: palette.muted, mt: 0.5 }}>
+          Real-time overview of your operations.
+        </Typography>
+      </Box>
+
+      <Grid container spacing={2}>
+        <Grid item xs={12} sm={6} lg={3}>
+          <SummaryCard
+            title="Inventory Value"
+            value={formatMoney(inventoryValue)}
+            to="/home/inventory"
+            note="↑ 12% vs last week"
+            accent={alpha(palette.green, 0.12)}
+            textAccent={palette.green}
+            icon={<BoxSeam size={18} />}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} lg={3}>
+          <SummaryCard
+            title="Today's Sales"
+            value={formatMoney(todaySales)}
+            to="/home/sales"
+            note="↑ 8% vs yesterday"
+            accent={alpha(palette.orange, 0.14)}
+            textAccent={palette.orange}
+            icon={<CashStack size={18} />}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} lg={3}>
+          <SummaryCard
+            title="Orders in Production"
+            value={ordersInProduction}
+            to="/home/production"
+            note="In progress"
+            accent={alpha(palette.purple, 0.14)}
+            textAccent={palette.purple}
+            icon={<PersonWorkspace size={18} />}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} lg={3}>
+          <SummaryCard
+            title="Low Stock Items"
+            value={lowStockItems.length}
+            to="/home/inventory"
+            note="Needs attention"
+            accent={alpha(palette.orange, 0.14)}
+            textAccent={palette.orange}
+            icon={<ExclamationTriangle size={18} />}
+          />
+        </Grid>
+      </Grid>
+
+      <Grid container spacing={2}>
+        <Grid item xs={12} xl={6}>
+          <Panel
+            title="Sales Overview"
+            action={
+              <TextField select size="small" value="week" sx={{ minWidth: 92 }}>
+                <MenuItem value="week">This Week</MenuItem>
+              </TextField>
             }
-        });
+            sx={{ height: "100%" }}
+          >
+            <Box sx={{ height: 260 }}>
+              <canvas ref={salesChartRef} />
+            </Box>
+          </Panel>
+        </Grid>
 
-        const profitMargin = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
+        <Grid item xs={12} md={6} xl={3}>
+          <Panel
+            title="Top Selling Products"
+            action={
+              <TextField select size="small" value="week" sx={{ minWidth: 92 }}>
+                <MenuItem value="week">This Week</MenuItem>
+              </TextField>
+            }
+            sx={{ height: "100%" }}
+          >
+            <Stack spacing={1.5}>
+              {topProducts.length ? (
+                topProducts.map((item) => (
+                  <Stack
+                    key={item.itemId}
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    spacing={1}
+                  >
+                    <Stack direction="row" spacing={1.25} alignItems="center" minWidth={0}>
+                      <Avatar
+                        variant="rounded"
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          bgcolor: palette.orangeSoft,
+                          color: palette.orange,
+                          fontSize: "0.8rem",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {item.name.charAt(0).toUpperCase()}
+                      </Avatar>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: palette.text,
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {item.name}
+                      </Typography>
+                    </Stack>
+                    <Box sx={{ textAlign: "right" }}>
+                      <Typography variant="body2" sx={{ color: palette.green, fontWeight: 800 }}>
+                        {formatMoney(item.revenue)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: palette.muted }}>
+                        {item.units} units
+                      </Typography>
+                    </Box>
+                  </Stack>
+                ))
+              ) : (
+                <Typography variant="body2" sx={{ color: palette.muted }}>
+                  No product sales data yet.
+                </Typography>
+              )}
+            </Stack>
 
-        setKpis({
-            totalStock: stockItems?.reduce((sum, s) => sum + Number(s?.itemQuantity)||0, 0),
-            revenue: totalRevenue,
-            profitMargin: profitMargin.toFixed(1),
-            totalOrders: orders?.length,
-            // totalDues: dues.reduce((sum, d) => sum + (Number(d.totalAmount)-Number(d.initialDeposit)), 0),
-            totalDues: dues.reduce((sum, d) => {
-  const total = Number(d.totalAmount) || 0;
-  const deposit = Number(d.initialDeposit) || 0;
-  return sum + (total - deposit);
-}, 0),
-            totalExpenses: dailyExpenses.reduce((sum, e) => sum + Number(e.amount)||0, 0),
-            totalCustomers: customers.length,
-            totalEmployees: employees.length,
-        });
-    }, [dateRange]);
-    
-    // Initialize and update charts
-    useEffect(() => {
-        const chartInstances = [];
+            <Button
+              component={NavLink}
+              to="/home/inventory"
+              endIcon={<ArrowRight size={15} />}
+              sx={{ mt: 2, color: palette.muted, alignSelf: "flex-start" }}
+            >
+              View all products
+            </Button>
+          </Panel>
+        </Grid>
 
-        if (rawMaterialsChartRef.current) {
-            const chart = new Chart(rawMaterialsChartRef.current, {
-                type: 'bar',
-                data: { labels: rawMaterials.map(m => m.name), datasets: [{ label: 'Quantity', data: rawMaterials.map(m => m.Quantity), backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#6f42c1'], borderRadius: 5 }] },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-            });
-            chartInstances.push(chart);
-        }
+        <Grid item xs={12} md={6} xl={3}>
+          <Panel title="Quick Actions" sx={{ height: "100%" }}>
+            <Stack spacing={1.2}>
+              <Button
+                component={NavLink}
+                to="/home/assistant"
+                fullWidth
+                startIcon={<ChatDots size={16} />}
+                sx={{
+                  justifyContent: "flex-start",
+                  bgcolor: alpha(palette.green, 0.12),
+                  color: palette.green,
+                  border: `1px solid ${alpha(palette.green, 0.1)}`,
+                  "&:hover": { bgcolor: alpha(palette.green, 0.16) },
+                }}
+              >
+                Ask Ampla Copilot
+              </Button>
+              <Button
+                component={NavLink}
+                to="/home/inventory"
+                fullWidth
+                startIcon={<FolderPlus size={16} />}
+                sx={{
+                  justifyContent: "flex-start",
+                  bgcolor: palette.greenWash,
+                  color: palette.green,
+                  border: `1px solid ${alpha(palette.green, 0.08)}`,
+                  "&:hover": { bgcolor: alpha(palette.green, 0.1) },
+                }}
+              >
+                New Product
+              </Button>
+              <Button
+                component={NavLink}
+                to="/home/pos"
+                fullWidth
+                startIcon={<CashStack size={16} />}
+                variant="outlined"
+                sx={{ justifyContent: "flex-start", borderColor: palette.border, color: palette.text }}
+              >
+                New Sale
+              </Button>
+              <Button
+                component={NavLink}
+                to="/home/stock"
+                fullWidth
+                startIcon={<ClipboardCheck size={16} />}
+                variant="outlined"
+                sx={{ justifyContent: "flex-start", borderColor: palette.border, color: palette.text }}
+              >
+                Record Stock
+              </Button>
+              <Button
+                component={NavLink}
+                to="/home/reports"
+                fullWidth
+                startIcon={<Eye size={16} />}
+                variant="outlined"
+                sx={{ justifyContent: "flex-start", borderColor: palette.border, color: palette.text }}
+              >
+                View Reports
+              </Button>
+            </Stack>
+          </Panel>
+        </Grid>
+      </Grid>
 
-        if (salesVsStockChartRef.current) {
-            const chart = new Chart(salesVsStockChartRef.current, {
-                type: 'bar',
-                data: { labels: [], datasets: [{ label: 'Sold', data: [], backgroundColor: '#ffc107', borderRadius: 5 }, { label: 'In Stock', data: [], backgroundColor: '#0d6efd', borderRadius: 5 }] },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
-            });
-            chartInstances.push(chart);
-        }
+      <Grid container spacing={2}>
+        <Grid item xs={12} lg={4}>
+          <Panel title="Recent Activity" sx={{ height: "100%" }}>
+            <List disablePadding>
+              {recentActivity.length ? (
+                recentActivity.map((item) => (
+                  <ListItem key={item.id} disableGutters sx={{ py: 1.1 }}>
+                    <ListItemAvatar>
+                      <Avatar
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          bgcolor: alpha(item.accent, 0.14),
+                          color: item.accent,
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {item.initials}
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={item.title}
+                      secondary={item.detail}
+                      primaryTypographyProps={{
+                        color: palette.text,
+                        fontWeight: 700,
+                        fontSize: "0.92rem",
+                      }}
+                      secondaryTypographyProps={{
+                        color: palette.muted,
+                        fontSize: "0.83rem",
+                      }}
+                    />
+                    <Typography variant="caption" sx={{ color: palette.muted, textAlign: "right" }}>
+                      {formatDateTime(item.when)}
+                    </Typography>
+                  </ListItem>
+                ))
+              ) : (
+                <Typography variant="body2" sx={{ color: palette.muted }}>
+                  No activity available yet.
+                </Typography>
+              )}
+            </List>
+          </Panel>
+        </Grid>
 
-        return () => chartInstances.forEach(chart => chart.destroy());
-    }, []);
+        <Grid item xs={12} lg={5}>
+          <Panel title="Stock Summary" sx={{ height: "100%" }}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={5}>
+                <Box sx={{ height: 220, position: "relative" }}>
+                  <canvas ref={stockChartRef} />
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "grid",
+                      placeItems: "center",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <Box sx={{ textAlign: "center" }}>
+                      <Typography variant="body2" sx={{ color: palette.muted }}>
+                        Total Items
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: palette.text }}>
+                        {totalStockSummary}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={7}>
+                <Stack spacing={1.5}>
+                  {stockSummary.map((item) => (
+                    <Stack
+                      key={item.label}
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Box
+                          sx={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: "50%",
+                            bgcolor: item.color,
+                          }}
+                        />
+                        <Typography variant="body2" sx={{ color: palette.muted }}>
+                          {item.label}
+                        </Typography>
+                      </Stack>
+                      <Typography variant="body2" sx={{ color: palette.text, fontWeight: 700 }}>
+                        {item.value} ({totalStockSummary ? Math.round((item.value / totalStockSummary) * 100) : 0}%)
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              </Grid>
+            </Grid>
+          </Panel>
+        </Grid>
 
-    // Update Sales vs Stock chart when data changes
-    useEffect(() => {
-        const chart = Chart.getChart(salesVsStockChartRef.current);
-        if (!chart) return;
-        const labels = stockItems.map(i => i['itemName']);
-        const soldData = stockItems.map(item => sales?.filter(s => s?.saleItemId === item?.itemId).reduce((sum, s) => sum + Number(s?.saleQuantity)||0, 0));
-        // const inStockData = stockItems.map(item => stockStock.find(s => s.itemId === item['itemId'])?.quantity || 0);
-        const inStockData = stockItems.map(item => item?.itemQuantity || 0);
-        chart.data.labels = labels;
-        chart.data.datasets[0].data = soldData;
-        chart.data.datasets[1].data = inStockData;
-        chart.update();
-    }, [filteredData.sales]);
+        <Grid item xs={12} lg={3}>
+          <Stack spacing={2}>
+            <Panel
+              title="Low Stock Alerts"
+              action={
+                <Button component={NavLink} to="/home/inventory" sx={{ color: palette.muted }}>
+                  View all
+                </Button>
+              }
+            >
+              <Stack spacing={1.5}>
+                {lowStockItems.slice(0, 3).length ? (
+                  lowStockItems.slice(0, 3).map((item) => (
+                    <Stack key={item.itemId} direction="row" justifyContent="space-between" spacing={1}>
+                      <Box minWidth={0}>
+                        <Typography variant="body2" sx={{ color: palette.text, fontWeight: 700 }}>
+                          {item.itemName}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: palette.muted }}>
+                          Qty left: {item.itemQuantity}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label="Low"
+                        size="small"
+                        sx={{
+                          bgcolor: palette.redSoft,
+                          color: palette.red,
+                          fontWeight: 700,
+                        }}
+                      />
+                    </Stack>
+                  ))
+                ) : (
+                  <Typography variant="body2" sx={{ color: palette.muted }}>
+                    No low stock alerts.
+                  </Typography>
+                )}
+              </Stack>
+            </Panel>
 
-    const [_orders, setOrders] = useState([]);
-    const [totals, setTotals] = useState({ ordered: 0, produced: 0 });
+            <Panel title="Upcoming Tasks">
+              <Stack spacing={1.5}>
+                {upcomingTasks.length ? (
+                  upcomingTasks.map((task) => (
+                    <Stack key={task.id} direction="row" justifyContent="space-between" spacing={1}>
+                      <Box minWidth={0}>
+                        <Typography variant="body2" sx={{ color: palette.text, fontWeight: 700 }}>
+                          {task.title}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: palette.muted }}>
+                          {task.detail}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={task.level}
+                        size="small"
+                        sx={{
+                          bgcolor:
+                            task.level === "High"
+                              ? palette.redSoft
+                              : task.level === "Medium"
+                                ? palette.orangeSoft
+                                : palette.greenSoft,
+                          color:
+                            task.level === "High"
+                              ? palette.red
+                              : task.level === "Medium"
+                                ? palette.orange
+                                : palette.green,
+                          fontWeight: 700,
+                        }}
+                      />
+                    </Stack>
+                  ))
+                ) : (
+                  <Typography variant="body2" sx={{ color: palette.muted }}>
+                    No pending tasks.
+                  </Typography>
+                )}
+              </Stack>
+            </Panel>
+          </Stack>
+        </Grid>
+      </Grid>
 
-    useEffect(() => {
-        // Create lookup maps for efficient data combination
-        const customerMap = new Map(customers?.map(c => [c.custId, c.custName]));
-        const productMap = new Map(stockItems?.map(i => [i.itemId, i.itemName]));
-        console.log("customerMap: ",customerMap);
-        console.log("productMap: ",productMap);
-        
-        let totalOrdered = 0;
-        let totalProduced = 0;
+      <Grid container spacing={2}>
+        <Grid item xs={12} xl={9}>
+          <Panel
+            title="Recent Sales"
+            action={
+              <Button component={NavLink} to="/home/sales" sx={{ color: palette.muted }}>
+                View all sales
+              </Button>
+            }
+          >
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Invoice No.</TableCell>
+                    <TableCell>Customer</TableCell>
+                    <TableCell>Items</TableCell>
+                    <TableCell>Total Amount</TableCell>
+                    <TableCell>Payment Status</TableCell>
+                    <TableCell>Date</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {recentSales.length ? (
+                    recentSales.map((sale) => (
+                      <TableRow key={sale.id}>
+                        <TableCell>{`INV-${String(sale.id).padStart(5, "0")}`}</TableCell>
+                        <TableCell>{sale.customer}</TableCell>
+                        <TableCell>{sale.items}</TableCell>
+                        <TableCell>{formatMoney(sale.total)}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={sale.status}
+                            size="small"
+                            sx={{
+                              bgcolor: palette.greenSoft,
+                              color: palette.green,
+                              fontWeight: 700,
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>{formatDateOnly(sale.date)}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6}>
+                        <Typography sx={{ py: 2, color: palette.muted, textAlign: "center" }}>
+                          No recent sales recorded.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Panel>
+        </Grid>
 
-        // Combine data into a final, processed orders array
-        const processedOrders = orders.map(order => {
-            totalOrdered += parseInt(order.quantity, 10) || 0;
-            totalProduced += parseInt(order.quantityProduced, 10) || 0;
-            
-            return {
-                ...order,
-                customerName: customerMap.get(order.custId) || `Cust-${order.custId}`,
-                productName: order.customSize ? order.customSize : (productMap.get(order.prodId) || `Prod-${order.prodId}`),
-            };
-        });
-        
-        setOrders(processedOrders);
-        setTotals({ ordered: totalOrdered, produced: totalProduced });
+        <Grid item xs={12} xl={3}>
+          <Panel title="Notes">
+            <Stack spacing={1.25}>
+              <Typography variant="body2" sx={{ color: palette.muted, lineHeight: 1.7 }}>
+                Rebranded packaging received from supplier.
+              </Typography>
+              <Typography variant="body2" sx={{ color: palette.muted, lineHeight: 1.7 }}>
+                Keep maize flour and cooking oil under close reorder watch this week.
+              </Typography>
+              <Divider />
+              <Stack direction="row" spacing={1} alignItems="center">
+                <PencilSquare size={15} color={palette.muted} />
+                <Typography variant="caption" sx={{ color: palette.muted }}>
+                  {format(new Date(), "MMM d, yyyy")} • by admin
+                </Typography>
+              </Stack>
+            </Stack>
+          </Panel>
+        </Grid>
+      </Grid>
+    </Stack>
+  );
+};
 
-    }, []); // Empty dependency array ensures this runs only once on mount
-
-    const getPaymentStatus = (order) => {
-        const totalCost = parseFloat(order.totalCost) || 0;
-        const amountPaid = parseFloat(order.amountPaid) || 0;
-
-        if (amountPaid >= totalCost && totalCost > 0) {
-            return { variant: 'success', text: 'Paid' };
-        } else if (amountPaid > 0) {
-            return { variant: 'warning', text: 'Partial' };
-        } else {
-            return { variant: 'danger', text: 'Unpaid' };
-        }
-    };
-
-    const getProgress = (order) => {
-        const ordered = parseInt(order.quantity, 10) || 0;
-        const produced = parseInt(order.quantityProduced, 10) || 0;
-        if (produced === 0 && ordered > 0) {
-            return <Badge bg="secondary">Pending</Badge>;
-        }
-        const percentage = ordered > 0 ? Math.round((produced / ordered) * 100) : 0;
-        return <ProgressBar now={percentage} label={`${percentage}%`} variant={percentage === 100 ? 'success' : 'primary'} />;
-    };
-
-    const formatOrderDate = (dateString) => {
-        try {
-            // Parse the ISO-like string and format it
-            const date = parseISO(dateString);
-            return format(date, 'MMM d, yyyy');
-        } catch (error) {
-            // Return a fallback for invalid dates
-            console.error("Error formatting date:", error);
-            return 'Invalid Date';
-        }
-    };
-
-     const divStyle = {
-    height: "100%",
-    backgroundColor: settings.theme === 'dark' ? '#1A202C' : '#FFFFFF !important' // Sets color based on theme
-  };
-
-    return (
-        <div style={divStyle}>
-        {/* <div style={{ backgroundColor: '#f8f9fa',height:"100%" }} > */}
-            <Navbar bg={settings.theme === 'dark'?"dark":"light"} expand="lg" className="shadow-sm sticky-top">
-                <Container fluid>
-                    <Navbar.Brand href="#" className="fw-bold d-flex align-items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-pie-chart-fill text-primary me-2" viewBox="0 0 16 16"><path d="M15.985 8.5H8.207l-5.5 5.5a8 8 0 0 0 13.277-5.5zM2 13.292A8 8 0 0 1 7.5.015v7.778l-5.5 5.5zM8 1.03A8 8 0 0 0 2.252 8h6.966V1.03z"/></svg>
-                        Dashboard
-                    </Navbar.Brand>
-                    <div className="d-flex align-items-center ms-auto">
-                        <div style={{width: '280px'}}><input ref={datePickerRef} type="text" className="form-control" /></div>
-                    </div>
-                </Container>
-            </Navbar>
-
-            <Container fluid className="p-4" >
-              <div className='d-flex gap-2 flex-column'>
-                <div>
-<Row className="g-4" >
-
-                    <Col xs={12} sm={6} lg={4} xl={3} className='text-white'>
-                    <NavLink to="/home/inventory" className="menu-item_embedded bg-primary text-white" style={{textDecoration:'none'}} >
-                    <KpiCard title="Total Stock" bg='primary-subtle' value={kpis.totalStock} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-box-seam text-primary" viewBox="0 0 16 16"><path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5l2.404.961L8 2.596l3.75 1.865 2.404-.961L8.186 1.113zM15 4.239l-6.5 2.6v7.922l6.5-3.25V4.24zM1 4.239v7.482l6.5 3.25V6.838L1 4.24zM8 16l-6.5-3.25V3.102L8 5.869v10.13z"/></svg>} />
-                   </NavLink>
-                    </Col>
-                    <Col xs={12} sm={6} lg={4} xl={3}>
-                    <NavLink to="/home/sales" className="menu-item_embedded" style={{textDecoration:'none'}} >
-                    <KpiCard title="Revenue" bg='warning-subtle' value={`UGX ${kpis.revenue?.toLocaleString()}`} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-cash-stack text-warning" viewBox="0 0 16 16"><path d="M1 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1H1zm7 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M0 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1V5zm3 0a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h10a2 2 0 0 1 2-2V7a2 2 0 0 1-2-2H3z"/></svg>} />
-                  </NavLink>
-                    </Col>
-                    <Col xs={12} sm={6} lg={4} xl={3}>
-                    <NavLink to="/home/sales" className="menu-item_embedded" style={{textDecoration:'none'}} >
-                    <KpiCard title="Profit Margin" bg='success-subtle' value={`${kpis.profitMargin}%`} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-graph-up-arrow text-success" viewBox="0 0 16 16"><path fillRule="evenodd" d="M0 0h1v15h15v1H0V0zm10 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V4.9l-3.613 4.417a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61L13.445 4H10.5a.5.5 0 0 1-.5-.5z"/></svg>} />
-                   </NavLink>
-                    </Col>
-                    <Col xs={12} sm={6} lg={4} xl={3}>
-                    <NavLink to="/home/production?tab=Orders" className="menu-item_embedded" style={{textDecoration:'none'}} >
-                    <KpiCard  title="Total Orders" bg='info-subtle' value={kpis.totalOrders} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-journal-check text-info" viewBox="0 0 16 16"><path fillRule="evenodd" d="M10.854 6.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 8.793l2.646-2.647a.5.5 0 0 1 .708 0z"/><path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2z"/><path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H1zm0 3v-.5a.5.5 0 0 1 1 0V8h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H1zm0 3v-.5a.5.5 0 0 1 1 0v.5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H1z"/></svg>} />
-                   </NavLink>
-                    </Col>
-                    <Col xs={12} sm={6} lg={4} xl={3}>
-                    <NavLink to="/home/customers" className="menu-item_embedded" style={{textDecoration:'none'}} >
-                    <KpiCard title="Total Dues" bg='danger-subtle' value={`UGX ${kpis.totalDues?.toLocaleString()}`} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-hourglass-split text-danger" viewBox="0 0 16 16"><path d="M2.5 15a.5.5 0 1 1 0-1h11a.5.5 0 0 1 0 1h-11zm2-13v1c0 .537.12 1.045.337 1.5h6.326c.216-.455.337-.963.337-1.5V2h-7zm3 6.25a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zM2 2.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-1z"/></svg>} />
-                    </NavLink>
-                    </Col>
-                    <Col xs={12} sm={6} lg={4} xl={3}>
-                    <NavLink to="/home/production?tab=Expenses" className="menu-item_embedded" style={{textDecoration:'none'}} >
-                    <KpiCard title="Total Expenses" bg='secondary-subtle' value={`UGX ${kpis.totalExpenses?.toLocaleString()}`} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-receipt text-secondary" viewBox="0 0 16 16"><path d="M1.92.506a.5.5 0 0 1 .434.14L3 1.293l.646-.647a.5.5 0 0 1 .708 0L5 1.293l.646-.647a.5.5 0 0 1 .708 0L7 1.293l.646-.647a.5.5 0 0 1 .708 0L9 1.293l.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .801.13l.5 1A.5.5 0 0 1 15 2v12a.5.5 0 0 1-.053.224l-.5 1a.5.5 0 0 1-.8.13L13 14.707l-.646.647a.5.5 0 0 1-.708 0L11 14.707l-.646.647a.5.5 0 0 1-.708 0L9 14.707l-.646.647a.5.5 0 0 1-.708 0L7 14.707l-.646.647a.5.5 0 0 1-.708 0L5 14.707l-.646.647a.5.5 0 0 1-.708 0L3 14.707l-.646.647a.5.5 0 0 1-.801-.13l-.5-1A.5.5 0 0 1 1 14V2a.5.5 0 0 1 .053-.224l.5-1a.5.5 0 0 1 .367-.27zm.217 1.338L2 2.118v11.764l.137.274.51-.51a.5.5 0 0 1 .707 0l.646.647.646-.646a.5.5 0 0 1 .708 0l.646.646.646-.646a.5.5 0 0 1 .708 0l.646.646.646-.646a.5.5 0 0 1 .708 0l.646.646.646-.646a.5.5 0 0 1 .708 0l.646.646.646-.646a.5.5 0 0 1 .708 0l.509.509.137-.274V2.118l-.137-.274-.51.51a.5.5 0 0 1-.707 0L12.354 1.5l-.647.646a.5.5 0 0 1-.708 0L10.354 1.5l-.647.646a.5.5 0 0 1-.708 0L8.354 1.5l-.647.646a.5.5 0 0 1-.708 0L6.354 1.5l-.647.646a.5.5 0 0 1-.708 0L4.354 1.5l-.647.646a.5.5 0 0 1-.708 0l-.509-.51z"/><path d="M3 4.5a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm8-6a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5z"/></svg>} />
-                    </NavLink>
-                    </Col>
-                    <Col xs={12} sm={6} lg={4} xl={3}>
-                    <NavLink to="/home/customers" className="menu-item_embedded" style={{textDecoration:'none'}} >
-                    <KpiCard title="Total Customers" bg='info-subtle' value={kpis.totalCustomers} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-people-fill text-info" viewBox="0 0 16 16"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path fillRule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>} />
-                    </NavLink>
-                    </Col>
-                    <Col xs={12} sm={6} lg={4} xl={3}>
-                    <NavLink to="/home/production?tab=Employees" className="menu-item_embedded" style={{textDecoration:'none'}} >
-                    <KpiCard title="Total Employees" bg='dark-subtle' value={kpis.totalEmployees} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-person-badge text-dark" viewBox="0 0 16 16"><path d="M6.5 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3zM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path d="M4.5 0A2.5 2.5 0 0 0 2 2.5v11A2.5 2.5 0 0 0 4.5 16h7a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 11.5 0h-7zM3 2.5A1.5 1.5 0 0 1 4.5 1h7A1.5 1.5 0 0 1 13 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 13.5v-11z"/></svg>} />
-                   </NavLink>
-                    </Col>
-
-
-                    <Col xs={6}><SectionCard id="sales-vs-stock" title="Product Sales vs. Stock"><div className="chart-container"><canvas ref={salesVsStockChartRef} /></div></SectionCard></Col>
-                    <Col lg={6}><SectionCard id="materials" title="Raw Materials Status"><div className="chart-container"><canvas ref={rawMaterialsChartRef} /></div></SectionCard></Col>
-                    
-                    <Col lg={12}>
-                    <SectionCard id="orders" title="Rescent Orders" >
-                        {/* <Table headers={['ID', 'Customer', 'Items', 'Total', 'Date']}>
-                            {filteredData.sales.map(sale => { const customer = customers.find(c => c.custId === sale.custId); const item = stockItems.find(i => i['itemId'] === sale?.saleItemId); return (<tr key={sale.saleId}><td>#{sale?.saleId}</td><td>{customer?.custName || 'N/A'}</td><td>{sale?.saleQuantity} x {item?.['itemName'] || 'N/A'}</td><td>{Number(sale?.saleQuantity)*Number(sale?.salePrice).toLocaleString()}</td><td>{new Date(sale?.saleDateCreated).toLocaleDateString()}</td></tr>);})}
-                            </Table> */}
-
- <Table responsive striped bordered hover>
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Customer</th>
-                                <th>Order Date</th>
-                                <th>Product / Custom Size</th>
-                                <th className="text-center">Qty Ordered</th>
-                                <th className="text-center">Qty Produced</th>
-                                <th>Progress / Status</th>
-                                <th className="text-center">Payment Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {_orders.map((order, index) => (
-                                <tr key={order.orderId}>
-                                    <td>{index + 1}</td>
-                                    <td>{order.customerName}</td>
-                                    <td>{formatOrderDate(order.orderDateCreated)}</td>
-                                    <td>{order.productName}</td>
-                                    <td className="text-center">{order.quantity}</td>
-                                    <td className="text-center">{order.quantityProduced}</td>
-                                    <td>{getProgress(order)}</td>
-                                    <td className="text-center">
-                                        <Badge bg={getPaymentStatus(order).variant}>
-                                            {getPaymentStatus(order).text}
-                                        </Badge>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                        <tfoot>
-                            <tr className="fw-bold">
-                                <td colSpan="4" className="text-end">Total</td>
-                                <td className="text-center">{totals.ordered}</td>
-                                <td className="text-center">{totals.produced}</td>
-                                <td colSpan="2"></td>
-                            </tr>
-                        </tfoot>
-                    </Table>
-
-                            </SectionCard>
-                            </Col>
-                     {/* <Col lg={6}><SectionCard id="dues" title="Outstanding Dues"><Table headers={['ID', 'Customer', 'Amount Due', 'Due Date']}>{dues.map(due => { const customer = customers.find(c => c.custId === due.customer_id); return (<tr key={due.id}><td>#{due.id}</td><td>{customer?.custName || 'N/A'}</td><td className="text-danger fw-bold">{due?.amount?.toLocaleString()}</td><td>{new Date(due.due_date)?.toLocaleDateString()}</td></tr>);})}</Table></SectionCard></Col>
-                    <Col lg={6}><SectionCard id="expenses" title="Expenses"><Table headers={['ID', 'Description', 'Amount', 'Date']}>{filteredData.expenses.map(expense => (<tr key={expense.id}><td>#{expense.id}</td><td>{expense.description}</td><td>{expense.amount.toLocaleString()}</td><td>{new Date(expense.created_at).toLocaleDateString()}</td></tr>))}</Table></SectionCard></Col> */}
-                   
-                </Row>
-                </div>
-
-                <div>
-                <Row className="g-4 mt-2">
-                  {/* <div>food</div> */}
-                </Row>
-                </div>
-
-              </div>
-            </Container>
-        </div>
-    );
-}
+export default Dashboard;

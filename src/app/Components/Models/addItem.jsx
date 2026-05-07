@@ -105,9 +105,9 @@ const resetFields = () => {
   
   return (
     <div>
-        <div className="modal-dialog"  style={{ width: '75vw'}}>
-    <div className="modal-content">
-      <div className="modal-header text-white shadow" style={{backgroundColor: "#1C4E80"}}>
+        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable inventory-modal-dialog">
+    <div className="modal-content inventory-modal-content">
+      <div className="modal-header inventory-modal-header shadow">
         <h5 className="modal-title" id="staticBackdropLabel">Create Product
         </h5>
         <button type="button" className="btn-close bg-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -117,8 +117,8 @@ const resetFields = () => {
    <LinearProgress />
           :""  
     }
-      <div className="modal-body" style={{height: '410px'}}>
-        <h5 classNameName='border-bottom pb-1' style={{borderColor: '#488A99'}}>Item Details</h5>
+      <div className="modal-body inventory-modal-body">
+        <h5 className='inventory-modal-section-title'>Item Details</h5>
       <form className="row g-3 h-100">
   <div className="col-6">
     <label for="itemName" className="form-label" >Item Name</label>
@@ -194,7 +194,7 @@ return  <option key={index} value={condition} >{condition}</option>
 
 </form>
       </div>
-      <div className="modal-footer mt-4">
+      <div className="modal-footer inventory-modal-footer mt-4">
 
         {
           canAdd?

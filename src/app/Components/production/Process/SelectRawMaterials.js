@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Modal,
   Button,
@@ -12,8 +12,24 @@ import { selectRawMaterialsIntake, useAddRawMaterialListMutation, useUpdateRawMa
 
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import {
+  paginateItems,
+  ProductionTableFooter,
+} from "../ProductionTableControls";
 
 const getTodayDate = () => format(new Date(), "yyyy-MM-dd");
+const getSafeDateKey = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  return format(parsedDate, "yyyy-MM-dd");
+};
 
 const handleApiError = (error) => {
   const status = error?.status || 'unknown';
@@ -57,10 +73,10 @@ const RawMaterialModal = () => {
       if (!date || isNaN(new Date(date))) return false;
       return format(new Date(date), "yyyy-MM-dd") === today;
     }
-  ).map(e => e.materialId);
+  ).map(e => String(e.materialId));
 
-  const filteredRawMaterials =  rawMaterials.filter(
-      (e) => !todayListIds.includes(e.materialId)
+  const filteredRawMaterials = rawMaterials.filter(
+      (e) => !todayListIds.includes(String(e.materialId)) && (e.status || "active") === "active"
     );
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -80,6 +96,8 @@ const RawMaterialModal = () => {
   });
   const [editing, setEditing] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
   const handleClose = () => setShowModal(false);
 
@@ -146,29 +164,49 @@ const RawMaterialModal = () => {
 
   const filteredEntries = showAll
     ? rawMaterialsList
-    : rawMaterialsList.filter(
-        (e) => {
-          const date = e.dailyRawmaterialsDateCreated;
-          if (!date || isNaN(new Date(date))) return false;
-          return format(new Date(date), "yyyy-MM-dd") === today;
-        }
-      );
+    : rawMaterialsList.filter((entry) => getSafeDateKey(entry.dailyRawmaterialsDateCreated) === today);
 
-  const getMaterialName = (id) =>
-    rawMaterials.find((m) => m.materialId === id)?.name || "Unknown";
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [rowsPerPage, showAll, filteredEntries.length]);
+
+  useEffect(() => {
+    const nextTotalPages = Math.max(1, Math.ceil(filteredEntries.length / rowsPerPage));
+    if (currentPage > nextTotalPages) {
+      setCurrentPage(nextTotalPages);
+    }
+  }, [currentPage, filteredEntries.length, rowsPerPage]);
+
+  const {
+    totalPages,
+    paginatedItems: paginatedEntries,
+  } = useMemo(
+    () => paginateItems(filteredEntries, currentPage, rowsPerPage),
+    [currentPage, filteredEntries, rowsPerPage]
+  );
+
+  const getMaterial = (id) => rawMaterials.find((m) => String(m.materialId) === String(id));
+  const getMaterialName = (id) => {
+    const material = getMaterial(id);
+    if (!material) {
+      return "Unknown";
+    }
+
+    return material.materialCode ? `${material.name} (${material.materialCode})` : material.name;
+  };
 
   return (
     <div>
       <Button onClick={() => setShowModal(true)}>
         Daily List
       </Button>
-    <Modal show={showModal} onHide={handleClose} size="xl">
+    <Modal show={showModal} onHide={handleClose} size="xl" backdrop="static" dialogClassName="production-modal-shell">
       <Modal.Header closeButton>
         <Modal.Title>Daily Raw Material Intake</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <Form className="mb-4">
-          <div className="d-flex flex-wrap gap-3">
+          <div className="production-form-grid">
             <Form.Group style={{ minWidth: 200 }}>
               <Form.Label>Material</Form.Label>
               <Form.Select
@@ -180,7 +218,7 @@ const RawMaterialModal = () => {
   <option value="">-- Select --</option>
   {filteredRawMaterials.map((material) => (
     <option key={material.materialId} value={material.materialId}>
-      {material.name}
+      {material.materialCode ? `${material.materialCode} - ` : ""}{material.name} ({material.Quantity} {material.unitOfMeasure || "pcs"} available)
     </option>
   ))}
 </Form.Select>
@@ -192,6 +230,8 @@ const RawMaterialModal = () => {
                 type="number"
                 name="quantity"
                 value={form.quantity}
+                min="0"
+                step="0.001"
                 onChange={handleChange}
               />
             </Form.Group>
@@ -206,7 +246,7 @@ const RawMaterialModal = () => {
               />
             </Form.Group>
 
-            <div className="d-flex align-items-end">
+            <div className="d-flex align-items-end production-form-grid-single">
               {editing?isUpdateLoading?<Button variant="primary">
                 Updating
               </Button>:
@@ -222,8 +262,11 @@ const RawMaterialModal = () => {
           </div>
         </Form>
 
-        <div className="d-flex justify-content-between align-items-center mb-2">
-          <h5>{showAll ? "All Records" : "Today's Records"}</h5>
+        <div className="production-filter-bar mb-3">
+          <div className="production-section-copy">
+            <h5 className="mb-0">{showAll ? "All Records" : "Today's Records"}</h5>
+            <p>{showAll ? "Browse the full intake history." : "Focus on the current day’s intake list."}</p>
+          </div>
           <Button
             size="sm"
             variant="outline-secondary"
@@ -233,7 +276,9 @@ const RawMaterialModal = () => {
           </Button>
         </div>
 
-        <Table striped bordered hover>
+        <div className="production-table-card">
+          <div className="production-table-scroll">
+        <Table hover className="production-modern-table align-middle">
           <thead>
             <tr>
               <th>#</th>
@@ -246,21 +291,19 @@ const RawMaterialModal = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredEntries?.map((entry, index) => (
+            {paginatedEntries?.map((entry, index) => (
               <tr key={entry.id}>
-                <td>{index + 1}</td>
+                <td>{(currentPage - 1) * rowsPerPage + index + 1}</td>
                 <td>{getMaterialName(entry.materialId)}</td>
-                <td>{entry.quantity}</td>
+                <td>
+                  {entry.quantity} {getMaterial(entry.materialId)?.unitOfMeasure || ""}
+                </td>
                 <td>{entry.totalCost}</td>
                 <td>{entry.initials}</td>
-                <td>{
-                  entry.dailyRawmaterialsDateCreated && !isNaN(new Date(entry.dailyRawmaterialsDateCreated))
-                    ? format(new Date(entry.dailyRawmaterialsDateCreated), "yyyy-MM-dd")
-                    : "N/A"
-                }</td>
+                <td>{getSafeDateKey(entry.dailyRawmaterialsDateCreated) || "N/A"}</td>
                 <td>
                 {
-                  format(new Date(entry.dailyRawmaterialsDateCreated), "yyyy-MM-dd") === today? <div><Button
+                  getSafeDateKey(entry.dailyRawmaterialsDateCreated) === today? <div><Button
                   variant="warning"
                   size="sm"
                   onClick={() => handleEdit(entry)}
@@ -304,6 +347,17 @@ const RawMaterialModal = () => {
             )}
           </tbody>
         </Table>
+          </div>
+          <ProductionTableFooter
+            totalItems={filteredEntries.length}
+            currentPage={currentPage}
+            rowsPerPage={rowsPerPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            onRowsPerPageChange={setRowsPerPage}
+            itemLabel="intake records"
+          />
+        </div>
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" onClick={handleClose}>
@@ -312,9 +366,9 @@ const RawMaterialModal = () => {
       </Modal.Footer>
     </Modal>
 
-    <Modal show={showDeleteModal} onHide={handleCloseDeleteModal}>
+    <Modal show={showDeleteModal} onHide={handleCloseDeleteModal} backdrop="static" dialogClassName="production-modal-shell">
     <Modal.Header>Delete Alert</Modal.Header>
-    <Modal.Body><div className="text-danger fs-5 fw-bold">You are about to delete an item from the list!</div></Modal.Body>
+    <Modal.Body><div className="production-modal-alert production-modal-alert-danger">You are about to delete an item from the list.</div></Modal.Body>
     <Modal.Footer>
     <Button onClick={()=>setShowDeleteModal(false)}>Cancel</Button>
    {

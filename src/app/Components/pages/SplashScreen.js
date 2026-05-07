@@ -20,6 +20,7 @@ import { extendedStatsApiSlice } from "../../features/api/statisticsSlice";
 import { extendedStokApiSlice } from "../../features/api/stockSlice";
 import { extendedUserApiSlice } from "../../features/api/userSlice";
 import { extendedCustomersApiSlice } from "../../features/api/customers";
+import { extendedBranchesApiSlice } from "../../features/api/branchesSlice";
 import { extendedRawMaterialsApiSlice } from "../../features/api/rawmaterialsSlice";
 import { extendedEmployeesApiSlice } from "../../features/api/employeesSlice";
 import { extendedExpensesApiSlice } from "../../features/api/ExpensesSlice";
@@ -34,6 +35,8 @@ const roleToPathMap = [
     { role: 'dashboard', path: '/home/dashboard' },
     { role: 'salesdesk', path: '/home/pos' },
     { role: 'production', path: '/home/production' },
+    { role: 'batches', path: '/home/production?tab=Batches' },
+    { role: 'categories', path: '/home/production?tab=Categories' },
     { role: 'products', path: '/home/inventory' },
     { role: 'customers', path: '/home/customers' },
     { role: 'stock', path: '/home/stock' },
@@ -84,6 +87,7 @@ const SplashScreen = () => {
                         dispatch(extendedStokApiSlice.util.prefetch('getStok', undefined, { force: true })),
                         dispatch(extendedUserApiSlice.util.prefetch('getProfile', undefined, { force: true })),
                         dispatch(extendedCustomersApiSlice.util.prefetch('getCustomers', undefined, { force: true })),
+                        dispatch(extendedBranchesApiSlice.util.prefetch('getBranches', undefined, { force: true })),
                         dispatch(extendedRawMaterialsApiSlice.util.prefetch('getRawMaterials', undefined, { force: true })),
                         dispatch(extendedEmployeesApiSlice.util.prefetch('getEmployees', undefined, { force: true })),
                         dispatch(extendedExpensesApiSlice.util.prefetch('getExpenses', undefined, { force: true })),

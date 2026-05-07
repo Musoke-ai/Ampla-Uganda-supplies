@@ -18,7 +18,7 @@ export const extendedEmployeeDailyListApiSlice = apiSlice.injectEndpoints({
         getEmployeeDailyList: builder.query({
             query: () => '/employeedailylist',
             transformResponse:  responseData => {
-            return employeeDailyList.setAll(initialState, responseData)
+            return employeeDailyList.setAll(initialState, Array.isArray(responseData) ? responseData : [])
            },
            providesTags: [commonTags.inventory],
         }),

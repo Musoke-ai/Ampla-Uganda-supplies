@@ -9,7 +9,9 @@ REACT_APP_PUSHER_CLUSTER='mt1'
 # BACKEND API URL
 # ----------------------------------
 # Use this for local development
-# REACT_APP_API_URL=http://localhost/3000
+REACT_APP_API_BASE_URL=http://localhost/AmplaBackUp/amplaerp/index.php/api
+REACT_APP_AUTH_BASE_URL=http://localhost/AmplaBackUp/amplaerp/index.php
 
 # For production, you might have another .env.production file or change this value
-# REACT_APP_API_URL=https://www.poweredstock.com/api/api
+# REACT_APP_API_BASE_URL=https://your-ampla-uganda-domain.example/api
+# REACT_APP_AUTH_BASE_URL=https://your-ampla-uganda-domain.example

@@ -1,6 +1,6 @@
 
 import { apiSlice } from "../features/api/apiSlice";
-import { logOut, setCredentials, setRoles, setProfile, setPermissions, setUserId } from "./authSlice";
+import { logOut, setCredentials, setRoles, setProfile, setPermissions, setUserId, setBranchScope } from "./authSlice";
 import {tags as commonTags } from '../features/api/commonTags'
 
 export const authApiSlice = apiSlice.injectEndpoints({
@@ -19,6 +19,18 @@ export const authApiSlice = apiSlice.injectEndpoints({
                 method: 'POST',
                 body: { ...credentials }
             }),
+            async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+                try {
+                    const { data } = await queryFulfilled;
+                    const { accessToken, roles, permissions, user_id, branchScope } = data?.data || {};
+                    dispatch(setCredentials({ accessToken }));
+                    dispatch(setUserId({ user_id }));
+                    dispatch(setRoles({ roles: Array.isArray(roles) ? roles : [roles] }));
+                    dispatch(setPermissions({ permissions: Array.isArray(permissions) ? permissions : [permissions] }));
+                    dispatch(setBranchScope({ branchScope: branchScope ?? null }));
+                } catch (err) {
+                }
+            },
             invalidatesTags: [commonTags.profile],
         }),
         getProfile: builder.query({
@@ -28,6 +40,9 @@ export const authApiSlice = apiSlice.injectEndpoints({
                     const { data }  =
                     await queryFulfilled
                     dispatch(setProfile({data}))
+                    if (data?.branchScope) {
+                        dispatch(setBranchScope({ branchScope: data.branchScope }));
+                    }
                 } catch (err) {
                   
                 }
@@ -40,6 +55,18 @@ export const authApiSlice = apiSlice.injectEndpoints({
                 url:'/updateprofile',
                 method: 'POST',
                 body: { ...credentials }
+            }),
+            invalidatesTags: [commonTags.profile],
+        }),
+        getSettings: builder.query({
+            query: () => '/settings',
+            providesTags: [commonTags.profile],
+        }),
+        updateSettings: builder.mutation({
+            query: settingsPayload => ({
+                url:'/settings',
+                method: 'POST',
+                body: { ...settingsPayload }
             }),
             invalidatesTags: [commonTags.profile],
         }),
@@ -75,12 +102,13 @@ export const authApiSlice = apiSlice.injectEndpoints({
             async onQueryStarted(arg, { dispatch, queryFulfilled }) {
                 try {
                     const { data } = await queryFulfilled
-                    const { accessToken, roles, permissions, user_id } = data?.data || {}
+                    const { accessToken, roles, permissions, user_id, branchScope } = data?.data || {}
                     dispatch(setCredentials({ accessToken }))
                     dispatch(setUserId({ user_id }))
                     //make sure always the roles is an array
                     dispatch(setRoles({ roles: Array.isArray(roles) ? roles : [roles] }));
                     dispatch(setPermissions({ permissions: Array.isArray(permissions) ? permissions : [permissions] }));
+                    dispatch(setBranchScope({ branchScope: branchScope ?? null }));
                 } catch (err) {
                     console.log(err)
                 }
@@ -95,8 +123,10 @@ export const {
     useRegisterMutation,
     useLoginMutation,
     useGetProfileQuery,
+    useGetSettingsQuery,
     useSendLogoutMutation,
     useUpdateProfileMutation,
+    useUpdateSettingsMutation,
     useUpLoadLogoMutation,
     useRefreshMutation,
 } = authApiSlice

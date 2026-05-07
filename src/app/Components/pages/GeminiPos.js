@@ -1,341 +1,1896 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Button,
-  Form,
-  ListGroup,
-  Modal,
-  InputGroup,
-  Badge,
-  Offcanvas,
-} from "react-bootstrap";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import { selectStock } from "../../features/stock/stockSlice";
-import { useMakeSalesMutation } from "../../features/api/salesSlice";
-import CustomerSelection from "../Models/CustomerSelection";
-import { PauseFill, PlayFill, Trash3Fill, XCircleFill, ArrowRepeat } from "react-bootstrap-icons";
-import PermissionWrapper from "../../auth/PermissionWrapper";
-import { useSettings } from "../Settings";
-import { selectProfile } from "../../auth/authSlice";
-import { ReceiptTemplate } from "../receipts/Receipt";
-import AmplaReceipt from "../receipts/AmplaReceipt";
-import './PosPage.css';
-import { toast } from "react-toastify";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControl,
+  IconButton,
+  InputAdornment,
+  MenuItem,
+  Select,
+  Snackbar,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import {
+  Add,
+  ChevronRight,
+  Close,
+  DeleteOutline,
+  GridView,
+  LockOutlined,
+  PauseCircleOutline,
+  Remove,
+  Search,
+  ShoppingCartOutlined,
+  ViewList,
+} from "@mui/icons-material";
 
-function PosPage() {
-  // --- STATE MANAGEMENT ---
-  const receiptRef = useRef();
+import { selectBranchScope, selectProfile } from "../../auth/authSlice";
+import { useSettings } from "../Settings";
+import { selectStock, useGetStockQuery } from "../../features/stock/stockSlice";
+import { selectBranches, useGetBranchesQuery } from "../../features/api/branchesSlice";
+import { selectCustomers, useGetCustomersQuery } from "../../features/api/customers";
+import { useMakeSalesMutation } from "../../features/api/salesSlice";
+import AmplaReceipt from "../receipts/AmplaReceipt";
+import "./PosPage.css";
+
+const HOLD_SALES_STORAGE_KEY = "gemini-pos-held-sales";
+
+const money = (value, currency = "UGX") =>
+  `${currency} ${Number(value || 0).toLocaleString()}`;
+
+const getInitials = (name = "") =>
+  name
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+const toNumber = (value) => Number(value || 0);
+const clampPercent = (value) => Math.min(100, Math.max(0, toNumber(value)));
+const toBooleanSetting = (value, fallback = true) => {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (typeof value === "boolean") return value;
+  return ["1", "true", "yes", "enabled"].includes(String(value).toLowerCase());
+};
+
+const getLineTotal = (item) => toNumber(item.saleQuantity) * toNumber(item.salePrice);
+
+const createCartItem = (product, priceType) => {
+  const retailPrice = toNumber(product.itemLeastPrice);
+  const configuredWholesalePrice = toNumber(product.itemWholesalePrice);
+  const wholesalePrice = configuredWholesalePrice > 0 ? configuredWholesalePrice : retailPrice;
+
+  return {
+    saleItemId: product.itemId,
+    itemId: product.itemId,
+    itemName: product.itemName,
+    itemModel: product.itemModel,
+    itemQuantity: toNumber(product.itemQuantity),
+    saleQuantity: 1,
+    salePrice: priceType === "retail" ? retailPrice : wholesalePrice,
+    priceMode: priceType,
+    retailPrice,
+    wholesalePrice,
+  };
+};
+
+export default function GeminiPos() {
   const { settings } = useSettings();
-  const companyProfile = useSelector(selectProfile);
-  const stockData = useSelector(selectStock);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [tenderedAmount, setTenderedAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const currency = settings?.currency && settings.currency !== "none" ? settings.currency : "UGX";
+  const taxRate = toNumber(settings?.taxRate);
+  const lowStockThreshold = toNumber(settings?.lowLevelProducts) || 10;
+  const minWholesaleOrder = toNumber(settings?.minWholesaleOrder);
+  const autoPriceDetermination = Boolean(settings?.autoPriceDetermination);
+
+  const companyProfile = useSelector(selectProfile) ?? {};
+  const branchScope = useSelector(selectBranchScope) ?? {};
+  const stockItems = useSelector(selectStock) ?? [];
+  const customers = useSelector(selectCustomers) ?? [];
+  const branches = useSelector(selectBranches) ?? [];
+  const canSwitchBranches = Boolean(branchScope?.can_switch_branches);
+  const scopedBranchId = branchScope?.effective_branch_id
+    ? String(branchScope.effective_branch_id)
+    : "";
+
+  useGetBranchesQuery();
+  const {
+    isLoading: isStockLoading,
+    isError: isStockError,
+    error: stockError,
+  } = useGetStockQuery();
+  const {
+    isLoading: isCustomersLoading,
+    isError: isCustomersError,
+    error: customersError,
+  } = useGetCustomersQuery();
+
+  const [makeSale, { isLoading: isSubmittingSale }] = useMakeSalesMutation();
+
+  const [selectedBranchId, setSelectedBranchId] = useState(scopedBranchId);
+  const [query, setQuery] = useState("");
   const [custId, setCustId] = useState("");
-  const [customer, setCustomer] = useState(null);
-  const [moreInfo, setMoreInfo] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [defaultPriceType, setDefaultPriceType] = useState("retail");
-  const [taxRate, setTaxRate] = useState(0);
-  const [discount, setDiscount] = useState("");
+  const [priceType, setPriceType] = useState("retail");
+  const [productView, setProductView] = useState("grid");
   const [cart, setCart] = useState([]);
   const [heldSales, setHeldSales] = useState([]);
-  const [showHeldSalesModal, setShowHeldSalesModal] = useState(false);
-  const [showCartOffcanvas, setShowCartOffcanvas] = useState(false);
-  const [saleDetails, setSaleDetails] = useState({});
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [makeSale, { isLoading }] = useMakeSalesMutation();
+  const [showHeldSales, setShowHeldSales] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [amountPaid, setAmountPaid] = useState("");
+  const [discountType, setDiscountType] = useState("amount");
+  const [discountValue, setDiscountValue] = useState("");
+  const [taxType, setTaxType] = useState("none");
+  const [taxValue, setTaxValue] = useState("");
+  const [creditEndDate, setCreditEndDate] = useState("");
+  const [paymentNote, setPaymentNote] = useState("");
+  const [lastAdded, setLastAdded] = useState(null);
+  const [showAddedNotice, setShowAddedNotice] = useState(false);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+  const [feedback, setFeedback] = useState({ open: false, severity: "success", message: "" });
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [completedSale, setCompletedSale] = useState(null);
+  const [debtAlertOpen, setDebtAlertOpen] = useState(false);
 
   useEffect(() => {
-    const savedSales = JSON.parse(localStorage.getItem("heldSales") || "[]");
-    setHeldSales(savedSales);
-    setTaxRate(settings?.taxRate || 0);
-  }, [settings?.taxRate]);
+    const savedHeldSales = JSON.parse(localStorage.getItem(HOLD_SALES_STORAGE_KEY) || "[]");
+    setHeldSales(savedHeldSales);
+  }, []);
 
-  // --- CART LOGIC ---
+  useEffect(() => {
+    if (!canSwitchBranches && scopedBranchId && selectedBranchId !== scopedBranchId) {
+      setSelectedBranchId(scopedBranchId);
+    }
+  }, [canSwitchBranches, scopedBranchId, selectedBranchId]);
 
-  const addProductToCart = (product) => {
-    const salePrice =
-      defaultPriceType === "wholesale"
-        ? product.itemStockPrice
-        : product.itemLeastPrice;
+  useEffect(() => {
+    if (canSwitchBranches && !selectedBranchId && scopedBranchId) {
+      setSelectedBranchId(scopedBranchId);
+    }
+  }, [canSwitchBranches, scopedBranchId, selectedBranchId]);
 
-    setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.itemId === product.itemId);
+  const branchStockItems = useMemo(() => {
+    if (!selectedBranchId) return [];
+
+    return stockItems.filter((item) => String(item.branchId) === String(selectedBranchId));
+  }, [selectedBranchId, stockItems]);
+
+  const branchCustomers = useMemo(() => {
+    if (!selectedBranchId) return [];
+
+    return customers.filter((customer) => String(customer.branchId) === String(selectedBranchId));
+  }, [customers, selectedBranchId]);
+
+  const selectedBranch = useMemo(
+    () => branches.find((branch) => String(branch.branchId) === String(selectedBranchId)) || null,
+    [branches, selectedBranchId]
+  );
+
+  const selectedCustomer = useMemo(
+    () => branchCustomers.find((customer) => String(customer.custId) === String(custId)) || null,
+    [branchCustomers, custId]
+  );
+
+  const filteredProducts = useMemo(() => {
+    const normalizedQuery = query.toLowerCase().trim();
+    if (!normalizedQuery) return branchStockItems;
+
+    return branchStockItems.filter((item) =>
+      `${item.itemName || ""} ${item.itemModel || ""} ${item.itemSku || ""} ${item.itemBarcode || ""}`
+        .toLowerCase()
+        .includes(normalizedQuery)
+    );
+  }, [branchStockItems, query]);
+
+  useEffect(() => {
+    if (taxRate > 0 && taxType === "none" && taxValue === "") {
+      setTaxType("percent");
+      setTaxValue(String(taxRate));
+    }
+  }, [taxRate, taxType, taxValue]);
+
+  const subtotal = useMemo(
+    () => cart.reduce((sum, item) => sum + getLineTotal(item), 0),
+    [cart]
+  );
+  const discountAmount = useMemo(() => {
+    if (discountType === "percent") {
+      return subtotal * (clampPercent(discountValue) / 100);
+    }
+
+    return Math.min(subtotal, Math.max(0, toNumber(discountValue)));
+  }, [discountType, discountValue, subtotal]);
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+  const taxAmount = useMemo(() => {
+    if (taxType === "percent") {
+      return taxableAmount * (clampPercent(taxValue) / 100);
+    }
+
+    if (taxType === "amount") {
+      return Math.max(0, toNumber(taxValue));
+    }
+
+    return 0;
+  }, [taxType, taxValue, taxableAmount]);
+  const total = taxableAmount + taxAmount;
+  const wholesaleThresholdReached =
+    autoPriceDetermination && minWholesaleOrder > 0 && subtotal >= minWholesaleOrder;
+  const tenderedAmount = toNumber(amountPaid);
+  const changeDue = tenderedAmount - total;
+  const dueAmount = Math.max(0, total - tenderedAmount);
+  const requiresDueDate = dueAmount > 0;
+  const debtSalesAllowed = toBooleanSetting(
+    selectedBranch?.allowDebtSales,
+    toBooleanSetting(settings?.allowDebtSales, true)
+  );
+  const discountSummaryLabel =
+    discountType === "percent"
+      ? `Discount (${clampPercent(discountValue)}%)`
+      : "Discount";
+  const taxSummaryLabel =
+    taxType === "percent"
+      ? `Tax (${clampPercent(taxValue)}%)`
+      : taxType === "amount"
+        ? "Tax"
+        : "Tax (0%)";
+  const canCheckout = cart.length > 0 && Boolean(custId) && Boolean(selectedBranchId);
+  const canCompleteCheckout =
+    canCheckout &&
+    !isSubmittingSale &&
+    (paymentMethod === "Credit" ? true : amountPaid !== "");
+  const cartItemCount = useMemo(
+    () => cart.reduce((sum, item) => sum + toNumber(item.saleQuantity), 0),
+    [cart]
+  );
+  const lowStockCount = useMemo(
+    () =>
+      branchStockItems.filter((item) => {
+        const quantity = toNumber(item.itemQuantity);
+        return quantity > 0 && quantity <= lowStockThreshold;
+      }).length,
+    [branchStockItems, lowStockThreshold]
+  );
+
+  useEffect(() => {
+    if (wholesaleThresholdReached && priceType !== "wholesale") {
+      setPriceType("wholesale");
+    }
+  }, [priceType, wholesaleThresholdReached]);
+
+  const showFeedback = (severity, message) => {
+    setFeedback({ open: true, severity, message });
+  };
+
+  const persistHeldSales = (nextHeldSales) => {
+    setHeldSales(nextHeldSales);
+    localStorage.setItem(HOLD_SALES_STORAGE_KEY, JSON.stringify(nextHeldSales));
+  };
+
+  const handleBranchChange = (branchId) => {
+    setSelectedBranchId(branchId);
+    setCart([]);
+    setCustId("");
+    setQuery("");
+    clearCheckoutState();
+  };
+
+  const clearCheckoutState = () => {
+    setAmountPaid("");
+    setPaymentNote("");
+    setPaymentMethod("Cash");
+    setCreditEndDate("");
+    setShowCheckout(false);
+    setDebtAlertOpen(false);
+    setCartDrawerOpen(false);
+  };
+
+  const resetAdjustments = () => {
+    setDiscountType("amount");
+    setDiscountValue("");
+    setTaxType(taxRate > 0 ? "percent" : "none");
+    setTaxValue(taxRate > 0 ? String(taxRate) : "");
+  };
+
+  const clearSaleWorkspace = () => {
+    setCart([]);
+    setCustId("");
+    resetAdjustments();
+    clearCheckoutState();
+  };
+
+  const openCheckout = (quickAmount = "") => {
+    if (!cart.length) return;
+
+    if (!custId) {
+      showFeedback("warning", "Select a customer before continuing to payment.");
+      return;
+    }
+
+    setAmountPaid(quickAmount ? String(quickAmount) : String(total));
+    setShowCheckout(true);
+  };
+
+  const addToCart = (product) => {
+    if (!selectedBranchId) {
+      showFeedback("warning", "Select the selling branch first.");
+      return;
+    }
+
+    const availableStock = toNumber(product.itemQuantity);
+    if (availableStock <= 0) {
+      showFeedback("warning", `${product.itemName} is out of stock.`);
+      return;
+    }
+
+    setLastAdded({
+      itemName: product.itemName,
+      salePrice:
+        priceType === "retail"
+          ? toNumber(product.itemLeastPrice)
+          : toNumber(product.itemWholesalePrice) || toNumber(product.itemLeastPrice),
+    });
+    setShowAddedNotice(true);
+
+    setCart((currentCart) => {
+      const existingItem = currentCart.find((item) => item.saleItemId === product.itemId);
 
       if (existingItem) {
-        if (existingItem.cartQuantity < existingItem.itemQuantity) {
-          return prevCart.map((item) =>
-            item.itemId === product.itemId
-              ? { ...item, cartQuantity: item.cartQuantity + 1 }
-              : item
+        if (toNumber(existingItem.saleQuantity) >= availableStock) {
+          showFeedback(
+            "warning",
+            `Cannot add more. Only ${availableStock} of ${product.itemName} available.`
           );
-        } else {
-          toast.warn(`Cannot add more. Only ${existingItem.itemQuantity} of ${existingItem.itemName} available.`);
-          return prevCart;
+          return currentCart;
         }
-      } else {
-        if (product.itemQuantity > 0) {
-          // FIXED: Now correctly assigns the calculated salePrice
-          return [...prevCart, { ...product, cartQuantity: 1, salePrice: salePrice }];
-        } else {
-          toast.warn(`${product.itemName} is out of stock.`);
-          return prevCart;
-        }
-      }
-    });
-  };
 
-  const updateQuantity = useCallback((productId, change) => {
-    setCart(currentCart => {
-      const itemInCart = currentCart.find((item) => item.itemId === productId);
-      if (!itemInCart) return currentCart;
-
-      const newCartQuantity = itemInCart.cartQuantity + change;
-
-      if (change > 0 && newCartQuantity > itemInCart.itemQuantity) {
-        toast.warn(`Cannot add more. Only ${itemInCart.itemQuantity} of ${itemInCart.itemName} available.`);
-        return currentCart;
-      }
-
-      if (newCartQuantity > 0) {
-        return currentCart.map(item =>
-          item.itemId === productId
-            ? { ...item, cartQuantity: newCartQuantity }
+        return currentCart.map((item) =>
+          item.saleItemId === product.itemId
+            ? { ...item, saleQuantity: toNumber(item.saleQuantity) + 1, itemQuantity: availableStock }
             : item
         );
-      } else {
-        return currentCart.filter(item => item.itemId !== productId);
       }
+
+      return [...currentCart, createCartItem(product, priceType)];
     });
-  }, []);
+  };
 
-  // NEW: Function to handle direct quantity input
-  const setQuantity = useCallback((productId, quantityString) => {
-    // If the input is empty, don't do anything yet
-    if (quantityString === "") {
-        setCart(currentCart => currentCart.map(item => 
-            item.itemId === productId ? { ...item, cartQuantity: "" } : item
-        ));
-        return;
-    }
+  const updateQty = (itemId, change) => {
+    setCart((currentCart) =>
+      currentCart
+        .map((item) => {
+          if (item.saleItemId !== itemId) return item;
 
-    const quantity = parseInt(quantityString, 10);
+          const maxStock = toNumber(item.itemQuantity);
+          const nextQuantity = toNumber(item.saleQuantity) + change;
 
-    setCart(currentCart => {
-        const itemInCart = currentCart.find(item => item.itemId === productId);
-        if (!itemInCart) return currentCart;
-
-        // If not a valid number or less than 1, remove the item
-        if (isNaN(quantity) || quantity < 1) {
-            return currentCart.filter(item => item.itemId !== productId);
-        }
-
-        // If quantity exceeds stock, set to max stock and alert user
-        if (quantity > itemInCart.itemQuantity) {
-            toast.warn(`Only ${itemInCart.itemQuantity} of ${itemInCart.itemName} available.`);
-            return currentCart.map(item =>
-                item.itemId === productId ? { ...item, cartQuantity: itemInCart.itemQuantity } : item
+          if (nextQuantity > maxStock) {
+            showFeedback(
+              "warning",
+              `Cannot add more. Only ${maxStock} of ${item.itemName} available.`
             );
-        }
+            return item;
+          }
 
-        // Otherwise, set the quantity
-        return currentCart.map(item =>
-            item.itemId === productId ? { ...item, cartQuantity: quantity } : item
-        );
-    });
-  }, []);
+          return { ...item, saleQuantity: nextQuantity };
+        })
+        .filter((item) => toNumber(item.saleQuantity) > 0)
+    );
+  };
 
-  const handleTogglePriceInCart = useCallback((itemId) => {
-    setCart(prevCart => prevCart.map(item => {
-      if (item.itemId === itemId) {
-        const newPrice = item.salePrice === item.itemLeastPrice ? item.itemStockPrice : item.itemLeastPrice;
-        return { ...item, salePrice: newPrice };
-      }
-      return item;
-    }));
-  }, []);
+  const updateCartItemPriceMode = (itemId, nextPriceMode) => {
+    setCart((currentCart) =>
+      currentCart.map((item) => {
+        if (item.saleItemId !== itemId) return item;
+
+        return {
+          ...item,
+          priceMode: nextPriceMode,
+          salePrice: nextPriceMode === "retail" ? toNumber(item.retailPrice) : toNumber(item.wholesalePrice),
+        };
+      })
+    );
+  };
+
+  const removeItem = (itemId) => {
+    setCart((currentCart) => currentCart.filter((item) => item.saleItemId !== itemId));
+  };
 
   const clearCart = () => {
-    setCart([]); setDiscount(""); setTenderedAmount(""); setMoreInfo(""); setCustId(""); setCustomer(null); setEndDate("");
+    setCart([]);
+    clearCheckoutState();
   };
 
-  const handleShow = () => setShowReceiptModal(true);
-  const handleClose = () => { clearCart(); setShowReceiptModal(false); };
+  const holdCurrentSale = () => {
+    if (!cart.length) return;
 
-  const handleHoldSale = () => {
-    if (cart.length === 0) return;
-    const newHeldSale = { id: Date.now(), cart, customer, custId, discount, taxRate, time: new Date().toLocaleTimeString() };
-    const updatedHeldSales = [...heldSales, newHeldSale];
-    setHeldSales(updatedHeldSales);
-    localStorage.setItem("heldSales", JSON.stringify(updatedHeldSales));
-    clearCart();
+    const heldSale = {
+      id: Date.now(),
+      branchId: selectedBranchId,
+      branchName: selectedBranch?.branchName || "",
+      custId,
+      customerName: selectedCustomer?.custName || "",
+      items: cart,
+      priceType,
+      total,
+      discountType,
+      discountValue,
+      taxType,
+      taxValue,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    const nextHeldSales = [heldSale, ...heldSales];
+    persistHeldSales(nextHeldSales);
+    clearSaleWorkspace();
+    showFeedback("success", "Sale placed on hold.");
   };
 
-  const handleResumeSale = (saleId) => {
-    const saleToResume = heldSales.find((sale) => sale.id === saleId);
-    if (saleToResume) {
-      setCart(saleToResume.cart); setCustomer(saleToResume.customer); setCustId(saleToResume.custId); setDiscount(saleToResume.discount); setTaxRate(saleToResume.taxRate);
-      handleDeleteHeldSale(saleId);
+  const resumeHeldSale = (saleId) => {
+    const sale = heldSales.find((item) => item.id === saleId);
+    if (!sale) return;
+
+    if (canSwitchBranches && sale.branchId) {
+      setSelectedBranchId(String(sale.branchId));
     }
-    setShowHeldSalesModal(false);
+    setCart(sale.items);
+    setPriceType(sale.priceType || "retail");
+    setCustId(sale.custId || "");
+    setDiscountType(sale.discountType ?? "amount");
+    setDiscountValue(sale.discountValue ?? "");
+    setTaxType(sale.taxType ?? (taxRate > 0 ? "percent" : "none"));
+    setTaxValue(sale.taxValue ?? (taxRate > 0 ? String(taxRate) : ""));
+    persistHeldSales(heldSales.filter((item) => item.id !== saleId));
+    setShowHeldSales(false);
+    showFeedback("success", "Held sale resumed.");
   };
 
-  const handleDeleteHeldSale = (saleId) => {
-    const updatedHeldSales = heldSales.filter((sale) => sale.id !== saleId);
-    setHeldSales(updatedHeldSales);
-    localStorage.setItem("heldSales", JSON.stringify(updatedHeldSales));
+  const deleteHeldSale = (saleId) => {
+    persistHeldSales(heldSales.filter((item) => item.id !== saleId));
   };
 
-  const { subtotal, discountAmount, taxAmount, total } = useMemo(() => {
-    const subtotal = cart.reduce((acc, item) => acc + item.salePrice * item.cartQuantity, 0);
-    const discountAmount = parseFloat(discount) || 0;
-    const taxableAmount = Math.max(0, subtotal - discountAmount);
-    const taxAmount = taxableAmount * (taxRate / 100);
-    const total = taxableAmount + taxAmount;
-    return { subtotal, discountAmount, taxAmount, total };
-  }, [cart, discount, taxRate]);
+  const completeCheckout = async ({ confirmDebt = false } = {}) => {
+    if (!selectedBranchId) {
+      showFeedback("warning", "Select the selling branch before completing the sale.");
+      return;
+    }
 
-  const changeDue = useMemo(() => (parseFloat(tenderedAmount) || 0) - total, [tenderedAmount, total]);
-  const dueAmount = useMemo(() => -changeDue, [changeDue]);
+    if (!selectedCustomer) {
+      showFeedback("warning", "Select a customer before completing the sale.");
+      return;
+    }
 
-  const completeSale = async () => {
-    const payloadItems = cart.map((item) => ({ custId, saleQuantity: item.cartQuantity, salePrice: item.salePrice, saleItemId: item.itemId }));
-    const currentSaleDetails = { custId, paymentMethod, tenderedAmount: parseFloat(tenderedAmount) || 0, discount: discountAmount, tax: taxAmount, total, dueAmount: dueAmount > 0 ? dueAmount : 0, endDate: dueAmount > 0 ? endDate : null, moreInfo };
-    setSaleDetails(currentSaleDetails);
+    if (tenderedAmount < 0) {
+      showFeedback("warning", "Amount paid cannot be negative.");
+      return;
+    }
+
+    if (dueAmount > 0 && !debtSalesAllowed) {
+      showFeedback(
+        "warning",
+        "Debt sales are disabled for this branch. Collect full payment before completing the sale."
+      );
+      return;
+    }
+
+    if (requiresDueDate && !creditEndDate) {
+      showFeedback("warning", "Select a due date for the outstanding balance.");
+      return;
+    }
+
+    if (dueAmount > 0 && !confirmDebt) {
+      setDebtAlertOpen(true);
+      return;
+    }
+
+    const saleItems = cart.map((item) => ({
+      custId,
+      saleQuantity: toNumber(item.saleQuantity),
+      salePrice: toNumber(item.salePrice),
+      saleItemId: item.saleItemId,
+    }));
+
+    const saleDetails = {
+      branchId: selectedBranchId,
+      branchName: selectedBranch?.branchName || "",
+      custId,
+      customerName: selectedCustomer.custName,
+      paymentMethod,
+      tenderedAmount,
+      discount: discountAmount,
+      discountAmount,
+      discountType,
+      discountValue: discountType === "percent" ? clampPercent(discountValue) : toNumber(discountValue),
+      tax: taxAmount,
+      taxAmount,
+      taxType,
+      taxValue: taxType === "percent" ? clampPercent(taxValue) : toNumber(taxValue),
+      total,
+      dueAmount,
+      confirmDebt: dueAmount > 0 && confirmDebt,
+      endDate: creditEndDate || null,
+      moreInfo: paymentNote,
+    };
+
     try {
-      await makeSale({ saleItems: payloadItems, saleDetails: currentSaleDetails }).unwrap();
-      toast.success('Sale successful');
-      handleShow(); handleClosePaymentModal();
+      await makeSale({ branchId: selectedBranchId, saleItems, saleDetails }).unwrap();
+
+      setCompletedSale({
+        cart: cart.map((item) => ({
+          ...item,
+          saleQuantity: toNumber(item.saleQuantity),
+          salePrice: toNumber(item.salePrice),
+        })),
+        saleDetails,
+        customerName: selectedCustomer.custName,
+      });
+      setReceiptOpen(true);
+      clearCheckoutState();
+      showFeedback("success", "Sale completed successfully.");
     } catch (error) {
-      toast.error('Error occurred during the sale: ' + (error?.data?.message || 'Please try again.'));
+      const message =
+        error?.data?.message || error?.error || "Failed to complete sale. Please try again.";
+
+      if (error?.data?.error === "DebtConfirmationRequired") {
+        setDebtAlertOpen(true);
+        showFeedback("warning", message);
+        return;
+      }
+
+      if (error?.data?.error === "DebtSalesDisabled") {
+        setDebtAlertOpen(false);
+        showFeedback("warning", message);
+        return;
+      }
+
+      showFeedback("error", message);
     }
   };
 
-  const filteredProducts = useMemo(() => stockData.filter(p => p.itemName?.toLowerCase().includes(searchTerm.toLowerCase()) || p.itemModel?.toLowerCase().includes(searchTerm.toLowerCase())), [stockData, searchTerm]);
+  const handleReceiptClose = () => {
+    setReceiptOpen(false);
+    setCompletedSale(null);
+    clearSaleWorkspace();
+  };
 
-  const handleShowCart = () => setShowCartOffcanvas(true);
-  const handleCloseCart = () => setShowCartOffcanvas(false);
+  const renderProduct = (product) => {
+    const availableStock = toNumber(product.itemQuantity);
+    const retailPrice = toNumber(product.itemLeastPrice);
+    const configuredWholesalePrice = toNumber(product.itemWholesalePrice);
+    const wholesalePrice = configuredWholesalePrice > 0 ? configuredWholesalePrice : retailPrice;
+    const displayPrice = priceType === "retail" ? retailPrice : wholesalePrice;
+    const inCartQty =
+      cart.find((item) => item.saleItemId === product.itemId)?.saleQuantity || 0;
+    const isOutOfStock = availableStock <= 0;
 
-  const handleShowPaymentModal = () => { if (cart.length > 0) setShowPaymentModal(true); };
-  const handleClosePaymentModal = () => setShowPaymentModal(false);
+    if (productView === "list") {
+      return (
+        <Card key={product.itemId} onClick={() => addToCart(product)} sx={productListCardStyle}>
+          <Box sx={productInitialStyle}>{getInitials(product.itemName)}</Box>
 
-  const CartContent = useCallback(() => (
-    <Card className="flex-grow-1 shadow-sm d-flex flex-column h-100">
-      <Card.Header className="d-flex justify-content-between align-items-center p-2">
-        <h5 className="mb-0">Current Sale</h5>
-        <div><Button variant="outline-warning" size="sm" onClick={() => setShowHeldSalesModal(true)} className="me-2"><PauseFill /> Held ({heldSales.length})</Button><Button variant="outline-danger" size="sm" onClick={clearCart} disabled={cart.length === 0}><XCircleFill /> Clear</Button></div>
-      </Card.Header>
-      <Card.Body className="d-flex flex-column p-0 flex-grow-1 cart-body-wrapper">
-        {customer && (<div className="p-2 bg-light-subtle border-bottom d-flex justify-content-between align-items-center"><div><small className="text-muted d-block">Customer</small><span className="fw-medium">{customer.custName}</span></div><Button variant="link" size="sm" className="p-0 text-danger" onClick={() => { setCustomer(null); setCustId(""); }}><XCircleFill /></Button></div>)}
-        <ListGroup variant="flush" className="cart-items">
-          {cart.length === 0 ? (<p className="text-center text-muted p-5 m-0">Cart is empty.</p>) : (cart.map((item) => (
-            <ListGroup.Item key={item.itemId} className="d-flex flex-wrap align-items-center">
-              <div className="flex-grow-1">
-                <p className="fw-bold mb-0">{item.itemName}</p>
-                <p className="text-muted small mb-0" onClick={() => handleTogglePriceInCart(item.itemId)}><Badge pill bg={item.salePrice === item.itemLeastPrice ? "info" : "secondary"} className="price-toggle-btn">{item.salePrice === item.itemLeastPrice ? "Retail" : "W/S"} <ArrowRepeat size={12} /></Badge><span className="ms-2">@ {settings?.currency !== 'none' ? settings?.currency : ""}{item.salePrice}</span></p>
-              </div>
-              <div className="d-flex align-items-center my-1 my-sm-0">
-                <Button variant="light" size="sm" className="quantity-btn" onClick={() => updateQuantity(item.itemId, -1)} >-</Button>
-                <Form.Control
-                    type="number"
-                    value={item.cartQuantity}
-                    onChange={(e) => setQuantity(item.itemId, e.target.value)}
-                    className="quantity-input mx-1 text-center"
-                    min="1"
-                />
-                <Button variant="light" size="sm" className="quantity-btn" onClick={() => updateQuantity(item.itemId, 1)} >+</Button>
-              </div>
-              <div className="ms-sm-3 text-end" style={{ minWidth: "80px" }}><span className="fw-bold">{settings?.currency !== 'none' ? settings?.currency : ""}{(item.salePrice * item.cartQuantity).toFixed(2)}</span></div>
-            </ListGroup.Item>
-          )))}
-        </ListGroup>
-        <div className={`p-3 border-top mt-auto ${settings.theme === 'dark' ? 'bg-dark' : 'bg-light'}`}>
-          <Row className="g-2 my-2">
-            <Col className="mb-2"><InputGroup><InputGroup.Text>Discount</InputGroup.Text><Form.Control type="number" placeholder="0.00" value={discount} onChange={(e) => setDiscount(e.target.value)} /></InputGroup></Col>
-            <Col className="mt-2"><InputGroup><InputGroup.Text>Tax</InputGroup.Text><Form.Control type="number" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} /><InputGroup.Text>%</InputGroup.Text></InputGroup></Col>
-          </Row>
-          <div className='mt-4 p-2'>
-            <div className="d-flex justify-content-between text-muted"><span>Subtotal</span> <span className="fw-medium">{settings?.currency !== 'none' ? settings?.currency : ""}{subtotal.toFixed(2)}</span></div>
-            <div className="d-flex justify-content-between text-muted"><span>Discount</span> <span className="fw-medium text-danger">-{settings?.currency !== 'none' ? settings?.currency : ""}{discountAmount.toFixed(2)}</span></div>
-            <div className="d-flex justify-content-between text-muted"><span>Tax ({taxRate}%)</span> <span className="fw-medium">{settings?.currency !== 'none' ? settings?.currency : ""}{taxAmount.toFixed(2)}</span></div>
-          </div><hr />
-          <div className="d-flex justify-content-between fs-4 fw-bold"><span>Total</span> <span>{settings?.currency !== 'none' ? settings?.currency : ""}{total.toFixed(2)}</span></div>
-          <div className="d-grid gap-2 mt-3"><PermissionWrapper required={['salescreate']}><Button variant="success" size="lg" onClick={handleShowPaymentModal} disabled={cart.length === 0 || !customer}>Charge Payment</Button></PermissionWrapper><Button variant="secondary" size="lg" onClick={handleHoldSale} disabled={cart.length === 0} className="mt-2">Hold Sale</Button></div>
-        </div>
-      </Card.Body>
-    </Card>
-  ), [cart, heldSales, customer, custId, discount, taxRate, settings, handleTogglePriceInCart, updateQuantity, setQuantity, clearCart, subtotal, discountAmount, taxAmount, total]);
+          <Box sx={{ minWidth: 0 }}>
+            <Typography fontWeight={900}>{product.itemName}</Typography>
+            <Typography variant="body2" color="#64748B">
+              Model: {product.itemModel || "N/A"}
+            </Typography>
+          </Box>
+
+          <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+            <Chip
+              size="small"
+              label={isOutOfStock ? "Out of Stock" : "In Stock"}
+              sx={isOutOfStock ? outOfStockChipStyle : stockChipStyle}
+            />
+            {inCartQty > 0 && (
+              <Chip size="small" label={`In cart: ${inCartQty}`} sx={inCartChipStyle} />
+            )}
+          </Stack>
+
+          <Box>
+            <Typography variant="body2" color="#64748B">
+              Stock
+            </Typography>
+            <Typography fontWeight={900}>{availableStock}</Typography>
+          </Box>
+
+          <Box>
+            <Typography variant="body2" color="#64748B">
+              Price
+            </Typography>
+            <Typography fontWeight={900}>{money(displayPrice, currency)}</Typography>
+          </Box>
+
+          <Button
+            variant="contained"
+            size="small"
+            disabled={isOutOfStock}
+            sx={greenButton}
+            onClick={(event) => {
+              event.stopPropagation();
+              addToCart(product);
+            }}
+          >
+            Add
+          </Button>
+        </Card>
+      );
+    }
+
+    return (
+      <Card key={product.itemId} onClick={() => addToCart(product)} sx={productCardStyle}>
+        <CardContent>
+          <Stack alignItems="center" spacing={1}>
+            <Box sx={productInitialStyle}>{getInitials(product.itemName)}</Box>
+            <Box textAlign="center">
+              <Typography fontWeight={900}>{product.itemName}</Typography>
+              <Typography variant="body2" color="#64748B">
+                Model: {product.itemModel || "N/A"}
+              </Typography>
+            </Box>
+            <Stack direction="row" gap={1} justifyContent="center" flexWrap="wrap">
+              <Chip
+                size="small"
+                label={isOutOfStock ? "Out of Stock" : "In Stock"}
+                sx={isOutOfStock ? outOfStockChipStyle : stockChipStyle}
+              />
+              {inCartQty > 0 && (
+                <Chip size="small" label={`In cart: ${inCartQty}`} sx={inCartChipStyle} />
+              )}
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" width="100%">
+              <Typography variant="body2" color="#64748B">
+                Qty
+              </Typography>
+              <Typography fontWeight={900}>{availableStock}</Typography>
+            </Stack>
+            <Typography fontWeight={900} fontSize={16}>
+              {money(displayPrice, currency)}
+            </Typography>
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  if (isStockLoading || isCustomersLoading) {
+    return (
+      <Box sx={loadingShellStyle}>
+        <Stack spacing={2} alignItems="center">
+          <CircularProgress sx={{ color: "#2F8F57" }} />
+          <Typography color="#64748B">Loading POS data...</Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  if (isStockError || isCustomersError) {
+    const message =
+      stockError?.data?.message ||
+      customersError?.data?.message ||
+      "Could not load POS data. Please refresh and try again.";
+
+    return (
+      <Box sx={loadingShellStyle}>
+        <Alert severity="error" sx={{ borderRadius: 3 }}>
+          {message}
+        </Alert>
+      </Box>
+    );
+  }
 
   return (
-    <div className="pos-page-container">
-      <Container fluid className="p-3 main-content-pos">
-        <Row className="h-100 gx-3">
-          <Col md={7} lg={8} className="product-grid-container">
-            <Card className="flex-grow-1 shadow-sm d-flex flex-column">
-              <Card.Header style={{ height: '65px' }} className="p-2">
-                <Row className="g-2 align-items-center">
-                  <Col lg={4} md={6}><Form.Control type="text" placeholder="Search products..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></Col>
-                  <Col lg={5} md={6}><CustomerSelection setCustId={setCustId} setCustomer={setCustomer} /></Col>
-                  <Col lg={3} md={6}><Form.Check type="switch" id="price-type-switch" className="mt-2 ms-4" label={defaultPriceType === 'retail' ? 'Default: Retail' : 'Default: Wholesale'} checked={defaultPriceType === 'retail'} onChange={() => setDefaultPriceType(p => p === 'retail' ? 'wholesale' : 'retail')} /></Col>
-                </Row>
-              </Card.Header>
-              <Card.Body className="product-grid">
-                <Row xs={2} sm={3} md={3} lg={4} xl={5} className="g-2">
-                  {filteredProducts.map((product) => {
-                    const isOutOfStock = product.itemQuantity <= 0;
-                    return (
-                      <Col key={product.itemId}>
-                        <Card className={`h-100 product-card ${isOutOfStock ? 'out-of-stock' : ''}`} onClick={() => !isOutOfStock && addProductToCart(product)}>
-                          {isOutOfStock && (<div className="out-of-stock-overlay"><Badge bg="danger" pill>Out of Stock</Badge></div>)}
-                          <Card.Body className="d-flex flex-column p-2">
-                            <Card.Title className="fs-6 fw-bold mb-1">{product.itemName}</Card.Title>
-                            <Card.Text className="text-muted small">Model: {product.itemModel}</Card.Text>
-                            <Card.Text className="text-muted small">Qty: {product.itemQuantity}</Card.Text>
-                            <p className="mt-auto fw-bold text-primary mb-0">Retail: {settings?.currency !== 'none' ? settings?.currency : ""}{product.itemLeastPrice}</p>
-                            <p className="fw-normal text-secondary small mb-0">Wholesale: {settings?.currency !== 'none' ? settings?.currency : ""}{product.itemStockPrice}</p>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                    );
-                  })}
-                </Row>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col md={5} lg={4} className="d-none d-md-flex cart-container"><CartContent /></Col>
-        </Row>
-      </Container>
-      <div className="d-md-none mobile-cart-button-container"><Button variant="primary" className="w-100 py-2" onClick={handleShowCart}>View Cart ({cart.reduce((sum, item) => sum + Number(item.cartQuantity || 0), 0)} items) - {settings?.currency !== 'none' ? settings?.currency : ""}{total.toFixed(2)}</Button></div>
-      <Offcanvas show={showCartOffcanvas} onHide={handleCloseCart} placement="bottom" className="h-100"><Offcanvas.Header closeButton><Offcanvas.Title>Cart</Offcanvas.Title></Offcanvas.Header><Offcanvas.Body className="d-flex flex-column p-0"><CartContent /></Offcanvas.Body></Offcanvas>
-      <Modal show={showPaymentModal} onHide={handleClosePaymentModal} centered backdrop="static" keyboard={false}>
-        <Modal.Header closeButton={!isLoading} ><Modal.Title>Complete Payment</Modal.Title></Modal.Header>
-        <Modal.Body>
-          <h3 className="text-center mb-3">Total Due: <span className="text-primary fw-bold">{settings?.currency !== 'none' ? settings?.currency : ""}{total.toFixed(2)}</span></h3>
-          <Form.Group className="mb-3"><Form.Label>Payment Method</Form.Label><Form.Select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} size="lg" style={{ height: '45px' }}><option value="Cash">Cash</option><option value="Mobile Money">Mobile Money</option><option value="Bank">Bank</option><option value="Credit">Credit</option></Form.Select></Form.Group>
-          <Form.Group className="mb-3"><Form.Label>Amount Paid</Form.Label><Form.Control type="number" size="lg" placeholder="0.00" value={tenderedAmount} onChange={(e) => setTenderedAmount(e.target.value)} autoFocus /></Form.Group>
-          <Form.Group className="mb-3"><Form.Label>Notes / More Info</Form.Label><Form.Control as="textarea" rows={2} value={moreInfo} onChange={(e) => setMoreInfo(e.target.value)} /></Form.Group>
-          {dueAmount > 0 && (<Form.Group className="mb-3"><Form.Label>Credit End Date</Form.Label><Form.Control type="date" size="lg" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Form.Group>)}
-          <h4 className={`text-center mt-3 fw-bold ${changeDue >= 0 ? 'text-success' : 'text-danger'}`}>{changeDue >= 0 ? `Change: ${settings?.currency !== 'none' ? settings?.currency : ""}${changeDue.toFixed(2)}` : `Amount Due: ${settings?.currency !== 'none' ? settings?.currency : ""}${-changeDue.toFixed(2)}`}</h4>
-        </Modal.Body>
-        <Modal.Footer><Button variant="secondary" disabled={isLoading}  onClick={handleClosePaymentModal}>Cancel</Button><Button variant="success" onClick={completeSale} disabled={isLoading || !tenderedAmount}>{isLoading ? "Processing..." : "Complete Sale"}</Button></Modal.Footer>
-      </Modal>
-      <Modal show={showHeldSalesModal} onHide={() => setShowHeldSalesModal(false)} centered>
-        <Modal.Header closeButton><Modal.Title>Held Sales</Modal.Title></Modal.Header>
-        <Modal.Body>{heldSales.length > 0 ? (<ListGroup>{heldSales.map(sale => (<ListGroup.Item key={sale.id} className="d-flex justify-content-between align-items-center"><div><strong>{sale.customer?.custName || 'Walk-in Customer'}</strong><br /><small className="text-muted">{sale.cart.length} items - Held at {sale.time}</small></div><div><Button variant="outline-success" size="sm" className="me-2" onClick={() => handleResumeSale(sale.id)}><PlayFill /> Resume</Button><Button variant="outline-danger" size="sm" onClick={() => handleDeleteHeldSale(sale.id)}><Trash3Fill /></Button></div></ListGroup.Item>))}</ListGroup>) : (<p className="text-center text-muted">No sales are currently on hold.</p>)}</Modal.Body>
-      </Modal>
-      <div style={{ display: 'none' }}><ReceiptTemplate ref={receiptRef} data={{ items: cart, details: saleDetails }} companyInfo={companyProfile} /></div>
-      <Modal show={showReceiptModal} onHide={handleClose} fullscreen={true} backdrop="static" keyboard={false}>
-        <Modal.Header closeButton><Modal.Title>Receipt</Modal.Title></Modal.Header>
-        <Modal.Body><AmplaReceipt companyInfo={companyProfile} customerName={customer?.custName} cart={cart} saleDetails={saleDetails} /></Modal.Body>
-        <Modal.Footer><Button variant="secondary" onClick={handleClose}>Close & New Sale</Button></Modal.Footer>
-      </Modal>
-    </div>
+    <Box className="pos-page-container" sx={pageOuterStyle}>
+      <Box sx={pageInnerStyle}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          justifyContent="space-between"
+          gap={2}
+          mb={3}
+        >
+          <Box>
+            <Typography variant="h4" fontWeight={800} color="#14231B">
+              Point of Sale
+            </Typography>
+            <Typography color="#64748B">
+              Monitor stock, sales, and production from one live workspace.
+            </Typography>
+          </Box>
+
+          <Stack direction="row" gap={1} flexWrap="wrap">
+            <Chip label={`${branchStockItems.length} products ready`} sx={chipStyle} />
+            <Chip label={`${cart.length} cart lines`} sx={chipStyle} />
+            <Chip label={`${heldSales.length} held sales`} sx={chipStyle} />
+            <Chip
+              label={`${lowStockCount} low stock`}
+              sx={{ ...chipStyle, bgcolor: "#FFF4E5", color: "#C77700" }}
+            />
+          </Stack>
+        </Stack>
+
+        <Box sx={mainGridStyle}>
+          <Card sx={cardStyle}>
+            <Box sx={toolbarStyle}>
+              <FormControl fullWidth>
+                <Select
+                  displayEmpty
+                  value={selectedBranchId}
+                  onChange={(event) => handleBranchChange(event.target.value)}
+                  disabled={!canSwitchBranches}
+                >
+                  <MenuItem value="">Select selling branch</MenuItem>
+                  {branches.map((branch) => (
+                    <MenuItem key={branch.branchId} value={String(branch.branchId)}>
+                      {branch.branchName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <TextField
+                placeholder="Search products..."
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
+              <FormControl fullWidth>
+                <Select
+                  displayEmpty
+                  value={custId}
+                  onChange={(event) => setCustId(event.target.value)}
+                >
+                  <MenuItem value="">Select a customer</MenuItem>
+                  {branchCustomers.map((customer) => (
+                    <MenuItem key={customer.custId} value={String(customer.custId)}>
+                      {customer.custName} {customer.custContact ? `- ${customer.custContact}` : ""}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Stack direction="row" gap={1}>
+                <IconButton
+                  onClick={() => setProductView("grid")}
+                  sx={productView === "grid" ? activeIconStyle : plainIconStyle}
+                >
+                  <GridView />
+                </IconButton>
+                <IconButton
+                  onClick={() => setProductView("list")}
+                  sx={productView === "list" ? activeIconStyle : plainIconStyle}
+                >
+                  <ViewList />
+                </IconButton>
+              </Stack>
+
+              <Button
+                variant="contained"
+                onClick={() => setPriceType(priceType === "retail" ? "wholesale" : "retail")}
+                sx={greenButton}
+              >
+                Default: {priceType === "retail" ? "Retail" : "Wholesale"}
+              </Button>
+            </Box>
+
+            {autoPriceDetermination && minWholesaleOrder > 0 && (
+              <Alert severity={wholesaleThresholdReached ? "success" : "info"} sx={{ mt: 2 }}>
+                {wholesaleThresholdReached
+                  ? `Wholesale pricing is now active for new items because the order reached ${money(
+                      minWholesaleOrder,
+                      currency
+                    )}.`
+                  : `Automatic wholesale pricing will activate for new items once the order reaches ${money(
+                      minWholesaleOrder,
+                      currency
+                    )}.`}
+              </Alert>
+            )}
+
+            {!selectedBranchId && (
+              <Alert severity="warning" sx={{ mt: 2, borderRadius: 3 }}>
+                Select a branch before adding products to this sale.
+              </Alert>
+            )}
+
+            <Box sx={{ p: 2 }}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                justifyContent="space-between"
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                gap={1.5}
+                mb={2}
+              >
+                <Box>
+                  <Typography fontWeight={900} fontSize={20}>
+                    Products for this sale
+                  </Typography>
+                  <Typography color="#64748B" fontSize={14}>
+                    {selectedBranch
+                      ? `Live inventory for ${selectedBranch.branchName}.`
+                      : "Choose a branch to load sale products."}
+                  </Typography>
+                </Box>
+                <Chip label={`${filteredProducts.length} products showing`} sx={chipStyle} />
+              </Stack>
+
+              <Box sx={productView === "grid" ? productGridStyle : productListStyle}>
+                {filteredProducts.map(renderProduct)}
+              </Box>
+
+              {filteredProducts.length === 0 && (
+                <Alert severity="info" sx={{ mt: 2, borderRadius: 3 }}>
+                  No products match your search.
+                </Alert>
+              )}
+
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                justifyContent="space-between"
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                gap={1}
+                mt={3}
+              >
+                <Typography color="#64748B">
+                  Showing 1 to {filteredProducts.length} of {branchStockItems.length} products
+                </Typography>
+                <Stack direction="row" gap={1}>
+                  {[1, 2, 3, 4, 5].map((page) => (
+                    <Button key={page} sx={page === 1 ? pagerActive : pagerButton}>
+                      {page}
+                    </Button>
+                  ))}
+                </Stack>
+              </Stack>
+            </Box>
+          </Card>
+
+          <Card sx={cartCardStyle}>
+            <Box sx={{ p: 2.5, borderBottom: "1px solid #E7EFE9" }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
+                <Typography variant="h6" fontWeight={900}>
+                  Current Sale
+                </Typography>
+                <Stack direction="row" gap={1}>
+                  <Button
+                    variant="outlined"
+                    color="warning"
+                    startIcon={<PauseCircleOutline />}
+                    onClick={() => setShowHeldSales(true)}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    Held ({heldSales.length})
+                  </Button>
+                  <Button variant="outlined" color="error" onClick={clearCart} sx={{ borderRadius: 2 }}>
+                    Clear
+                  </Button>
+                </Stack>
+              </Stack>
+            </Box>
+
+            <Box sx={cartItemsStyle}>
+              {cart.length === 0 ? (
+                <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 250 }} color="#94A3B8">
+                  <ShoppingCartOutlined sx={{ fontSize: 46, mb: 1 }} />
+                  <Typography>Cart is empty.</Typography>
+                </Stack>
+              ) : (
+                <Stack gap={2}>
+                  {cart.map((item) => (
+                    <Box key={item.saleItemId} sx={cartItemStyle}>
+                      <Box sx={cartInitialStyle}>{getInitials(item.itemName)}</Box>
+
+                      <Box>
+                        <Typography fontWeight={900}>{item.itemName}</Typography>
+                        <Typography variant="body2" color="#64748B">
+                          {item.itemModel || "No model"}
+                        </Typography>
+                        <Stack direction="row" gap={0.8} mt={0.8} flexWrap="wrap">
+                          <Button
+                            size="small"
+                            onClick={() => updateCartItemPriceMode(item.saleItemId, "retail")}
+                            sx={item.priceMode === "retail" ? linePriceToggleActive : linePriceToggle}
+                          >
+                            Retail
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => updateCartItemPriceMode(item.saleItemId, "wholesale")}
+                            sx={item.priceMode === "wholesale" ? linePriceToggleActive : linePriceToggle}
+                          >
+                            Wholesale
+                          </Button>
+                        </Stack>
+                        <Stack direction="row" gap={1.2} mt={0.8} flexWrap="wrap">
+                          <Typography variant="caption" color="#64748B">
+                            Retail: {money(item.retailPrice, currency)}
+                          </Typography>
+                          <Typography variant="caption" color="#64748B">
+                            Wholesale: {money(item.wholesalePrice, currency)}
+                          </Typography>
+                        </Stack>
+                        <Typography color="#237B49" fontWeight={900}>
+                          {money(item.salePrice, currency)}
+                        </Typography>
+                      </Box>
+
+                      <Stack direction="row" alignItems="center" gap={1} justifyContent="flex-end">
+                        <IconButton
+                          size="small"
+                          onClick={() => updateQty(item.saleItemId, -1)}
+                          sx={qtyButton}
+                        >
+                          <Remove fontSize="small" />
+                        </IconButton>
+                        <Typography fontWeight={900}>{item.saleQuantity}</Typography>
+                        <IconButton
+                          size="small"
+                          onClick={() => updateQty(item.saleItemId, 1)}
+                          sx={qtyButton}
+                        >
+                          <Add fontSize="small" />
+                        </IconButton>
+                        <Typography fontWeight={900} minWidth={88} textAlign="right">
+                          {money(getLineTotal(item), currency)}
+                        </Typography>
+                        <IconButton color="error" onClick={() => removeItem(item.saleItemId)}>
+                          <DeleteOutline />
+                        </IconButton>
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+
+            <Box sx={{ p: 2.5, bgcolor: "#FBFEFC", borderTop: "1px solid #E7EFE9" }}>
+              {selectedCustomer ? (
+                <Alert severity="success" sx={{ mb: 2, borderRadius: 3 }}>
+                  Selling to {selectedCustomer.custName}
+                </Alert>
+              ) : (
+                <Alert severity="warning" sx={{ mb: 2, borderRadius: 3 }}>
+                  Select a customer before charging payment.
+                </Alert>
+              )}
+
+              <Stack direction="row" gap={1} flexWrap="wrap" mb={2}>
+                <Chip
+                  label={
+                    discountAmount > 0
+                      ? `${discountSummaryLabel}: ${money(discountAmount, currency)}`
+                      : "No discount"
+                  }
+                  sx={discountAmount > 0 ? adjustmentChipActive : adjustmentChip}
+                />
+                <Chip
+                  label={
+                    taxAmount > 0 ? `${taxSummaryLabel}: ${money(taxAmount, currency)}` : "No tax"
+                  }
+                  sx={taxAmount > 0 ? adjustmentChipActive : adjustmentChip}
+                />
+              </Stack>
+
+              <Stack gap={1.1}>
+                <TotalRow label="Subtotal" value={money(subtotal, currency)} />
+                <TotalRow label={discountSummaryLabel} value={`-${money(discountAmount, currency)}`} danger />
+                <TotalRow label={taxSummaryLabel} value={money(taxAmount, currency)} />
+              </Stack>
+
+              <Divider sx={{ my: 2 }} />
+
+              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography fontSize={20} fontWeight={900}>
+                  Total
+                </Typography>
+                <Typography fontSize={22} fontWeight={900}>
+                  {money(total, currency)}
+                </Typography>
+              </Stack>
+
+              <Button
+                fullWidth
+                variant="contained"
+                sx={{ ...greenButton, height: 54, fontSize: 16, mb: 1.2 }}
+                onClick={() => openCheckout()}
+                disabled={!canCheckout}
+              >
+                Charge Payment
+              </Button>
+              <Button
+                fullWidth
+                variant="contained"
+                sx={holdButtonStyle}
+                onClick={holdCurrentSale}
+                disabled={cart.length === 0}
+              >
+                Hold Sale
+              </Button>
+
+              <Stack direction="row" justifyContent="center" gap={0.8} color="#64748B" mt={2}>
+                <LockOutlined fontSize="small" />
+                <Typography variant="body2">All transactions are secure and encrypted</Typography>
+              </Stack>
+            </Box>
+          </Card>
+        </Box>
+
+        <Card sx={{ ...cardStyle, mt: 2, mb: { xs: 10, xl: 0 } }}>
+          <Box sx={quickPayStyle}>
+            {[5000, 10000, 20000, 50000, 100000].map((amount) => (
+              <Button
+                key={amount}
+                sx={quickAmount}
+                onClick={() => openCheckout(amount)}
+                disabled={!canCheckout}
+              >
+                {money(amount, currency)}
+              </Button>
+            ))}
+            <Button
+              sx={{ ...quickAmount, color: "#14231B" }}
+              onClick={() => openCheckout(total)}
+              disabled={!canCheckout}
+            >
+              Exact Amount
+            </Button>
+          </Box>
+        </Card>
+      </Box>
+
+      {cart.length > 0 && (
+        <>
+          <Box sx={floatingCartFabStyle} onClick={() => setCartDrawerOpen(true)}>
+            <Box sx={floatingCartBubble}>{cartItemCount}</Box>
+            <ShoppingCartOutlined />
+            <Box>
+              <Typography fontWeight={900} fontSize={13}>
+                Cart
+              </Typography>
+              <Typography variant="caption">{money(total, currency)}</Typography>
+            </Box>
+            <ChevronRight fontSize="small" />
+          </Box>
+
+          <Box
+            sx={{
+              ...drawerOverlayStyle,
+              opacity: cartDrawerOpen ? 1 : 0,
+              pointerEvents: cartDrawerOpen ? "auto" : "none",
+            }}
+            onClick={() => setCartDrawerOpen(false)}
+          />
+
+          <Box
+            sx={{
+              ...cartDrawerStyle,
+              transform: cartDrawerOpen ? "translateX(0)" : "translateX(105%)",
+            }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography fontWeight={900} fontSize={22}>
+                Quick Cart
+              </Typography>
+              <IconButton onClick={() => setCartDrawerOpen(false)}>
+                <Close />
+              </IconButton>
+            </Stack>
+
+            <Stack gap={1.2} sx={{ flex: 1, overflowY: "auto", pr: 1, ...scrollbarStyle }}>
+              {cart.map((item) => (
+                <Box key={item.saleItemId} sx={miniCartItemStyle}>
+                  <Box sx={cartInitialStyle}>{getInitials(item.itemName)}</Box>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography fontWeight={800}>{item.itemName}</Typography>
+                    <Typography variant="body2" color="#64748B">
+                      {item.saleQuantity} x {money(item.salePrice, currency)}
+                    </Typography>
+                  </Box>
+                  <Typography fontWeight={900}>{money(getLineTotal(item), currency)}</Typography>
+                </Box>
+              ))}
+            </Stack>
+
+            <Divider sx={{ my: 2 }} />
+
+            <Stack direction="row" justifyContent="space-between" mb={2}>
+              <Typography fontWeight={900}>Total</Typography>
+              <Typography fontWeight={900}>{money(total, currency)}</Typography>
+            </Stack>
+
+            <Button
+              fullWidth
+              variant="contained"
+              sx={{ ...greenButton, mb: 1.2 }}
+              onClick={() => {
+                setCartDrawerOpen(false);
+                openCheckout();
+              }}
+              disabled={!canCheckout}
+            >
+              Checkout
+            </Button>
+
+            <Button fullWidth variant="outlined" onClick={() => setCartDrawerOpen(false)} sx={{ borderRadius: 2.5 }}>
+              Continue Shopping
+            </Button>
+          </Box>
+        </>
+      )}
+
+      <Snackbar
+        open={showAddedNotice}
+        autoHideDuration={1800}
+        onClose={() => setShowAddedNotice(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="success"
+          variant="filled"
+          onClose={() => setShowAddedNotice(false)}
+          sx={{ borderRadius: 3, fontWeight: 800 }}
+        >
+          {lastAdded?.itemName} added to cart - {money(lastAdded?.salePrice, currency)}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={feedback.open}
+        autoHideDuration={3000}
+        onClose={() => setFeedback((current) => ({ ...current, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert
+          severity={feedback.severity}
+          variant="filled"
+          onClose={() => setFeedback((current) => ({ ...current, open: false }))}
+          sx={{ borderRadius: 3, fontWeight: 700 }}
+        >
+          {feedback.message}
+        </Alert>
+      </Snackbar>
+
+      <Dialog
+        open={showCheckout}
+        onClose={() => !isSubmittingSale && setShowCheckout(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 4 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900 }}>Checkout</DialogTitle>
+        <DialogContent dividers>
+          <Stack gap={2.2}>
+            <Box sx={checkoutTotalStyle}>
+              <Typography color="#64748B" fontWeight={800}>
+                TOTAL TO PAY
+              </Typography>
+              <Typography fontSize={34} fontWeight={950} color="#237B49">
+                {money(total, currency)}
+              </Typography>
+              {selectedCustomer && (
+                <Typography color="#64748B" mt={1}>
+                  Customer: {selectedCustomer.custName}
+                </Typography>
+              )}
+            </Box>
+
+            <FormControl fullWidth>
+              <Typography fontWeight={800} mb={0.8}>
+                Payment Method
+              </Typography>
+              <Select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
+                <MenuItem value="Cash">Cash</MenuItem>
+                <MenuItem value="Mobile Money">Mobile Money</MenuItem>
+                <MenuItem value="Bank">Bank</MenuItem>
+                <MenuItem value="Credit">Credit</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Box>
+              <Typography fontWeight={800} mb={0.8}>
+                Amount Paid
+              </Typography>
+              <TextField
+                fullWidth
+                type="number"
+                value={amountPaid}
+                onChange={(event) => setAmountPaid(event.target.value)}
+                placeholder="Enter amount paid"
+              />
+            </Box>
+
+            <Box sx={checkoutAdjustmentGridStyle}>
+              <Box sx={checkoutAdjustmentCardStyle}>
+                <Typography fontWeight={800} mb={1}>
+                  Discount
+                </Typography>
+                <Stack direction="row" gap={1} mb={1.2}>
+                  <Button
+                    onClick={() => setDiscountType("amount")}
+                    sx={discountType === "amount" ? modeButtonActiveStyle : modeButtonStyle}
+                  >
+                    Amount
+                  </Button>
+                  <Button
+                    onClick={() => setDiscountType("percent")}
+                    sx={discountType === "percent" ? modeButtonActiveStyle : modeButtonStyle}
+                  >
+                    Percent
+                  </Button>
+                </Stack>
+                <TextField
+                  fullWidth
+                  type="number"
+                  value={discountValue}
+                  onChange={(event) => setDiscountValue(event.target.value)}
+                  placeholder={discountType === "percent" ? "Enter discount %" : "Enter discount amount"}
+                  inputProps={discountType === "percent" ? { min: 0, max: 100 } : { min: 0 }}
+                />
+              </Box>
+
+              <Box sx={checkoutAdjustmentCardStyle}>
+                <Typography fontWeight={800} mb={1}>
+                  Tax
+                </Typography>
+                <Stack direction="row" gap={1} mb={1.2} flexWrap="wrap">
+                  <Button
+                    onClick={() => setTaxType("none")}
+                    sx={taxType === "none" ? modeButtonActiveStyle : modeButtonStyle}
+                  >
+                    None
+                  </Button>
+                  <Button
+                    onClick={() => setTaxType("percent")}
+                    sx={taxType === "percent" ? modeButtonActiveStyle : modeButtonStyle}
+                  >
+                    Percent
+                  </Button>
+                  <Button
+                    onClick={() => setTaxType("amount")}
+                    sx={taxType === "amount" ? modeButtonActiveStyle : modeButtonStyle}
+                  >
+                    Amount
+                  </Button>
+                </Stack>
+                <TextField
+                  fullWidth
+                  type="number"
+                  value={taxType === "none" ? "" : taxValue}
+                  onChange={(event) => setTaxValue(event.target.value)}
+                  placeholder={
+                    taxType === "amount"
+                      ? "Enter tax amount"
+                      : taxType === "percent"
+                        ? "Enter tax %"
+                        : "Tax disabled"
+                  }
+                  disabled={taxType === "none"}
+                  inputProps={taxType === "percent" ? { min: 0, max: 100 } : { min: 0 }}
+                />
+              </Box>
+            </Box>
+
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
+              {[5000, 10000, 20000, 50000, 100000, total].map((amount, index) => (
+                <Button
+                  key={`${amount}-${index}`}
+                  sx={quickAmount}
+                  onClick={() => setAmountPaid(String(amount))}
+                >
+                  {index === 5 ? "Exact" : money(amount, currency)}
+                </Button>
+              ))}
+            </Box>
+
+            {requiresDueDate && (
+              <>
+                <Alert severity={debtSalesAllowed ? "warning" : "error"} sx={{ borderRadius: 3 }}>
+                  {debtSalesAllowed
+                    ? "This payment leaves a balance. Completing the sale will require confirmation and record the balance as customer debt."
+                    : "Debt sales are disabled for this branch. Collect full payment to complete this sale."}
+                </Alert>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Balance due date"
+                  value={creditEndDate}
+                  onChange={(event) => setCreditEndDate(event.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  helperText="Required for any sale that leaves an outstanding balance."
+                  disabled={!debtSalesAllowed}
+                />
+              </>
+            )}
+
+            <TextField
+              fullWidth
+              multiline
+              minRows={2}
+              label="Payment note / reference"
+              value={paymentNote}
+              onChange={(event) => setPaymentNote(event.target.value)}
+            />
+
+            <Box sx={checkoutSummaryStyle}>
+              <TotalRow label="Subtotal" value={money(subtotal, currency)} />
+              <TotalRow label={discountSummaryLabel} value={`-${money(discountAmount, currency)}`} danger />
+              <TotalRow label={taxSummaryLabel} value={money(taxAmount, currency)} />
+              <Divider />
+              <TotalRow
+                label={changeDue >= 0 ? "Change" : "Balance Due"}
+                value={money(Math.abs(changeDue), currency)}
+                danger={changeDue < 0}
+              />
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setShowCheckout(false)}
+            sx={{ borderRadius: 2, fontWeight: 800 }}
+            disabled={isSubmittingSale}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            sx={greenButton}
+            onClick={completeCheckout}
+            disabled={!canCompleteCheckout}
+          >
+            {isSubmittingSale ? "Completing..." : "Complete Sale"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={debtAlertOpen}
+        onClose={() => !isSubmittingSale && setDebtAlertOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 4 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900 }}>Record Balance As Debt?</DialogTitle>
+        <DialogContent dividers>
+          <Stack gap={2}>
+            <Alert severity="warning" sx={{ borderRadius: 3 }}>
+              The customer has paid less than the sale total. Confirming will complete the sale
+              and record the remaining balance as customer debt.
+            </Alert>
+
+            <Box sx={checkoutSummaryStyle}>
+              <TotalRow label="Sale total" value={money(total, currency)} />
+              <TotalRow label="Amount paid" value={money(tenderedAmount, currency)} />
+              <Divider />
+              <TotalRow label="Debt balance" value={money(dueAmount, currency)} danger />
+              <TotalRow
+                label="Due date"
+                value={creditEndDate ? new Date(creditEndDate).toLocaleDateString() : "Required"}
+                danger={!creditEndDate}
+              />
+            </Box>
+
+            {selectedCustomer ? (
+              <Typography color="#64748B">
+                Debt will be linked to {selectedCustomer.custName}.
+              </Typography>
+            ) : null}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setDebtAlertOpen(false)}
+            sx={{ borderRadius: 2, fontWeight: 800 }}
+            disabled={isSubmittingSale}
+          >
+            Review Payment
+          </Button>
+          <Button
+            variant="contained"
+            sx={greenButton}
+            onClick={() => completeCheckout({ confirmDebt: true })}
+            disabled={isSubmittingSale || !creditEndDate}
+          >
+            {isSubmittingSale ? "Completing..." : "Confirm Debt & Complete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={showHeldSales}
+        onClose={() => setShowHeldSales(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 4 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900 }}>Held Sales</DialogTitle>
+        <DialogContent dividers>
+          {heldSales.length === 0 ? (
+            <Stack alignItems="center" justifyContent="center" sx={{ py: 5 }} color="#94A3B8">
+              <PauseCircleOutline sx={{ fontSize: 44, mb: 1 }} />
+              <Typography>No held sales yet.</Typography>
+            </Stack>
+          ) : (
+            <Stack gap={1.5}>
+              {heldSales.map((sale) => (
+                <Box key={sale.id} sx={heldSaleItemStyle}>
+                  <Box>
+                    <Typography fontWeight={900}>
+                      {sale.customerName || "Selected customer"}
+                    </Typography>
+                    <Typography variant="body2" color="#64748B">
+                      {sale.items.length} items - {sale.time}
+                    </Typography>
+                  </Box>
+                  <Typography fontWeight={900}>{money(sale.total, currency)}</Typography>
+                  <Stack direction="row" gap={1}>
+                    <Button size="small" variant="contained" sx={greenButton} onClick={() => resumeHeldSale(sale.id)}>
+                      Resume
+                    </Button>
+                    <IconButton color="error" onClick={() => deleteHeldSale(sale.id)}>
+                      <DeleteOutline />
+                    </IconButton>
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setShowHeldSales(false)} sx={{ borderRadius: 2, fontWeight: 800 }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <AmplaReceipt
+        show={receiptOpen}
+        onClose={handleReceiptClose}
+        companyInfo={companyProfile}
+        customerName={completedSale?.customerName}
+        cart={completedSale?.cart || []}
+        saleDetails={completedSale?.saleDetails || {}}
+      />
+    </Box>
   );
 }
 
-export default PosPage;
+function TotalRow({ label, value, danger }) {
+  return (
+    <Stack direction="row" justifyContent="space-between">
+      <Typography color="#64748B">{label}</Typography>
+      <Typography fontWeight={700} color={danger ? "#EF4444" : "#334155"}>
+        {value}
+      </Typography>
+    </Stack>
+  );
+}
+
+const scrollbarStyle = {
+  scrollbarWidth: "thin",
+  scrollbarColor: "#c3d4c8 #eef5f0",
+  "&::-webkit-scrollbar": {
+    width: 8,
+    height: 8,
+  },
+  "&::-webkit-scrollbar-track": {
+    backgroundColor: "#eef5f0",
+    borderRadius: 999,
+  },
+  "&::-webkit-scrollbar-thumb": {
+    backgroundColor: "#c3d4c8",
+    borderRadius: 999,
+    border: "2px solid #eef5f0",
+  },
+  "&::-webkit-scrollbar-thumb:hover": {
+    backgroundColor: "#9bb8a3",
+  },
+};
+
+const loadingShellStyle = {
+  minHeight: "70vh",
+  display: "grid",
+  placeItems: "center",
+  p: 3,
+};
+
+const pageOuterStyle = {
+  minHeight: "100vh",
+  overflowY: "auto",
+  overflowX: "hidden",
+  bgcolor: "#F8FCF9",
+  p: { xs: 2, md: 3 },
+};
+
+const pageInnerStyle = {
+  maxWidth: 1500,
+  mx: "auto",
+  width: "100%",
+  minHeight: "100%",
+  pr: { xs: 0, md: 1 },
+  pb: { xs: 12, md: 8 },
+  ...scrollbarStyle,
+};
+
+const mainGridStyle = {
+  display: "grid",
+  gridTemplateColumns: { xs: "1fr", lg: "1fr", xl: "1fr 420px" },
+  gap: 2.5,
+};
+
+const toolbarStyle = {
+  p: 2,
+  borderBottom: "1px solid #E7EFE9",
+  display: "grid",
+  gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr auto auto" },
+  gap: 1.5,
+};
+
+const productGridStyle = {
+  display: "grid",
+  gridTemplateColumns: { xs: "repeat(2, 1fr)", md: "repeat(3, 1fr)", xl: "repeat(4, 1fr)" },
+  gap: 1.2,
+};
+
+const productListStyle = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: 1,
+};
+
+const productListCardStyle = {
+  p: 1.2,
+  display: "grid",
+  gridTemplateColumns: { xs: "48px 1fr", md: "52px minmax(180px, 1fr) 90px 80px 130px 80px" },
+  gap: 1.5,
+  alignItems: "center",
+  borderRadius: 2.5,
+  border: "1px solid #E7EFE9",
+  boxShadow: "0 6px 18px rgba(15,23,42,.035)",
+  cursor: "pointer",
+  transition: ".2s ease",
+  "&:hover": { transform: "translateY(-2px)", borderColor: "rgba(47,143,87,.35)", bgcolor: "#FBFEFC" },
+};
+
+const checkoutTotalStyle = {
+  p: 2,
+  borderRadius: 3,
+  bgcolor: "#E8F5EC",
+  border: "1px solid #D7EBDD",
+  textAlign: "center",
+};
+
+const checkoutSummaryStyle = {
+  display: "grid",
+  gap: 1.1,
+  p: 2,
+  borderRadius: 3,
+  bgcolor: "#FBFEFC",
+  border: "1px solid #E7EFE9",
+};
+
+const checkoutAdjustmentGridStyle = {
+  display: "grid",
+  gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+  gap: 1.5,
+};
+
+const checkoutAdjustmentCardStyle = {
+  p: 2,
+  borderRadius: 3,
+  bgcolor: "#FBFEFC",
+  border: "1px solid #E7EFE9",
+};
+
+const floatingCartFabStyle = {
+  display: { xs: "flex", xl: "none" },
+  position: "fixed",
+  right: 18,
+  bottom: 18,
+  zIndex: 1300,
+  bgcolor: "#14231B",
+  color: "#fff",
+  borderRadius: "18px",
+  px: 2,
+  py: 1.4,
+  gap: 1.2,
+  alignItems: "center",
+  boxShadow: "0 18px 50px rgba(0,0,0,.28)",
+  cursor: "pointer",
+};
+
+const floatingCartBubble = {
+  width: 28,
+  height: 28,
+  borderRadius: "50%",
+  bgcolor: "#2F8F57",
+  display: "grid",
+  placeItems: "center",
+  fontWeight: 900,
+  fontSize: 12,
+};
+
+const drawerOverlayStyle = {
+  display: { xs: "block", xl: "none" },
+  position: "fixed",
+  inset: 0,
+  bgcolor: "rgba(15,23,42,.35)",
+  zIndex: 1390,
+  transition: ".25s",
+};
+
+const cartDrawerStyle = {
+  display: { xs: "flex", xl: "none" },
+  flexDirection: "column",
+  position: "fixed",
+  top: 0,
+  right: 0,
+  width: "92%",
+  maxWidth: 420,
+  height: "100vh",
+  bgcolor: "#fff",
+  zIndex: 1400,
+  p: 2.5,
+  transition: ".3s ease",
+  boxShadow: "-20px 0 50px rgba(15,23,42,.18)",
+};
+
+const miniCartItemStyle = {
+  display: "grid",
+  gridTemplateColumns: "52px 1fr auto",
+  gap: 1,
+  alignItems: "center",
+  p: 1,
+  border: "1px solid #E7EFE9",
+  borderRadius: 3,
+};
+
+const heldSaleItemStyle = {
+  display: "grid",
+  gridTemplateColumns: { xs: "1fr", sm: "1fr auto auto" },
+  gap: 1.5,
+  alignItems: "center",
+  p: 1.5,
+  borderRadius: 3,
+  border: "1px solid #E7EFE9",
+  bgcolor: "#FBFEFC",
+};
+
+const cartCardStyle = {
+  borderRadius: 4,
+  border: "1px solid #E7EFE9",
+  boxShadow: "0 16px 40px rgba(15, 23, 42, 0.06)",
+  overflow: "hidden",
+  alignSelf: "start",
+  position: { xl: "sticky" },
+  top: 20,
+  maxHeight: { xl: "calc(100vh - 120px)" },
+  display: "flex",
+  flexDirection: "column",
+};
+
+const cartItemsStyle = {
+  p: 2.5,
+  minHeight: 250,
+  maxHeight: "50vh",
+  overflowY: "auto",
+  flex: 1,
+  ...scrollbarStyle,
+};
+
+const cartItemStyle = {
+  display: "grid",
+  gridTemplateColumns: { xs: "54px 1fr", sm: "54px 1fr auto" },
+  gap: 1.5,
+  alignItems: "center",
+};
+
+const quickPayStyle = {
+  p: 2,
+  display: "grid",
+  gridTemplateColumns: { xs: "repeat(2, 1fr)", md: "repeat(6, 1fr)" },
+  gap: 1.5,
+};
+
+const cardStyle = {
+  borderRadius: 4,
+  border: "1px solid #E7EFE9",
+  boxShadow: "0 16px 40px rgba(15, 23, 42, 0.06)",
+  overflow: "hidden",
+};
+
+const greenButton = {
+  borderRadius: 2.5,
+  bgcolor: "#2F8F57",
+  fontWeight: 800,
+  textTransform: "none",
+  boxShadow: "0 10px 25px rgba(47,143,87,.22)",
+  "&:hover": { bgcolor: "#267347" },
+};
+
+const chipStyle = {
+  bgcolor: "#E8F5EC",
+  color: "#237B49",
+  fontWeight: 800,
+  px: 1,
+};
+
+const activeIconStyle = {
+  bgcolor: "#2F8F57",
+  color: "white",
+  borderRadius: 2,
+  "&:hover": { bgcolor: "#267347" },
+};
+
+const plainIconStyle = {
+  bgcolor: "#F4FAF5",
+  color: "#64748B",
+  borderRadius: 2,
+};
+
+const productCardStyle = {
+  borderRadius: 2.5,
+  border: "1px solid #E7EFE9",
+  boxShadow: "0 6px 18px rgba(15,23,42,.04)",
+  cursor: "pointer",
+  minHeight: 190,
+  transition: ".2s ease",
+  "& .MuiCardContent-root": { padding: "14px !important" },
+  "&:hover": { transform: "translateY(-4px)", borderColor: "rgba(47,143,87,.35)" },
+};
+
+const productInitialStyle = {
+  width: 52,
+  height: 52,
+  borderRadius: 2,
+  bgcolor: "#E8F5EC",
+  border: "1px solid #D7EBDD",
+  color: "#237B49",
+  display: "grid",
+  placeItems: "center",
+  fontSize: 16,
+  fontWeight: 900,
+};
+
+const cartInitialStyle = {
+  width: 52,
+  height: 52,
+  borderRadius: 2.5,
+  bgcolor: "#E8F5EC",
+  border: "1px solid #D7EBDD",
+  color: "#237B49",
+  display: "grid",
+  placeItems: "center",
+  fontSize: 16,
+  fontWeight: 900,
+};
+
+const qtyButton = {
+  width: 30,
+  height: 30,
+  border: "1px solid #E7EFE9",
+  borderRadius: 2,
+};
+
+const adjustmentChip = {
+  bgcolor: "#F4FAF5",
+  color: "#486353",
+  border: "1px solid #E7EFE9",
+  fontWeight: 800,
+};
+
+const adjustmentChipActive = {
+  ...adjustmentChip,
+  bgcolor: "#E8F5EC",
+  color: "#237B49",
+  borderColor: "#D7EBDD",
+};
+
+const holdButtonStyle = {
+  height: 54,
+  borderRadius: 2.5,
+  bgcolor: "#9AA3AF",
+  fontWeight: 800,
+  "&:hover": { bgcolor: "#7E8794" },
+};
+
+const quickAmount = {
+  height: 54,
+  borderRadius: 2.5,
+  bgcolor: "#FFFFFF",
+  border: "1px solid #E7EFE9",
+  color: "#237B49",
+  fontWeight: 900,
+  textTransform: "none",
+  "&:hover": { bgcolor: "#E8F5EC" },
+};
+
+const modeButtonStyle = {
+  flex: 1,
+  minWidth: 0,
+  borderRadius: 2.5,
+  border: "1px solid #E7EFE9",
+  bgcolor: "#FFFFFF",
+  color: "#486353",
+  fontWeight: 800,
+  textTransform: "none",
+  "&:hover": { bgcolor: "#F4FAF5" },
+};
+
+const modeButtonActiveStyle = {
+  ...modeButtonStyle,
+  bgcolor: "#E8F5EC",
+  color: "#237B49",
+  borderColor: "#D7EBDD",
+};
+
+const linePriceToggle = {
+  minWidth: 0,
+  px: 1.25,
+  py: 0.45,
+  borderRadius: 999,
+  border: "1px solid #DCE8DF",
+  bgcolor: "#FFFFFF",
+  color: "#64748B",
+  fontWeight: 800,
+  fontSize: 11,
+  lineHeight: 1,
+  textTransform: "none",
+  "&:hover": { bgcolor: "#F4FAF5" },
+};
+
+const linePriceToggleActive = {
+  ...linePriceToggle,
+  bgcolor: "#E8F5EC",
+  color: "#237B49",
+  borderColor: "#CFE5D6",
+};
+
+const pagerButton = {
+  minWidth: 36,
+  borderRadius: 2,
+  color: "#64748B",
+  fontWeight: 800,
+};
+
+const pagerActive = {
+  ...pagerButton,
+  bgcolor: "#2F8F57",
+  color: "white",
+  "&:hover": { bgcolor: "#267347" },
+};
+
+const stockChipStyle = {
+  bgcolor: "#DFF3E6",
+  color: "#237B49",
+  fontWeight: 800,
+};
+
+const outOfStockChipStyle = {
+  bgcolor: "#FFE5E5",
+  color: "#D94A4A",
+  fontWeight: 800,
+};
+
+const inCartChipStyle = {
+  bgcolor: "#2F8F57",
+  color: "#FFFFFF",
+  fontWeight: 900,
+};
