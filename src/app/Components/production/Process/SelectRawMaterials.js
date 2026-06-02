@@ -192,7 +192,8 @@ const RawMaterialModal = () => {
       return "Unknown";
     }
 
-    return material.materialCode ? `${material.name} (${material.materialCode})` : material.name;
+    const identifiers = [material.materialCode, material.rawMaterialBarcode].filter(Boolean).join(" / ");
+    return identifiers ? `${material.name} (${identifiers})` : material.name;
   };
 
   return (
@@ -218,7 +219,9 @@ const RawMaterialModal = () => {
   <option value="">-- Select --</option>
   {filteredRawMaterials.map((material) => (
     <option key={material.materialId} value={material.materialId}>
-      {material.materialCode ? `${material.materialCode} - ` : ""}{material.name} ({material.Quantity} {material.unitOfMeasure || "pcs"} available)
+      {[material.materialCode, material.rawMaterialBarcode].filter(Boolean).join(" / ")}
+      {material.materialCode || material.rawMaterialBarcode ? " - " : ""}
+      {material.name} ({material.Quantity} {material.unitOfMeasure || "pcs"} available)
     </option>
   ))}
 </Form.Select>

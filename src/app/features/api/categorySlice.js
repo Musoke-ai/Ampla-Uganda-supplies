@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from '../api/apiSlice';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 
 const categoriesAdapter = createEntityAdapter({
     selectId: (categories) => categories.categoryId,
-sortComparer: (a, b) => (b.categoryDateCreated || "").localeCompare(a.categoryDateCreated || "")
+sortComparer: (a, b) => compareDesc(a.categoryDateCreated, b.categoryDateCreated)
 })
 
 const initialState = categoriesAdapter.getInitialState();
@@ -18,7 +19,7 @@ export const extendedCatApiSlice = apiSlice.injectEndpoints({
         getCategories: builder.query({
             query: () => '/categories',
             transformResponse:  responseData => {
-            return categoriesAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : [])
+            return categoriesAdapter.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
         }),

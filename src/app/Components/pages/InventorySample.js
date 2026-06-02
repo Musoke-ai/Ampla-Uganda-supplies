@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Container,
   Row,
@@ -25,16 +25,27 @@ import {
   PencilSquare,
   Search,
   Trash,
+  UpcScan,
   XCircle,
+  Camera,
+  PlusCircle,
+  Stars,
 } from "react-bootstrap-icons";
 import "./InventorySample.css";
 
+import BarcodeScannerDialog from "../BarcodeScannerDialog";
+import ImageCaptureDialog from "../ImageCaptureDialog";
 import CategoryManagement from "../production/CategoryManagement";
 import { useSettings } from "../Settings";
 import PermissionWrapper from "../../auth/PermissionWrapper";
 import { selectBranchScope } from "../../auth/authSlice";
 import { selectBranches, useGetBranchesQuery } from "../../features/api/branchesSlice";
-import { selectCategories, useGetCategoriesQuery } from "../../features/api/categorySlice";
+import {
+  selectCategories,
+  useAddCategoryMutation,
+  useGetCategoriesQuery,
+} from "../../features/api/categorySlice";
+import { useAnalyzeCatalogImageMutation } from "../../features/api/catalogImageAnalysisSlice";
 import {
   selectStock,
   useAddStockMutation,
@@ -60,6 +71,84 @@ const palette = {
   shadow: "0 12px 32px rgba(15, 23, 42, 0.05)",
 };
 
+const API_ROOT = (process.env.REACT_APP_API_BASE_URL || "").replace(/\/api\/?$/, "");
+
+const assetUrl = (path) => {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_ROOT}/${String(path).replace(/^\/+/, "")}`;
+};
+
+const toProductFormData = (itemData) => {
+  const formData = new FormData();
+  const fields = {
+    itemId: itemData.itemId,
+    branchId: itemData.branchId,
+    item_name: itemData.itemName,
+    item_category: itemData.itemCategoryId,
+    item_model: itemData.itemModel,
+    item_sku: itemData.itemSku,
+    item_barcode: itemData.itemBarcode,
+    item_brand: itemData.itemBrand,
+    item_product_type: itemData.itemProductType,
+    item_unit: itemData.itemUnit,
+    item_supplier: itemData.itemSupplier,
+    item_reorder_level: itemData.itemReorderLevel,
+    item_quality: itemData.itemQuality,
+    item_quantity: itemData.itemQuantity,
+    item_condition: itemData.itemCondition,
+    item_size: itemData.itemSize,
+    item_min_price: itemData.itemLeastPrice,
+    item_wholesale_price: itemData.itemWholesalePrice,
+    item_notes: itemData.itemNotes,
+    item_owner: itemData.itemOwner,
+    item_stock_price: itemData.itemStockPrice,
+  };
+
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) formData.append(key, value);
+  });
+
+  if (itemData.itemImageFile) {
+    formData.append("item_image", itemData.itemImageFile);
+  }
+
+  return formData;
+};
+
+const productAnalysisLabels = {
+  itemName: "Item name",
+  itemDescription: "Description",
+  itemBrand: "Brand",
+  itemModel: "Model",
+  itemSku: "SKU / product code",
+  itemBarcode: "Barcode",
+  itemUnit: "Unit",
+  itemQuality: "Quality",
+  itemCondition: "Condition",
+  itemSize: "Size",
+  itemNotes: "Notes",
+};
+
+const buildAnalysisSummary = (fields = {}, labels = {}) =>
+  Object.entries(fields)
+    .filter(([, value]) => String(value || "").trim())
+    .map(([key, value]) => ({
+      key,
+      label: labels[key] || key,
+      value: String(value || "").trim(),
+    }));
+
+const readableErrorMessage = (error, fallback) => {
+  const message = error?.data?.message || error?.data?.error || error?.error || fallback;
+
+  if (typeof message === "string") return message;
+  if (Array.isArray(message)) return message.filter(Boolean).join(" ");
+  if (message && typeof message === "object") return Object.values(message).filter(Boolean).join(" ");
+
+  return fallback;
+};
+
 export default function InventoryPage() {
   const { settings } = useSettings();
   const currency = settings?.currency !== "none" ? settings?.currency : "UGX";
@@ -70,7 +159,7 @@ export default function InventoryPage() {
     : "";
 
   useGetBranchesQuery();
-  useGetCategoriesQuery();
+  const { refetch: refetchCategories } = useGetCategoriesQuery();
 
   const {
     isLoading: isStockLoading,
@@ -85,10 +174,13 @@ export default function InventoryPage() {
     itemId: null,
     branchId: currentBranchId,
     itemName: "",
-    itemCategoryId: "1",
+    itemCategoryId: "",
     itemModel: "",
     itemSku: "",
     itemBarcode: "",
+    itemImage: "",
+    itemImageFile: null,
+    itemImagePreview: "",
     itemBrand: "",
     itemProductType: "purchased",
     itemUnit: "pcs",
@@ -107,6 +199,8 @@ export default function InventoryPage() {
   const [createInventory, { isLoading: isCreating }] = useAddStockMutation();
   const [deleteInventory, { isLoading: isDeleteLoading }] = useDeleteStockMutation();
   const [updateInventory, { isLoading: isUpdateLoading }] = useUpdateStockMutation();
+  const [quickAddCategory, { isLoading: isQuickAddingCategory }] = useAddCategoryMutation();
+  const [analyzeCatalogImage, { isLoading: isAnalyzingImage }] = useAnalyzeCatalogImageMutation();
 
 
   const [showFormModal, setShowFormModal] = useState(false);
@@ -120,6 +214,17 @@ export default function InventoryPage() {
   });
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
+  const [imageCaptureOpen, setImageCaptureOpen] = useState(false);
+  const [quickCategoryName, setQuickCategoryName] = useState("");
+  const [imageAnalysisNote, setImageAnalysisNote] = useState("");
+  const [imageAnalysisAlert, setImageAnalysisAlert] = useState(null);
+  const [imageAnalysisSummary, setImageAnalysisSummary] = useState([]);
+  const [saveFeedback, setSaveFeedback] = useState(null);
+  const productModalCloseGuardRef = useRef(false);
+  const pendingProductCaptureFileRef = useRef(null);
+  const recentBarcodeScanRef = useRef({ value: "", time: 0 });
+  const [forceProductModalOpen, setForceProductModalOpen] = useState(false);
 
   const formatCurrency = (amount) =>
     `${currency} ${Number(amount || 0).toLocaleString(undefined, {
@@ -142,6 +247,8 @@ export default function InventoryPage() {
         (item) =>
           String(item.itemName || "").toLowerCase().includes(normalizedFilter) ||
           String(item.itemModel || "").toLowerCase().includes(normalizedFilter) ||
+          String(item.itemSku || "").toLowerCase().includes(normalizedFilter) ||
+          String(item.itemBarcode || "").toLowerCase().includes(normalizedFilter) ||
           String(branchMap.get(String(item.branchId)) || "")
             .toLowerCase()
             .includes(normalizedFilter)
@@ -228,13 +335,244 @@ export default function InventoryPage() {
   }, [currentItem.itemLeastPrice, currentItem.itemStockPrice, currentItem.itemWholesalePrice]);
 
   const handleShowFormModal = (item) => {
-    setCurrentItem(item ? { ...item } : createInitialFormState());
+    setSaveFeedback(null);
+    setImageAnalysisAlert(null);
+    setForceProductModalOpen(false);
+    setCurrentItem(
+      item
+        ? { ...item, itemImageFile: null, itemImagePreview: assetUrl(item.itemImage) }
+        : createInitialFormState()
+    );
     setShowFormModal(true);
   };
 
   const handleCloseFormModal = () => {
+    if (isCreating || isUpdateLoading || isAnalyzingImage || imageCaptureOpen || productModalCloseGuardRef.current) return;
     setShowFormModal(false);
     setCurrentItem(createInitialFormState());
+    setQuickCategoryName("");
+    setImageAnalysisNote("");
+    setImageAnalysisAlert(null);
+    setImageAnalysisSummary([]);
+    setSaveFeedback(null);
+    setForceProductModalOpen(false);
+  };
+
+  const handleProductBarcodeDetected = (barcode) => {
+    const cleanBarcode = String(barcode || "").trim();
+    const now = Date.now();
+
+    if (
+      !cleanBarcode ||
+      (recentBarcodeScanRef.current.value === cleanBarcode && now - recentBarcodeScanRef.current.time < 2500)
+    ) {
+      return;
+    }
+
+    recentBarcodeScanRef.current = { value: cleanBarcode, time: now };
+    setCurrentItem((item) => ({ ...item, itemBarcode: cleanBarcode }));
+    setFilter(cleanBarcode);
+    setBarcodeScannerOpen(false);
+    toast.success(`Barcode detected: ${cleanBarcode}`, { toastId: `product-barcode-${cleanBarcode}` });
+  };
+
+  const applyProductImageFile = (file) => {
+    setImageAnalysisNote("");
+    setImageAnalysisAlert(null);
+    setImageAnalysisSummary([]);
+    setCurrentItem((item) => ({
+      ...item,
+      itemImageFile: file,
+      itemImagePreview: file ? URL.createObjectURL(file) : assetUrl(item.itemImage),
+    }));
+  };
+
+  const matchProductCategory = (categoryName) => {
+    const normalized = String(categoryName || "").trim().toLowerCase();
+    if (!normalized) return null;
+
+    return (
+      categories.find((category) => String(category.categoryName || "").toLowerCase() === normalized) ||
+      categories.find((category) => {
+        const candidate = String(category.categoryName || "").toLowerCase();
+        return candidate.includes(normalized) || normalized.includes(candidate);
+      }) ||
+      null
+    );
+  };
+
+  const applyProductImageAnalysis = (analysis) => {
+    const fields = analysis?.fields || {};
+    const summary = buildAnalysisSummary(fields, productAnalysisLabels);
+    const suggestedCategory =
+      analysis?.suggestedCategoryId
+        ? categories.find((category) => String(category.categoryId) === String(analysis.suggestedCategoryId))
+        : matchProductCategory(analysis?.matchedCategoryName || analysis?.suggestedCategoryName);
+
+    setCurrentItem((item) => {
+      const next = { ...item };
+      const shouldFill = (key, defaults = []) => {
+        const value = String(next[key] || "").trim();
+        return !value || defaults.map(String).includes(value);
+      };
+
+      [
+        "itemName",
+        "itemBrand",
+        "itemModel",
+        "itemSku",
+        "itemBarcode",
+        "itemUnit",
+        "itemQuality",
+        "itemCondition",
+        "itemSize",
+        "itemNotes",
+      ].forEach((key) => {
+        const defaults =
+          key === "itemUnit"
+            ? ["pcs"]
+            : key === "itemQuality"
+              ? ["New"]
+              : key === "itemCondition"
+                ? ["Good"]
+                : [];
+
+        if (fields[key] && shouldFill(key, defaults)) {
+          next[key] = fields[key];
+        }
+      });
+
+      if (fields.itemDescription && shouldFill("itemNotes")) {
+        next.itemNotes = fields.itemDescription;
+      }
+
+      if (suggestedCategory && (!next.itemCategoryId || next.itemCategoryId === "1")) {
+        next.itemCategoryId = String(suggestedCategory.categoryId);
+      }
+
+      return next;
+    });
+
+    setImageAnalysisSummary(summary);
+
+    if (suggestedCategory) {
+      setImageAnalysisNote(`Suggested category: ${suggestedCategory.categoryName}`);
+      setImageAnalysisAlert(null);
+    } else if (analysis?.suggestedCategoryName) {
+      setQuickCategoryName(analysis.suggestedCategoryName);
+      setImageAnalysisNote(`Suggested new category: ${analysis.suggestedCategoryName}`);
+      setImageAnalysisAlert(null);
+    } else {
+      setImageAnalysisNote(analysis?.notes || "Image checked. Confirm the fields before saving.");
+      setImageAnalysisAlert(null);
+    }
+  };
+
+  const analyzeProductImage = async (file = currentItem.itemImageFile, event = null) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    if (!file) {
+      toast.info("Capture or upload a product image first.");
+      return;
+    }
+
+    productModalCloseGuardRef.current = true;
+    setForceProductModalOpen(true);
+    setShowFormModal(true);
+    setImageAnalysisAlert({ type: "info", message: "Reading product image. Please wait..." });
+
+    try {
+      const response = await analyzeCatalogImage({
+        image: file,
+        type: "product",
+        branchId: currentItem.branchId || currentBranchId,
+      }).unwrap();
+      applyProductImageAnalysis(response);
+      setImageAnalysisAlert({ type: "success", message: "Product fields extracted from image. Review them before saving." });
+      toast.success("Product fields extracted from image.");
+    } catch (error) {
+      const message = readableErrorMessage(error, "Could not extract fields from this image.");
+      setImageAnalysisAlert({ type: "danger", message });
+      toast.error(message);
+    } finally {
+      setShowFormModal(true);
+      window.setTimeout(() => {
+        productModalCloseGuardRef.current = false;
+      }, 1200);
+    }
+  };
+
+  const handleProductImageCaptured = (file) => {
+    pendingProductCaptureFileRef.current = file;
+    productModalCloseGuardRef.current = true;
+    setForceProductModalOpen(true);
+    setShowFormModal(true);
+  };
+
+  useEffect(() => {
+    if (imageCaptureOpen || !pendingProductCaptureFileRef.current) {
+      return;
+    }
+
+    const file = pendingProductCaptureFileRef.current;
+    pendingProductCaptureFileRef.current = null;
+    productModalCloseGuardRef.current = true;
+    setForceProductModalOpen(true);
+    setShowFormModal(true);
+
+    window.setTimeout(() => {
+      setShowFormModal(true);
+      applyProductImageFile(file);
+      analyzeProductImage(file);
+    }, 0);
+  }, [imageCaptureOpen]);
+
+  const createQuickProductCategory = async (event = null) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    const categoryName = quickCategoryName.trim();
+    if (!categoryName) {
+      toast.error("Enter a category name first.");
+      return;
+    }
+
+    const existing = matchProductCategory(categoryName);
+    if (existing) {
+      setCurrentItem((item) => ({ ...item, itemCategoryId: String(existing.categoryId) }));
+      setQuickCategoryName("");
+      toast.success("Existing category selected.");
+      return;
+    }
+
+    try {
+      const response = await quickAddCategory({ category_name: categoryName }).unwrap();
+      const createdCategory = response?.data;
+      const refetchedCategories = await refetchCategories();
+      const categoriesAfterCreate = refetchedCategories?.data
+        ? Object.values(refetchedCategories.data.entities || {})
+        : [];
+      const createdOrMatchedCategory =
+        createdCategory ||
+        categoriesAfterCreate.find(
+          (category) =>
+            String(category?.categoryName || "").trim().toLowerCase() === categoryName.toLowerCase()
+        );
+
+      if (createdCategory?.categoryId) {
+        setCurrentItem((item) => ({ ...item, itemCategoryId: String(createdCategory.categoryId) }));
+      } else if (createdOrMatchedCategory?.categoryId) {
+        setCurrentItem((item) => ({
+          ...item,
+          itemCategoryId: String(createdOrMatchedCategory.categoryId),
+        }));
+      }
+      setQuickCategoryName("");
+      toast.success("Category created and selected.");
+    } catch (error) {
+      toast.error(error?.data?.message || "Could not create category.");
+    }
   };
 
   const handleShowDeleteModal = (item) => {
@@ -250,64 +588,43 @@ export default function InventoryPage() {
   const handleSaveItem = async (itemData) => {
     if (itemData.itemId) {
       try {
-        await updateInventory({
-          itemId: itemData.itemId,
-          branchId: itemData.branchId,
-          item_name: itemData.itemName,
-          item_category: itemData.itemCategoryId,
-          item_model: itemData.itemModel,
-          item_sku: itemData.itemSku,
-          item_barcode: itemData.itemBarcode,
-          item_brand: itemData.itemBrand,
-          item_product_type: itemData.itemProductType,
-          item_unit: itemData.itemUnit,
-          item_supplier: itemData.itemSupplier,
-          item_reorder_level: itemData.itemReorderLevel,
-          item_quality: itemData.itemQuality,
-          item_quantity: itemData.itemQuantity,
-          item_condition: itemData.itemCondition,
-          item_size: itemData.itemSize,
-          item_min_price: itemData.itemLeastPrice,
-          item_wholesale_price: itemData.itemWholesalePrice,
-          item_notes: itemData.itemNotes,
-          item_owner: itemData.itemOwner,
-          item_stock_price: itemData.itemStockPrice,
-        }).unwrap();
+        setSaveFeedback({ type: "info", message: "Updating item. Please wait..." });
+        await updateInventory(toProductFormData(itemData)).unwrap();
+        setSaveFeedback({ type: "success", message: "Item updated successfully." });
         toast.success("Item updated successfully.");
-        handleCloseFormModal();
+        window.setTimeout(() => {
+          setShowFormModal(false);
+          setForceProductModalOpen(false);
+          setCurrentItem(createInitialFormState());
+          setQuickCategoryName("");
+          setImageAnalysisNote("");
+          setImageAnalysisSummary([]);
+          setSaveFeedback(null);
+        }, 900);
       } catch (error) {
-        toast.error(error?.data?.message || error?.error || "Failed to update item.");
+        const message = error?.data?.message || error?.error || "Failed to update item.";
+        setSaveFeedback({ type: "danger", message });
+        toast.error(message);
       }
       return;
     }
 
     try {
-      await createInventory({
-        branchId: itemData.branchId,
-        item_name: itemData.itemName,
-        item_category: itemData.itemCategoryId,
-        item_model: itemData.itemModel,
-        item_sku: itemData.itemSku,
-        item_barcode: itemData.itemBarcode,
-        item_brand: itemData.itemBrand,
-        item_product_type: itemData.itemProductType,
-        item_unit: itemData.itemUnit,
-        item_supplier: itemData.itemSupplier,
-        item_reorder_level: itemData.itemReorderLevel,
-        item_quality: itemData.itemQuality,
-        item_quantity: itemData.itemQuantity,
-        item_condition: itemData.itemCondition,
-        item_size: itemData.itemSize,
-        item_min_price: itemData.itemLeastPrice,
-        item_wholesale_price: itemData.itemWholesalePrice,
-        item_notes: itemData.itemNotes,
-        item_owner: itemData.itemOwner,
-        item_stock_price: itemData.itemStockPrice,
-      }).unwrap();
+      setSaveFeedback({ type: "info", message: "Saving item. Please wait..." });
+      await createInventory(toProductFormData(itemData)).unwrap();
+      setSaveFeedback({ type: "success", message: "Item added successfully." });
       toast.success("Item added successfully.");
-      handleCloseFormModal();
+      window.setTimeout(() => {
+        setCurrentItem(createInitialFormState());
+        setQuickCategoryName("");
+        setImageAnalysisNote("");
+        setImageAnalysisSummary([]);
+        setSaveFeedback({ type: "success", message: "Item added successfully. You can add another item." });
+      }, 900);
     } catch (error) {
-      toast.error(error?.data?.message || error?.error || "Failed to add item.");
+      const message = error?.data?.message || error?.error || "Failed to add item.";
+      setSaveFeedback({ type: "danger", message });
+      toast.error(message);
     }
   };
 
@@ -453,7 +770,7 @@ export default function InventoryPage() {
             <PermissionWrapper
               required={["productscreate"]}
               children={
-                <Button onClick={() => handleShowFormModal(null)} style={addButtonStyle}>
+                <Button type="button" onClick={() => handleShowFormModal(null)} style={addButtonStyle}>
                   + Add New Item
                 </Button>
               }
@@ -553,7 +870,7 @@ export default function InventoryPage() {
                   <Search />
                 </InputGroup.Text>
                 <Form.Control
-                  placeholder="Search by item name, model, or branch..."
+                  placeholder="Search by item name, model, SKU, barcode, or branch..."
                   value={filter}
                   onChange={(event) => {
                     setFilter(event.target.value);
@@ -580,7 +897,7 @@ export default function InventoryPage() {
                     Item Name {getSortIcon("itemName")}
                   </th>
                   <th style={sortableHeaderStyle} onClick={() => requestSort("itemModel")}>
-                    Model / SKU {getSortIcon("itemModel")}
+                    Model / SKU / Barcode {getSortIcon("itemModel")}
                   </th>
                   <th style={sortableHeaderStyle} onClick={() => requestSort("branchName")}>
                     Branch {getSortIcon("branchName")}
@@ -607,6 +924,7 @@ export default function InventoryPage() {
               <tbody>
                 {paginatedInventory.map((item, index) => {
                   const status = getStockStatus(item.itemQuantity);
+                  const imageUrl = assetUrl(item.itemImage);
                   const absoluteIndex =
                     rowsPerPage === "All"
                       ? index + 1
@@ -616,13 +934,21 @@ export default function InventoryPage() {
                       <td style={bodyCellStyle}>{absoluteIndex}</td>
                       <td style={bodyCellStyle}>
                         <div className="d-flex align-items-center gap-3">
-                          <div style={itemAvatarStyle}>{String(item.itemName || "I").charAt(0).toUpperCase()}</div>
+                          {imageUrl ? (
+                            <img src={imageUrl} alt={item.itemName || "Product"} style={itemImageStyle} />
+                          ) : (
+                            <div style={itemAvatarStyle}>{String(item.itemName || "I").charAt(0).toUpperCase()}</div>
+                          )}
                           <div>
                             <div style={{ fontWeight: 700, color: palette.text }}>{item.itemName}</div>
                           </div>
                         </div>
                       </td>
-                      <td style={bodyCellStyle}>{item.itemModel}</td>
+                      <td style={bodyCellStyle}>
+                        <div>{item.itemModel || "N/A"}</div>
+                        {item.itemSku ? <div className="small text-muted">SKU: {item.itemSku}</div> : null}
+                        {item.itemBarcode ? <div className="small text-muted">Barcode: {item.itemBarcode}</div> : null}
+                      </td>
                       <td style={bodyCellStyle}>{item.branchName}</td>
                       <td style={{ ...bodyCellStyle, color: status.text, fontWeight: 800 }}>
                         {item.itemQuantity}
@@ -765,8 +1091,10 @@ export default function InventoryPage() {
       <CategoryManagement context="products" />
 
       <Modal
-        show={showFormModal}
-        onHide={handleCloseFormModal}
+        show={showFormModal || forceProductModalOpen}
+        onHide={() => {}}
+        backdrop="static"
+        keyboard={false}
         centered
         scrollable
         size="xl"
@@ -775,7 +1103,7 @@ export default function InventoryPage() {
         dialogClassName="inventory-modal-dialog"
         contentClassName="inventory-modal-content"
       >
-        <Modal.Header closeButton className="inventory-modal-header">
+        <Modal.Header className="inventory-modal-header">
           <div>
             <Modal.Title style={{ fontWeight: 800, color: palette.text }}>
               {currentItem.itemId ? "Edit Item" : "Add New Item"}
@@ -784,6 +1112,16 @@ export default function InventoryPage() {
               Keep product identity, stock and pricing in one clean workflow.
             </div>
           </div>
+          <Button
+            type="button"
+            variant="light"
+            className="rounded-circle ms-auto"
+            onClick={handleCloseFormModal}
+            disabled={isCreating || isUpdateLoading || isAnalyzingImage || imageCaptureOpen}
+            aria-label="Close item form"
+          >
+            <XCircle />
+          </Button>
         </Modal.Header>
         <Form
           className="inventory-modal-form"
@@ -831,6 +1169,71 @@ export default function InventoryPage() {
                     />
                   </Form.Group>
                 </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Product Image</Form.Label>
+                    <div className="d-flex align-items-center gap-3">
+                      {currentItem.itemImagePreview ? (
+                        <img
+                          src={currentItem.itemImagePreview}
+                          alt="Product preview"
+                          style={formImagePreviewStyle}
+                        />
+                      ) : (
+                        <div style={formImagePlaceholderStyle}>
+                          {String(currentItem.itemName || "I").charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="d-flex flex-column flex-sm-row gap-2 flex-grow-1">
+                        <Form.Control
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={(event) => applyProductImageFile(event.target.files?.[0] || null)}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline-secondary"
+                          className="d-inline-flex align-items-center justify-content-center gap-2"
+                          onClick={() => setImageCaptureOpen(true)}
+                        >
+                          <Camera />
+                          Capture
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline-primary"
+                          className="d-inline-flex align-items-center justify-content-center gap-2"
+                          disabled={isAnalyzingImage || !currentItem.itemImageFile}
+                          onClick={(event) => analyzeProductImage(currentItem.itemImageFile, event)}
+                        >
+                          <Stars />
+                          {isAnalyzingImage ? "Reading..." : "Auto fill"}
+                        </Button>
+                      </div>
+                    </div>
+                    <Form.Text className="text-muted">JPEG, PNG, or WEBP up to 3MB.</Form.Text>
+                    {imageAnalysisNote ? (
+                      <div className="small text-success fw-semibold mt-2">{imageAnalysisNote}</div>
+                    ) : null}
+                    {imageAnalysisAlert ? (
+                      <div className={`alert alert-${imageAnalysisAlert.type} py-2 px-3 mt-2 mb-0`}>
+                        {imageAnalysisAlert.message}
+                      </div>
+                    ) : null}
+                    {imageAnalysisSummary.length ? (
+                      <div className="mt-2 p-2 rounded border bg-light">
+                        <div className="small fw-bold text-dark mb-1">Auto-extracted fields</div>
+                        <div className="d-flex flex-column gap-1">
+                          {imageAnalysisSummary.map((item) => (
+                            <div key={item.key} className="small text-muted">
+                              <span className="fw-semibold text-dark">{item.label}:</span> {item.value}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </Form.Group>
+                </Col>
                 <Col md={6} xl={4}>
                   <Form.Group className="mb-3">
                     <Form.Label>Category</Form.Label>
@@ -848,6 +1251,22 @@ export default function InventoryPage() {
                         </option>
                       ))}
                     </Form.Select>
+                    <InputGroup className="mt-2">
+                      <Form.Control
+                        placeholder="Quick create category"
+                        value={quickCategoryName}
+                        onChange={(event) => setQuickCategoryName(event.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline-success"
+                        onClick={(event) => createQuickProductCategory(event)}
+                        disabled={isQuickAddingCategory}
+                      >
+                        <PlusCircle className="me-2" />
+                        {isQuickAddingCategory ? "Creating..." : "Create"}
+                      </Button>
+                    </InputGroup>
                   </Form.Group>
                 </Col>
                 <Col md={6}>
@@ -880,14 +1299,28 @@ export default function InventoryPage() {
                 <Col md={6} xl={4}>
                   <Form.Group className="mb-3">
                     <Form.Label>Barcode</Form.Label>
-                    <Form.Control
-                      type="text"
-                      placeholder="Optional barcode"
-                      value={currentItem.itemBarcode || ""}
-                      onChange={(event) =>
-                        setCurrentItem({ ...currentItem, itemBarcode: event.target.value })
-                      }
-                    />
+                    <InputGroup>
+                      <Form.Control
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="Scan or type barcode"
+                        value={currentItem.itemBarcode || ""}
+                        onChange={(event) =>
+                          setCurrentItem({ ...currentItem, itemBarcode: event.target.value.trim() })
+                        }
+                      />
+                      <Button
+                        variant="outline-secondary"
+                        type="button"
+                        title="Scan barcode with camera"
+                        onClick={() => setBarcodeScannerOpen(true)}
+                      >
+                        <UpcScan />
+                      </Button>
+                    </InputGroup>
+                    <Form.Text className="text-muted">
+                      Click this field and scan with a handheld scanner, or use the camera button.
+                    </Form.Text>
                   </Form.Group>
                 </Col>
                 <Col md={6} xl={4}>
@@ -1136,18 +1569,25 @@ export default function InventoryPage() {
             </div>
           </Modal.Body>
           <Modal.Footer className="inventory-modal-footer d-grid d-sm-flex gap-2 justify-content-sm-end">
+            {saveFeedback ? (
+              <div className={`alert alert-${saveFeedback.type} py-2 px-3 mb-0 me-sm-auto w-100 w-sm-auto`}>
+                {saveFeedback.message}
+              </div>
+            ) : null}
             <Button
+              type="button"
               variant="light"
               onClick={handleCloseFormModal}
               style={toolbarButtonStyle}
               className="w-100 w-sm-auto"
+              disabled={isCreating || isUpdateLoading || isAnalyzingImage}
             >
               Cancel
             </Button>
             <Button
               type="submit"
               style={addButtonStyle}
-              disabled={isCreating || isUpdateLoading}
+              disabled={isCreating || isUpdateLoading || isAnalyzingImage}
               className="w-100 w-sm-auto"
             >
               {currentItem.itemId
@@ -1188,6 +1628,21 @@ export default function InventoryPage() {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      <BarcodeScannerDialog
+        open={barcodeScannerOpen}
+        title="Scan product barcode"
+        description="Use the device camera to capture the product barcode while creating or editing the item."
+        onClose={() => setBarcodeScannerOpen(false)}
+        onDetected={handleProductBarcodeDetected}
+      />
+      <ImageCaptureDialog
+        show={imageCaptureOpen}
+        title="Capture product image"
+        fileNamePrefix="product-image"
+        onClose={() => setImageCaptureOpen(false)}
+        onCapture={handleProductImageCaptured}
+      />
     </Container>
   );
 }
@@ -1317,6 +1772,34 @@ const itemAvatarStyle = {
   display: "grid",
   placeItems: "center",
   fontWeight: 800,
+};
+
+const itemImageStyle = {
+  width: 44,
+  height: 44,
+  borderRadius: 12,
+  objectFit: "cover",
+  border: `1px solid ${palette.border}`,
+  backgroundColor: palette.greenSoft,
+};
+
+const formImagePreviewStyle = {
+  width: 72,
+  height: 72,
+  borderRadius: 14,
+  objectFit: "cover",
+  border: `1px solid ${palette.border}`,
+  flexShrink: 0,
+};
+
+const formImagePlaceholderStyle = {
+  ...formImagePreviewStyle,
+  display: "grid",
+  placeItems: "center",
+  backgroundColor: palette.greenSoft,
+  color: palette.green,
+  fontWeight: 800,
+  objectFit: "initial",
 };
 
 const iconButtonStyle = (color) => ({

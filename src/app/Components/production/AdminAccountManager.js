@@ -671,6 +671,7 @@ function extractAndModifyPermissions(permissions) {
         onHide={handleCloseUserModal}
         size="lg"
         backdrop="static"
+        scrollable
         dialogClassName="production-modal-shell"
       >
         <Form noValidate validated={validated} onSubmit={handleUserFormSubmit}>
@@ -863,7 +864,7 @@ function extractAndModifyPermissions(permissions) {
       </Modal>
 
       {/* View Permissions Modal */}
-      <Modal show={showViewModal} onHide={handleCloseViewModal} centered dialogClassName="production-modal-shell">
+      <Modal show={showViewModal} onHide={handleCloseViewModal} centered scrollable dialogClassName="production-modal-shell">
         <Modal.Header closeButton>
           <Modal.Title>
             <i className="bi bi-shield-shaded me-2"></i>Permissions for{" "}
@@ -885,7 +886,7 @@ function extractAndModifyPermissions(permissions) {
       </Modal>
 
       {/* Confirmation Modal */}
-      <Modal show={showConfirmModal} onHide={handleCloseConfirmModal} centered backdrop="static" dialogClassName="production-modal-shell">
+      <Modal show={showConfirmModal} onHide={handleCloseConfirmModal} centered backdrop="static" scrollable dialogClassName="production-modal-shell">
         <Modal.Header closeButton>
           <Modal.Title>
             <i className="bi bi-exclamation-triangle-fill text-danger me-2"></i>

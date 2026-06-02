@@ -24,6 +24,32 @@ export const extendedAccountsApiSlice = apiSlice.injectEndpoints({
            },
            providesTags: [commonTags.inventory, commonTags.profile],
         }),
+        getStaffOverview: builder.query({
+            query: () => '/staff/overview',
+            transformResponse: (responseData) => responseData?.data ?? { users: [], summary: {} },
+            providesTags: ['Accounts'],
+        }),
+        getStaffActivity: builder.query({
+            query: (userId) => `/staff/${userId}/activity`,
+            transformResponse: (responseData) => responseData?.data ?? { activity: [], logins: [] },
+            providesTags: (_result, _error, userId) => [{ type: 'Accounts', id: `activity-${userId}` }],
+        }),
+        updateStaffStatus: builder.mutation({
+            query: payload => ({
+                url: '/staff/status',
+                method: 'post',
+                body: payload
+            }),
+            invalidatesTags: ['Accounts', commonTags.inventory],
+        }),
+        uploadStaffDocuments: builder.mutation({
+            query: payload => ({
+                url: '/staff/documents',
+                method: 'post',
+                body: payload
+            }),
+            invalidatesTags: ['Accounts', commonTags.inventory],
+        }),
         addOrder: builder.mutation(
             {
                 query: payload => ({
@@ -91,6 +117,10 @@ export const extendedAccountsApiSlice = apiSlice.injectEndpoints({
 
 export const {
     useGetAccountsQuery,
+    useGetStaffOverviewQuery,
+    useGetStaffActivityQuery,
+    useUpdateStaffStatusMutation,
+    useUploadStaffDocumentsMutation,
     useAddOrderMutation,
     useChangePasswordMutation,
     useEditAccountMutation,

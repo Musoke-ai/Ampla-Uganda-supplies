@@ -1,0 +1,262 @@
+.floating-help {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1500;
+  color: #15202b;
+  font-family: inherit;
+}
+
+.floating-help-bubble {
+  min-width: 92px;
+  height: 52px;
+  border: 0;
+  border-radius: 999px;
+  background: #20364f;
+  color: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.floating-help-bubble:hover {
+  background: #16283e;
+}
+
+.floating-help-bubble:active {
+  cursor: grabbing;
+}
+
+.floating-help-panel {
+  width: min(390px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 112px));
+  margin-bottom: 14px;
+  border: 1px solid #dce8e0;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.floating-help-header {
+  padding: 16px 18px;
+  background: #f5fbf7;
+  border-bottom: 1px solid #e4eee7;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.floating-help-header:active {
+  cursor: grabbing;
+}
+
+.floating-help-header strong,
+.floating-help-header small,
+.floating-help-kicker {
+  display: block;
+}
+
+.floating-help-header strong {
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.floating-help-header small,
+.floating-help-kicker {
+  color: #667085;
+}
+
+.floating-help-kicker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.floating-help-icon-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d0dce4;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #344054;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.floating-help-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.floating-help-reset-btn {
+  min-width: 46px;
+  height: 36px;
+  border: 1px solid #d0dce4;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #344054;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.floating-help-reset-btn:hover,
+.floating-help-icon-btn:hover {
+  border-color: #b8c8c0;
+  background: #f8fbf9;
+}
+
+.floating-help-thread {
+  flex: 1;
+  min-height: 220px;
+  overflow-y: auto;
+  padding: 16px;
+  background: #fbfdfc;
+}
+
+.floating-help-message {
+  max-width: 92%;
+  margin-bottom: 12px;
+}
+
+.floating-help-message > span {
+  display: block;
+  margin-bottom: 4px;
+  color: #667085;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.floating-help-message p,
+.floating-help-typewriter .agent-typewriter-content {
+  margin: 0;
+  line-height: 1.58;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.floating-help-message-user {
+  margin-left: auto;
+}
+
+.floating-help-message-user p {
+  padding: 10px 12px;
+  border-radius: 14px 14px 4px 14px;
+  background: #20364f;
+  color: #ffffff;
+}
+
+.floating-help-message-agent {
+  margin-right: auto;
+}
+
+.floating-help-message-agent .agent-typewriter-content,
+.floating-help-message-agent p {
+  padding: 10px 12px;
+  border: 1px solid #e2ebe5;
+  border-radius: 14px 14px 14px 4px;
+  background: #ffffff;
+  color: #15202b;
+}
+
+.floating-help-prompts {
+  padding: 10px 14px 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #ffffff;
+}
+
+.floating-help-prompts button {
+  border: 1px solid #dce8e0;
+  border-radius: 999px;
+  background: #f8fbf9;
+  color: #344054;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.floating-help-prompts button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.floating-help-composer {
+  padding: 12px 14px 14px;
+  display: grid;
+  grid-template-columns: 1fr 44px;
+  gap: 8px;
+  background: #ffffff;
+}
+
+.floating-help-composer textarea {
+  min-height: 50px;
+  max-height: 120px;
+  resize: vertical;
+  border: 1px solid #d6e2dc;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #15202b;
+  outline: none;
+}
+
+.floating-help-composer textarea:focus {
+  border-color: #2f8f57;
+  box-shadow: 0 0 0 3px rgba(47, 143, 87, 0.14);
+}
+
+.floating-help-composer button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #2f8f57;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.floating-help-composer button:disabled {
+  cursor: not-allowed;
+  background: #b5c6bd;
+}
+
+@media (max-width: 640px) {
+  .floating-help {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .floating-help-panel {
+    max-height: calc(100vh - 92px);
+  }
+
+  .floating-help-bubble {
+    min-width: 56px;
+    width: 56px;
+    padding: 0;
+  }
+
+  .floating-help-bubble span {
+    display: none;
+  }
+}

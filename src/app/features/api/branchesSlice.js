@@ -5,11 +5,11 @@ import {
 import { apiSlice } from "./apiSlice";
 import { tags as commonTags } from "./commonTags";
 import { setBranchScope } from "../../auth/authSlice";
+import { compareDesc, extractArray } from "./responseUtils";
 
 const branchesAdapter = createEntityAdapter({
   selectId: (branch) => branch.branchId,
-  sortComparer: (a, b) =>
-    (b.branchDateCreated || "").localeCompare(a.branchDateCreated || ""),
+  sortComparer: (a, b) => compareDesc(a.branchDateCreated, b.branchDateCreated),
 });
 
 const initialState = branchesAdapter.getInitialState();
@@ -19,7 +19,7 @@ export const extendedBranchesApiSlice = apiSlice.injectEndpoints({
     getBranches: builder.query({
       query: () => "/branches",
       transformResponse: (responseData) =>
-        branchesAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : []),
+        branchesAdapter.setAll(initialState, extractArray(responseData)),
       providesTags: [commonTags.inventory],
     }),
     addBranch: builder.mutation({

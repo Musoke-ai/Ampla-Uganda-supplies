@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from '../api/apiSlice';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 
 const notificationsAdapter = createEntityAdapter({
     selectId: (notifications) => notifications.id,
-sortComparer: (a, b) => b.created_at.localeCompare(a.created_at)
+sortComparer: (a, b) => compareDesc(a.created_at, b.created_at)
 })
 
 const initialState = notificationsAdapter.getInitialState();
@@ -18,7 +19,7 @@ export const extendedNotificationsApiSlice = apiSlice.injectEndpoints({
         getNotifications: builder.query({
             query: () => '/fetchNotifications',
             transformResponse:  responseData => {
-            return notificationsAdapter.setAll(initialState, responseData)
+            return notificationsAdapter.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
         }),

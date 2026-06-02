@@ -16,7 +16,7 @@ import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import { Background } from "victory";
 
-const amplaLogo = `${process.env.PUBLIC_URL || ""}/logos/ampla_logo.png`;
+const amplaLogo = "/logos/ampla_logo.png";
 
 const SideBar = ({
   handleMenu,

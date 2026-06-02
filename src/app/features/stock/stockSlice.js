@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from '../api/apiSlice';
 import {tags as commonTags } from '../api/commonTags'
+import { compareDesc, extractArray } from '../api/responseUtils';
 
 const stockAdapter = createEntityAdapter({
     selectId: (stock) => stock.itemId,
-sortComparer: (a, b) => b.itemDateCreated.localeCompare(a.itemDateCreated)
+sortComparer: (a, b) => compareDesc(a.itemDateCreated, b.itemDateCreated)
 })
 
 const initialState = stockAdapter.getInitialState();
@@ -18,7 +19,7 @@ export const extendedApiSlice = apiSlice.injectEndpoints({
         getStock: builder.query({
             query: () => '/retrievals',
             transformResponse:  responseData => {
-            return stockAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : [])
+            return stockAdapter.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
         //    providesTags: (result, error, arg) => [
@@ -31,7 +32,8 @@ export const extendedApiSlice = apiSlice.injectEndpoints({
         getStockById: builder.query({
             query: id => `retrievals/${id}`,
             transformResponse: responseData => {
-                return stockAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : responseData ? [responseData] : []);
+                const rows = extractArray(responseData);
+                return stockAdapter.setAll(initialState, rows.length ? rows : responseData ? [responseData] : []);
             },
             providesTags: [commonTags.inventory],
             // providesTags: (result, error, arg) => [

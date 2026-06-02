@@ -1,8 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Table, Button, Modal, Form, Container, InputGroup } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useSelector } from "react-redux";
-import { selectRawMaterials, useAddRawMaterialMutation, useUpdateRawMaterialMutation, useDeleteRawMaterialMutation } from "../../features/api/rawmaterialsSlice";
+import {
+  selectRawMaterials,
+  useAddRawMaterialMutation,
+  useDeleteRawMaterialMutation,
+  useGetRawMaterialsQuery,
+  useUpdateRawMaterialMutation,
+} from "../../features/api/rawmaterialsSlice";
 import {
   selectRawMaterialCategories,
   useAddRawMaterialCategoryMutation,
@@ -19,7 +25,10 @@ import { Delete, Edit, Search } from "@mui/icons-material";
 import { useSettings } from "../Settings";
 import { toast } from "react-toastify";
 import { useTableSortSearch } from "../../hooks/useTableSortSearch";
-import { ArrowUp, ArrowDown } from "react-bootstrap-icons";
+import { ArrowUp, ArrowDown, UpcScan, Camera, PlusCircle, Stars, XCircle } from "react-bootstrap-icons";
+import BarcodeScannerDialog from "../BarcodeScannerDialog";
+import ImageCaptureDialog from "../ImageCaptureDialog";
+import { useAnalyzeCatalogImageMutation } from "../../features/api/catalogImageAnalysisSlice";
 import {
   paginateItems,
   ProductionTableFooter,
@@ -27,6 +36,7 @@ import {
 
 const searchableFields = [
   "materialCode",
+  "rawMaterialBarcode",
   "name",
   "category",
   "size",
@@ -38,6 +48,60 @@ const searchableFields = [
   "note",
 ];
 
+const API_ROOT = (process.env.REACT_APP_API_BASE_URL || "").replace(/\/api\/?$/, "");
+
+const assetUrl = (path) => {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_ROOT}/${String(path).replace(/^\/+/, "")}`;
+};
+
+const toRawMaterialFormData = (data) => {
+  const formData = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    if (key === "rawMaterialImageFile" || key === "rawMaterialImagePreview") return;
+    if (value !== undefined && value !== null) formData.append(key, value);
+  });
+
+  if (data.rawMaterialImageFile) {
+    formData.append("rawMaterialImage", data.rawMaterialImageFile);
+  }
+
+  return formData;
+};
+
+const rawMaterialAnalysisLabels = {
+  name: "Raw material name",
+  description: "Description",
+  materialCode: "Material code",
+  rawMaterialBarcode: "Barcode",
+  category: "Category",
+  size: "Package / specification",
+  unitOfMeasure: "Unit",
+  supplier: "Supplier",
+  storageLocation: "Storage location",
+  note: "Notes",
+};
+
+const buildAnalysisSummary = (fields = {}, labels = {}) =>
+  Object.entries(fields)
+    .filter(([, value]) => String(value || "").trim())
+    .map(([key, value]) => ({
+      key,
+      label: labels[key] || key,
+      value: String(value || "").trim(),
+    }));
+
+const readableErrorMessage = (error, fallback) => {
+  const message = error?.data?.message || error?.data?.error || error?.error || fallback;
+
+  if (typeof message === "string") return message;
+  if (Array.isArray(message)) return message.filter(Boolean).join(" ");
+  if (message && typeof message === "object") return Object.values(message).filter(Boolean).join(" ");
+
+  return fallback;
+};
+
 const unitOptions = ["pcs", "kg", "g", "litres", "ml", "metres", "rolls", "bags", "boxes", "sets"];
 const statusOptions = [
   { value: "active", label: "Active" },
@@ -47,6 +111,7 @@ const statusOptions = [
 
 const rawMaterialFields = [
   { key: "materialCode", label: "Material code", placeholder: "RM-SUGAR-001" },
+  { key: "rawMaterialBarcode", label: "Barcode", type: "barcode", placeholder: "Scan or type supplier barcode" },
   { key: "name", label: "Raw material name", placeholder: "Cotton fabric", required: true },
   { key: "category", label: "Category", type: "category", placeholder: "Fabric, packaging, chemical..." },
   { key: "size", label: "Package / specification", placeholder: "50 kg bag, 1 litre tin..." },
@@ -81,6 +146,46 @@ const stockStatus = (material) => {
   }
 
   return { label: "Ok", className: "success" };
+};
+
+const rawMaterialThumbStyle = {
+  width: 44,
+  height: 44,
+  borderRadius: 10,
+  objectFit: "cover",
+  border: "1px solid rgba(15, 23, 42, 0.12)",
+  background: "#f8fbf8",
+  flexShrink: 0,
+};
+
+const rawMaterialThumbPlaceholderStyle = {
+  ...rawMaterialThumbStyle,
+  display: "grid",
+  placeItems: "center",
+  objectFit: "initial",
+  background: "#e8f5ec",
+  color: "#2f8f57",
+  fontWeight: 800,
+};
+
+const rawMaterialPreviewStyle = {
+  width: 72,
+  height: 72,
+  borderRadius: 12,
+  objectFit: "cover",
+  border: "1px solid rgba(15, 23, 42, 0.12)",
+  background: "#f8fbf8",
+  flexShrink: 0,
+};
+
+const rawMaterialPlaceholderStyle = {
+  ...rawMaterialPreviewStyle,
+  display: "grid",
+  placeItems: "center",
+  objectFit: "initial",
+  background: "#e8f5ec",
+  color: "#2f8f57",
+  fontWeight: 800,
 };
 
 const RawMaterialCategoryManager = ({
@@ -175,7 +280,7 @@ const RawMaterialCategoryManager = ({
 
   return (
     <>
-      <Button variant="outline-primary" onClick={() => setShowModal(true)}>
+      <Button type="button" variant="outline-primary" onClick={() => setShowModal(true)}>
         Manage Categories
       </Button>
 
@@ -184,7 +289,7 @@ const RawMaterialCategoryManager = ({
           <Modal.Title>Raw Material Categories</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form className="production-form-grid mb-4">
+          <Form className="production-form-grid mb-4" onSubmit={(event) => event.preventDefault()}>
             <Form.Group>
               <Form.Label>Branch</Form.Label>
               <Form.Select
@@ -232,11 +337,11 @@ const RawMaterialCategoryManager = ({
 
           <div className="d-flex gap-2 justify-content-end mb-3">
             {editingCategory ? (
-              <Button variant="outline-secondary" onClick={resetForm}>
+              <Button type="button" variant="outline-secondary" onClick={resetForm}>
                 Cancel Edit
               </Button>
             ) : null}
-            <Button onClick={submitCategory} disabled={isAdding || isUpdating}>
+            <Button type="button" onClick={submitCategory} disabled={isAdding || isUpdating}>
               {editingCategory ? "Save Category" : "Add Category"}
             </Button>
           </div>
@@ -262,10 +367,10 @@ const RawMaterialCategoryManager = ({
                       </span>
                     </td>
                     <td className="text-center">
-                      <Button variant="info" size="sm" className="me-2 text-white" onClick={() => editCategory(category)}>
+                      <Button type="button" variant="info" size="sm" className="me-2 text-white" onClick={() => editCategory(category)}>
                         <Edit />
                       </Button>
-                      <Button variant="danger" size="sm" onClick={() => removeCategory(category)} disabled={isDeleting}>
+                      <Button type="button" variant="danger" size="sm" onClick={() => removeCategory(category)} disabled={isDeleting}>
                         <Delete />
                       </Button>
                     </td>
@@ -281,7 +386,7 @@ const RawMaterialCategoryManager = ({
           </div>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowModal(false)}>Close</Button>
+          <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>Close</Button>
         </Modal.Footer>
       </Modal>
     </>
@@ -294,7 +399,8 @@ const currency = settings.currency!=="none"?settings?.currency:"";
 const theme = settings.theme;
     const branchScope = useSelector(selectBranchScope);
     useGetBranchesQuery();
-    useGetRawMaterialCategoriesQuery();
+    const { refetch: refetchRawMaterials } = useGetRawMaterialsQuery();
+    const { refetch: refetchRawMaterialCategories } = useGetRawMaterialCategoriesQuery();
     const branches = useSelector(selectBranches) ?? [];
     const rawMaterialCategories = useSelector(selectRawMaterialCategories) ?? [];
     const currentBranchId = branchScope?.effective_branch_id ? String(branchScope.effective_branch_id) : "";
@@ -303,6 +409,10 @@ const theme = settings.theme;
     const createEmptyForm = () => ({
       branchId: currentBranchId,
       materialCode: "",
+      rawMaterialBarcode: "",
+      rawMaterialImage: "",
+      rawMaterialImageFile: null,
+      rawMaterialImagePreview: "",
       name: "",
       category: "",
       size: "",
@@ -319,14 +429,28 @@ const theme = settings.theme;
     });
 
     const rawMaterials = useSelector(selectRawMaterials);
-    const [addRawMaterial, {isLoading, isError, error, isSuccess} ]= useAddRawMaterialMutation();
-    const [updateRawMaterial, {isLoading:isUpdateLoading, isError: isUpdateError, error:updateError, isSuccess:isUpdateSuccess} ]= useUpdateRawMaterialMutation();
+    const [addRawMaterial, {isLoading} ]= useAddRawMaterialMutation();
+    const [updateRawMaterial, {isLoading:isUpdateLoading} ]= useUpdateRawMaterialMutation();
     const [deleteRawMaterial, {isLoading:isDeleteLoading, isError: isDeleteError, error:deleteError, isSuccess:isDeleteSuccess} ]= useDeleteRawMaterialMutation();
+    const [quickAddRawMaterialCategory, { isLoading: isQuickAddingRawCategory }] = useAddRawMaterialCategoryMutation();
+    const [analyzeCatalogImage, { isLoading: isAnalyzingImage }] = useAnalyzeCatalogImageMutation();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteAlertModal, setShowDeleteAlertModal] = useState(false);
+  const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
+  const [imageCaptureOpen, setImageCaptureOpen] = useState(false);
+  const [quickCategoryName, setQuickCategoryName] = useState("");
+  const [imageAnalysisNote, setImageAnalysisNote] = useState("");
+  const [imageAnalysisAlert, setImageAnalysisAlert] = useState(null);
+  const [imageAnalysisSummary, setImageAnalysisSummary] = useState([]);
+  const [saveFeedback, setSaveFeedback] = useState(null);
   const [selectedMaterial, setSelectedMaterial] = useState(null);
+  const rawMaterialModalCloseGuardRef = useRef(false);
+  const rawMaterialCaptureModeRef = useRef("add");
+  const pendingRawMaterialCaptureFileRef = useRef(null);
+  const recentBarcodeScanRef = useRef({ value: "", time: 0 });
+  const [forceRawMaterialModalMode, setForceRawMaterialModalMode] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -370,14 +494,35 @@ const theme = settings.theme;
 
   const handleShowEdit = (material) => {
     setSelectedMaterial(material);
+    setQuickCategoryName("");
+    setImageAnalysisNote("");
+    setImageAnalysisAlert(null);
+    setImageAnalysisSummary([]);
+    setSaveFeedback(null);
     setFormData({
       ...createEmptyForm(),
       ...material,
       branchId: material?.branchId ? String(material.branchId) : currentBranchId,
       status: material?.status || "active",
       unitOfMeasure: material?.unitOfMeasure || "pcs",
+      rawMaterialImageFile: null,
+      rawMaterialImagePreview: assetUrl(material?.rawMaterialImage),
     });
     setShowEditModal(true);
+  };
+
+  const closeAddRawMaterialModal = () => {
+    if (isLoading || isAnalyzingImage || imageCaptureOpen || rawMaterialModalCloseGuardRef.current) return;
+    setShowAddModal(false);
+    setForceRawMaterialModalMode(null);
+    setSaveFeedback(null);
+  };
+
+  const closeEditRawMaterialModal = () => {
+    if (isUpdateLoading || isAnalyzingImage || imageCaptureOpen || rawMaterialModalCloseGuardRef.current) return;
+    setShowEditModal(false);
+    setForceRawMaterialModalMode(null);
+    setSaveFeedback(null);
   };
 
   const getSortIcon = (key) => {
@@ -415,6 +560,7 @@ const theme = settings.theme;
   const cleanPayload = () => ({
     ...formData,
     materialCode: String(formData.materialCode || "").trim().toUpperCase(),
+    rawMaterialBarcode: String(formData.rawMaterialBarcode || "").trim(),
     name: String(formData.name || "").trim(),
     category: String(formData.category || "").trim(),
     size: String(formData.size || "").trim(),
@@ -428,6 +574,9 @@ const theme = settings.theme;
     status: formData.status || "active",
     note: String(formData.note || "").trim(),
     expiry: formData.expiry || "",
+    rawMaterialImage: formData.rawMaterialImage || "",
+    rawMaterialImageFile: formData.rawMaterialImageFile || null,
+    rawMaterialImagePreview: formData.rawMaterialImagePreview || "",
   });
 
   const handleAdd = async () => {
@@ -436,14 +585,25 @@ const theme = settings.theme;
     }
 
     try{
+        setSaveFeedback({ type: "info", message: "Saving raw material. Please wait..." });
         await addRawMaterial(
-           cleanPayload()
+           toRawMaterialFormData(cleanPayload())
         ).unwrap();
+        refetchRawMaterials();
+        setSaveFeedback({ type: "success", message: "Raw material added successfully." });
         toast.success("Raw material added successfully");
-        setFormData(createEmptyForm())
-        setShowAddModal(false)
+        window.setTimeout(() => {
+          setFormData(createEmptyForm());
+          setQuickCategoryName("");
+          setImageAnalysisNote("");
+          setImageAnalysisAlert(null);
+          setImageAnalysisSummary([]);
+          setSaveFeedback({ type: "success", message: "Raw material added successfully. You can add another raw material." });
+        }, 900);
     }catch (error){
-      toast.error(error?.data?.message || ("An error occured! " + error.status));
+      const message = error?.data?.message || ("An error occured! " + error.status);
+      setSaveFeedback({ type: "danger", message });
+      toast.error(message);
     }
   };
 
@@ -453,15 +613,24 @@ const theme = settings.theme;
     }
 
     try{
+        setSaveFeedback({ type: "info", message: "Updating raw material. Please wait..." });
         await updateRawMaterial(
-           cleanPayload()
+           toRawMaterialFormData(cleanPayload())
         ).unwrap();
+        refetchRawMaterials();
+        setSaveFeedback({ type: "success", message: "Raw material updated successfully." });
         toast.success("Raw material updated successfully");
-                setFormData(createEmptyForm())
-        setShowEditModal(false);
-         setSelectedMaterial(null);
+        window.setTimeout(() => {
+          setFormData(createEmptyForm());
+          setShowEditModal(false);
+          setForceRawMaterialModalMode(null);
+          setSelectedMaterial(null);
+          setSaveFeedback(null);
+        }, 900);
     }catch (error){
-toast.error(error?.data?.message || ("An error occured! " + error.status));
+      const message = error?.data?.message || ("An error occured! " + error.status);
+      setSaveFeedback({ type: "danger", message });
+      toast.error(message);
     }
     // setFormData({});
   };
@@ -471,6 +640,7 @@ toast.error(error?.data?.message || ("An error occured! " + error.status));
         await deleteRawMaterial(
            {materialId: id}
         ).unwrap();
+        refetchRawMaterials();
         toast.success("Raw material deleted successfully");
         setShowDeleteAlertModal(false);
         setSelectedMaterial(null);
@@ -479,6 +649,289 @@ toast.error(error?.data?.message || ("An error occured! " + error.status));
 toast.error("An error occured! "+error.status);
     }
   };
+
+  const handleRawMaterialBarcodeDetected = (barcode) => {
+    const cleanBarcode = String(barcode || "").trim();
+    const now = Date.now();
+
+    if (
+      !cleanBarcode ||
+      (recentBarcodeScanRef.current.value === cleanBarcode && now - recentBarcodeScanRef.current.time < 2500)
+    ) {
+      return;
+    }
+
+    recentBarcodeScanRef.current = { value: cleanBarcode, time: now };
+    setFormData((current) => ({ ...current, rawMaterialBarcode: cleanBarcode }));
+    setSearchTerm(cleanBarcode);
+    setBarcodeScannerOpen(false);
+    toast.success(`Raw material barcode detected: ${cleanBarcode}`, { toastId: `raw-material-barcode-${cleanBarcode}` });
+  };
+
+  const applyRawMaterialImageFile = (file) => {
+    setImageAnalysisNote("");
+    setImageAnalysisAlert(null);
+    setImageAnalysisSummary([]);
+    setFormData((current) => ({
+      ...current,
+      rawMaterialImageFile: file,
+      rawMaterialImagePreview: file ? URL.createObjectURL(file) : assetUrl(current.rawMaterialImage),
+    }));
+  };
+
+  const matchRawMaterialCategory = (categoryName) => {
+    const normalized = String(categoryName || "").trim().toLowerCase();
+    if (!normalized) return null;
+
+    return (
+      activeCategoryOptions.find((category) => String(category.categoryName || "").toLowerCase() === normalized) ||
+      activeCategoryOptions.find((category) => {
+        const candidate = String(category.categoryName || "").toLowerCase();
+        return candidate.includes(normalized) || normalized.includes(candidate);
+      }) ||
+      null
+    );
+  };
+
+  const applyRawMaterialImageAnalysis = (analysis) => {
+    const fields = analysis?.fields || {};
+    const summary = buildAnalysisSummary(fields, rawMaterialAnalysisLabels);
+    const suggestedName =
+      analysis?.matchedCategoryName ||
+      analysis?.suggestedCategoryName ||
+      fields.category ||
+      "";
+    const matchedCategory = matchRawMaterialCategory(suggestedName);
+
+    setFormData((current) => {
+      const next = { ...current };
+      const shouldFill = (key, defaults = []) => {
+        const value = String(next[key] || "").trim();
+        return !value || defaults.map(String).includes(value);
+      };
+
+      [
+        "name",
+        "materialCode",
+        "rawMaterialBarcode",
+        "size",
+        "unitOfMeasure",
+        "supplier",
+        "storageLocation",
+        "note",
+      ].forEach((key) => {
+        const defaults = key === "unitOfMeasure" ? ["pcs"] : [];
+        if (fields[key] && shouldFill(key, defaults)) {
+          next[key] = fields[key];
+        }
+      });
+
+      if (fields.description && shouldFill("note")) {
+        next.note = fields.description;
+      }
+
+      if (!next.category && suggestedName) {
+        next.category = matchedCategory?.categoryName || suggestedName;
+      }
+
+      return next;
+    });
+
+    setImageAnalysisSummary(summary);
+
+    if (matchedCategory) {
+      setImageAnalysisNote(`Suggested category: ${matchedCategory.categoryName}`);
+      setImageAnalysisAlert(null);
+    } else if (suggestedName) {
+      setQuickCategoryName(suggestedName);
+      setImageAnalysisNote(`Suggested new category: ${suggestedName}`);
+      setImageAnalysisAlert(null);
+    } else {
+      setImageAnalysisNote(analysis?.notes || "Image checked. Confirm the fields before saving.");
+      setImageAnalysisAlert(null);
+    }
+  };
+
+  const analyzeRawMaterialImage = async (
+    file = formData.rawMaterialImageFile,
+    event = null
+  ) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    if (!file) {
+      toast.info("Capture or upload a raw material image first.");
+      return;
+    }
+
+    rawMaterialModalCloseGuardRef.current = true;
+    rawMaterialCaptureModeRef.current = showEditModal ? "edit" : "add";
+    setForceRawMaterialModalMode(rawMaterialCaptureModeRef.current);
+    setImageAnalysisAlert({ type: "info", message: "Reading raw material image. Please wait..." });
+    if (rawMaterialCaptureModeRef.current === "edit") {
+      setShowEditModal(true);
+    } else {
+      setShowAddModal(true);
+    }
+
+    try {
+      const response = await analyzeCatalogImage({
+        image: file,
+        type: "raw_material",
+        branchId: formData.branchId || currentBranchId,
+      }).unwrap();
+      applyRawMaterialImageAnalysis(response);
+      setImageAnalysisAlert({ type: "success", message: "Raw material fields extracted from image. Review them before saving." });
+      toast.success("Raw material fields extracted from image.");
+    } catch (error) {
+      const message = readableErrorMessage(error, "Could not extract fields from this image.");
+      setImageAnalysisAlert({ type: "danger", message });
+      toast.error(message);
+    } finally {
+      if (rawMaterialCaptureModeRef.current === "edit") {
+        setShowEditModal(true);
+      } else {
+        setShowAddModal(true);
+      }
+      window.setTimeout(() => {
+        rawMaterialModalCloseGuardRef.current = false;
+      }, 1200);
+    }
+  };
+
+  const handleRawMaterialImageCaptured = (file) => {
+    pendingRawMaterialCaptureFileRef.current = file;
+    rawMaterialModalCloseGuardRef.current = true;
+    rawMaterialCaptureModeRef.current = showEditModal ? "edit" : "add";
+    setForceRawMaterialModalMode(rawMaterialCaptureModeRef.current);
+    if (showEditModal) {
+      setShowEditModal(true);
+    } else {
+      setShowAddModal(true);
+    }
+  };
+
+  useEffect(() => {
+    if (imageCaptureOpen || !pendingRawMaterialCaptureFileRef.current) {
+      return;
+    }
+
+    const file = pendingRawMaterialCaptureFileRef.current;
+    pendingRawMaterialCaptureFileRef.current = null;
+    rawMaterialModalCloseGuardRef.current = true;
+    setForceRawMaterialModalMode(rawMaterialCaptureModeRef.current);
+
+    window.setTimeout(() => {
+      if (rawMaterialCaptureModeRef.current === "edit") {
+        setShowEditModal(true);
+      } else {
+        setShowAddModal(true);
+      }
+      applyRawMaterialImageFile(file);
+      analyzeRawMaterialImage(file);
+    }, 0);
+  }, [imageCaptureOpen]);
+
+  const createQuickRawMaterialCategory = async (event = null) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    const categoryName = quickCategoryName.trim();
+    if (!categoryName) {
+      toast.error("Enter a category name first.");
+      return;
+    }
+
+    const existing = matchRawMaterialCategory(categoryName);
+    if (existing) {
+      setFormData((current) => ({ ...current, category: existing.categoryName }));
+      setQuickCategoryName("");
+      toast.success("Existing category selected.");
+      return;
+    }
+
+    try {
+      const response = await quickAddRawMaterialCategory({
+        branchId: formData.branchId || currentBranchId,
+        categoryName,
+        description: "",
+        isActive: 1,
+      }).unwrap();
+      const createdName = response?.data?.categoryName || categoryName;
+      await refetchRawMaterialCategories();
+      setFormData((current) => ({ ...current, category: createdName }));
+      setQuickCategoryName("");
+      toast.success("Raw material category created and selected.");
+    } catch (error) {
+      toast.error(error?.data?.message || "Could not create raw material category.");
+    }
+  };
+
+  const renderImageField = () => (
+    <Form.Group>
+      <Form.Label>Raw material image</Form.Label>
+      <div className="d-flex align-items-center gap-3">
+        {formData.rawMaterialImagePreview ? (
+          <img
+            src={formData.rawMaterialImagePreview}
+            alt="Raw material preview"
+            style={rawMaterialPreviewStyle}
+          />
+        ) : (
+          <div style={rawMaterialPlaceholderStyle}>
+            {String(formData.name || "R").charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="d-flex flex-column flex-sm-row gap-2 flex-grow-1">
+          <Form.Control
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) => applyRawMaterialImageFile(event.target.files?.[0] || null)}
+          />
+          <Button
+            type="button"
+            variant="outline-secondary"
+            className="d-inline-flex align-items-center justify-content-center gap-2"
+            onClick={() => setImageCaptureOpen(true)}
+          >
+            <Camera />
+            Capture
+          </Button>
+          <Button
+            type="button"
+            variant="outline-primary"
+            className="d-inline-flex align-items-center justify-content-center gap-2"
+            disabled={isAnalyzingImage || !formData.rawMaterialImageFile}
+            onClick={(event) => analyzeRawMaterialImage(formData.rawMaterialImageFile, event)}
+          >
+            <Stars />
+            {isAnalyzingImage ? "Reading..." : "Auto fill"}
+          </Button>
+        </div>
+      </div>
+      <Form.Text className="text-muted">JPEG, PNG, or WEBP up to 3MB.</Form.Text>
+      {imageAnalysisNote ? (
+        <div className="small text-success fw-semibold mt-2">{imageAnalysisNote}</div>
+      ) : null}
+      {imageAnalysisAlert ? (
+        <div className={`alert alert-${imageAnalysisAlert.type} py-2 px-3 mt-2 mb-0`}>
+          {imageAnalysisAlert.message}
+        </div>
+      ) : null}
+      {imageAnalysisSummary.length ? (
+        <div className="mt-2 p-2 rounded border bg-light">
+          <div className="small fw-bold text-dark mb-1">Auto-extracted fields</div>
+          <div className="d-flex flex-column gap-1">
+            {imageAnalysisSummary.map((item) => (
+              <div key={item.key} className="small text-muted">
+                <span className="fw-semibold text-dark">{item.label}:</span> {item.value}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </Form.Group>
+  );
 
   return (
     <Container className="mt-4 production-section-shell">
@@ -496,9 +949,16 @@ toast.error("An error occured! "+error.status);
               currentBranchId={currentBranchId}
             />
             <Button
+              type="button"
               variant="primary"
               onClick={() => {
+                setSelectedMaterial(null);
                 setFormData(createEmptyForm());
+                setQuickCategoryName("");
+                setImageAnalysisNote("");
+                setImageAnalysisAlert(null);
+                setImageAnalysisSummary([]);
+                setSaveFeedback(null);
                 setShowAddModal(true);
               }}
             >
@@ -513,7 +973,7 @@ toast.error("An error occured! "+error.status);
           <InputGroup>
             <InputGroup.Text className={`${theme==='dark'?'text-white':'text-dark'}`}><Search /></InputGroup.Text>
             <Form.Control
-              placeholder="Search by code, name, category, supplier, location, or note"
+              placeholder="Search by code, barcode, name, category, supplier, location, or note"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -535,6 +995,9 @@ toast.error("An error occured! "+error.status);
            <th>#</th>
             <th onClick={() => requestSort('materialCode')} className="production-sortable">
               Code {getSortIcon('materialCode')}
+            </th>
+            <th onClick={() => requestSort('rawMaterialBarcode')} className="production-sortable">
+              Barcode {getSortIcon('rawMaterialBarcode')}
             </th>
             <th onClick={() => requestSort('name')} className="production-sortable">
               Raw Material {getSortIcon('name')}
@@ -571,9 +1034,25 @@ toast.error("An error occured! "+error.status);
             <tr key={material.materialId}>
              <td>{(currentPage - 1) * rowsPerPage + idx + 1}</td>
              <td>{material.materialCode || "N/A"}</td>
+             <td>{material.rawMaterialBarcode || "N/A"}</td>
              <td>
-              <div className="fw-bold">{material.name}</div>
-              <div className="small text-muted">{material.size || "No package/spec"}{material.note ? ` - ${material.note}` : ""}</div>
+              <div className="d-flex align-items-center gap-3">
+                {material.rawMaterialImage ? (
+                  <img
+                    src={assetUrl(material.rawMaterialImage)}
+                    alt={material.name || "Raw material"}
+                    style={rawMaterialThumbStyle}
+                  />
+                ) : (
+                  <div style={rawMaterialThumbPlaceholderStyle}>
+                    {String(material.name || "R").charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <div className="fw-bold">{material.name}</div>
+                  <div className="small text-muted">{material.size || "No package/spec"}{material.note ? ` - ${material.note}` : ""}</div>
+                </div>
+              </div>
              </td>
              <td>{material.category || "Uncategorized"}</td>
              <td>
@@ -590,18 +1069,18 @@ toast.error("An error occured! "+error.status);
              <td>{material.expiry || "N/A"}</td>
              <td><span className="badge bg-secondary text-capitalize">{material.status || "active"}</span></td>
               <td className="text-center">
-              <PermissionWrapper  required={['rawupdate']} children={<Button variant="info" size="sm" className="me-2 text-white" onClick={() => handleShowEdit(material)}><Edit /></Button>}/>
-              <PermissionWrapper  required={['rawdelete']} children={ <Button variant="danger" size="sm" className="me-2 text-white" onClick={() =>{ setMaterialId(material.materialId);setShowDeleteAlertModal(true);}} ><Delete /></Button>}/>
+              <PermissionWrapper  required={['rawupdate']} children={<Button type="button" variant="info" size="sm" className="me-2 text-white" onClick={() => handleShowEdit(material)}><Edit /></Button>}/>
+              <PermissionWrapper  required={['rawdelete']} children={ <Button type="button" variant="danger" size="sm" className="me-2 text-white" onClick={() =>{ setMaterialId(material.materialId);setShowDeleteAlertModal(true);}} ><Delete /></Button>}/>
               </td>
             </tr>
           ))}
           {sortedMaterials.length === 0 ? (
             <tr>
-              <td colSpan={12} className="text-center">No raw materials found.</td>
+              <td colSpan={13} className="text-center">No raw materials found.</td>
             </tr>
           ) : null}
           <tr className="production-total-row">
-            <td className="fs-5 fw-bold" colSpan={3}>Total:</td>
+            <td className="fs-5 fw-bold" colSpan={4}>Total:</td>
             <td className="fs-5 fw-bold" colSpan={2}>
               {formatQuantity(sortedMaterials.reduce((total, item) => total + (Number(item.Quantity) || 0), 0))}
             </td>
@@ -625,13 +1104,29 @@ toast.error("An error occured! "+error.status);
       </div>
 
       {/* Add Modal */}
-      <Modal show={showAddModal} onHide={() => setShowAddModal(false)} backdrop="static" dialogClassName="production-modal-shell">
-        <Modal.Header closeButton>
+      <Modal
+        show={showAddModal || forceRawMaterialModalMode === "add"}
+        onHide={() => {}}
+        backdrop="static"
+        keyboard={false}
+        dialogClassName="production-modal-shell"
+      >
+        <Modal.Header>
           <Modal.Title>Add Raw Material</Modal.Title>
+          <Button
+            type="button"
+            variant="light"
+            className="ms-auto"
+            onClick={closeAddRawMaterialModal}
+            disabled={isLoading || isAnalyzingImage || imageCaptureOpen}
+            aria-label="Close raw material form"
+          >
+            <XCircle />
+          </Button>
         </Modal.Header>
         {isLoading?<div><ReactLoading type="balls" color="gray" height={'30px'} width={'30px'} className=''  /></div>:""}
         <Modal.Body>
-          <Form className="production-form-grid">
+          <Form className="production-form-grid" onSubmit={(event) => event.preventDefault()}>
             <Form.Group>
               <Form.Label>Branch</Form.Label>
               <Form.Select
@@ -647,24 +1142,43 @@ toast.error("An error occured! "+error.status);
                 ))}
               </Form.Select>
             </Form.Group>
+            {renderImageField()}
             {rawMaterialFields.map((field) => (
               <Form.Group key={field.key} className={field.type === "textarea" ? "production-form-grid-single" : ""}>
                 <Form.Label>{field.label}{field.required ? " *" : ""}</Form.Label>
                 {field.type === "category" ? (
-                  <Form.Select
-                    value={formData[field.key] || ""}
-                    onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                  >
-                    <option value="">Select category</option>
-                    {activeCategoryOptions.map((category) => (
-                      <option key={category.categoryId} value={category.categoryName}>
-                        {category.categoryName}
-                      </option>
-                    ))}
-                    {formData.category && !activeCategoryOptions.some((category) => category.categoryName === formData.category) ? (
-                      <option value={formData.category}>{formData.category}</option>
-                    ) : null}
-                  </Form.Select>
+                  <>
+                    <Form.Select
+                      value={formData[field.key] || ""}
+                      onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
+                    >
+                      <option value="">Select category</option>
+                      {activeCategoryOptions.map((category) => (
+                        <option key={category.categoryId} value={category.categoryName}>
+                          {category.categoryName}
+                        </option>
+                      ))}
+                      {formData.category && !activeCategoryOptions.some((category) => category.categoryName === formData.category) ? (
+                        <option value={formData.category}>{formData.category}</option>
+                      ) : null}
+                    </Form.Select>
+                    <InputGroup className="mt-2">
+                      <Form.Control
+                        placeholder="Quick create category"
+                        value={quickCategoryName}
+                        onChange={(event) => setQuickCategoryName(event.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline-success"
+                        onClick={(event) => createQuickRawMaterialCategory(event)}
+                        disabled={isQuickAddingRawCategory}
+                      >
+                        <PlusCircle className="me-2" />
+                        {isQuickAddingRawCategory ? "Creating..." : "Create"}
+                      </Button>
+                    </InputGroup>
+                  </>
                 ) : field.type === "select" ? (
                   <Form.Select
                     value={formData[field.key] || ""}
@@ -677,6 +1191,29 @@ toast.error("An error occured! "+error.status);
                       return <option key={value} value={value}>{label}</option>;
                     })}
                   </Form.Select>
+                ) : field.type === "barcode" ? (
+                  <>
+                    <InputGroup>
+                      <Form.Control
+                        type="text"
+                        inputMode="numeric"
+                        placeholder={field.placeholder}
+                        value={formData[field.key] || ""}
+                        onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value.trim() })}
+                      />
+                      <Button
+                        variant="outline-secondary"
+                        type="button"
+                        title="Scan barcode with camera"
+                        onClick={() => setBarcodeScannerOpen(true)}
+                      >
+                        <UpcScan />
+                      </Button>
+                    </InputGroup>
+                    <Form.Text className="text-muted">
+                      Click this field and scan with a handheld scanner, or use the camera button.
+                    </Form.Text>
+                  </>
                 ) : field.type === "textarea" ? (
                   <Form.Control
                     as="textarea"
@@ -699,26 +1236,44 @@ toast.error("An error occured! "+error.status);
               </Form.Group>
             ))}
           </Form>
-          {isSuccess?<div className="bg-success fw-bold text-white p-2">Raw material added successfully</div>:""}
-          {isError?<div className="bg-danger fw-bold text-white p-2">An error occured! {error}</div>:""}
         </Modal.Body>
         <Modal.Footer>
-       
-          <Button variant="secondary" onClick={() => setShowAddModal(false)}>Close</Button>
+          {saveFeedback ? (
+            <div className={`alert alert-${saveFeedback.type} py-2 px-3 mb-0 me-auto`}>
+              {saveFeedback.message}
+            </div>
+          ) : null}
+          <Button type="button" variant="secondary" onClick={closeAddRawMaterialModal} disabled={isLoading || isAnalyzingImage}>Close</Button>
           {
-        isLoading? <Button variant="primary" ><ReactLoading type="balls" color="gray" height={'30px'} width={'30px'} className=''  />Adding</Button>:<Button variant="primary" onClick={handleAdd}>Add</Button>
+        isLoading? <Button type="button" variant="primary" disabled><ReactLoading type="balls" color="gray" height={'30px'} width={'30px'} className=''  />Adding</Button>:<Button type="button" variant="primary" onClick={handleAdd} disabled={isAnalyzingImage}>Add</Button>
         }
         </Modal.Footer>
       </Modal>
 
       {/* Edit Modal */}
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} backdrop="static" dialogClassName="production-modal-shell">
-        <Modal.Header closeButton>
+      <Modal
+        show={showEditModal || forceRawMaterialModalMode === "edit"}
+        onHide={() => {}}
+        backdrop="static"
+        keyboard={false}
+        dialogClassName="production-modal-shell"
+      >
+        <Modal.Header>
           <Modal.Title>Edit Raw Material</Modal.Title>
+          <Button
+            type="button"
+            variant="light"
+            className="ms-auto"
+            onClick={closeEditRawMaterialModal}
+            disabled={isUpdateLoading || isAnalyzingImage || imageCaptureOpen}
+            aria-label="Close raw material form"
+          >
+            <XCircle />
+          </Button>
         </Modal.Header>
         {isLoading?<div><ReactLoading type="balls" color="gray" height={'30px'} width={'30px'} className=''  /></div>:""}
         <Modal.Body>
-          <Form className="production-form-grid">
+          <Form className="production-form-grid" onSubmit={(event) => event.preventDefault()}>
             <Form.Group>
               <Form.Label>Branch</Form.Label>
               <Form.Select
@@ -734,24 +1289,43 @@ toast.error("An error occured! "+error.status);
                 ))}
               </Form.Select>
             </Form.Group>
+            {renderImageField()}
             {rawMaterialFields.map((field) => (
               <Form.Group key={field.key} className={field.type === "textarea" ? "production-form-grid-single" : ""}>
                 <Form.Label>{field.label}{field.required ? " *" : ""}</Form.Label>
                 {field.type === "category" ? (
-                  <Form.Select
-                    value={formData[field.key] || ""}
-                    onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                  >
-                    <option value="">Select category</option>
-                    {activeCategoryOptions.map((category) => (
-                      <option key={category.categoryId} value={category.categoryName}>
-                        {category.categoryName}
-                      </option>
-                    ))}
-                    {formData.category && !activeCategoryOptions.some((category) => category.categoryName === formData.category) ? (
-                      <option value={formData.category}>{formData.category}</option>
-                    ) : null}
-                  </Form.Select>
+                  <>
+                    <Form.Select
+                      value={formData[field.key] || ""}
+                      onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
+                    >
+                      <option value="">Select category</option>
+                      {activeCategoryOptions.map((category) => (
+                        <option key={category.categoryId} value={category.categoryName}>
+                          {category.categoryName}
+                        </option>
+                      ))}
+                      {formData.category && !activeCategoryOptions.some((category) => category.categoryName === formData.category) ? (
+                        <option value={formData.category}>{formData.category}</option>
+                      ) : null}
+                    </Form.Select>
+                    <InputGroup className="mt-2">
+                      <Form.Control
+                        placeholder="Quick create category"
+                        value={quickCategoryName}
+                        onChange={(event) => setQuickCategoryName(event.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline-success"
+                        onClick={(event) => createQuickRawMaterialCategory(event)}
+                        disabled={isQuickAddingRawCategory}
+                      >
+                        <PlusCircle className="me-2" />
+                        {isQuickAddingRawCategory ? "Creating..." : "Create"}
+                      </Button>
+                    </InputGroup>
+                  </>
                 ) : field.type === "select" ? (
                   <Form.Select
                     value={formData[field.key] || ""}
@@ -764,6 +1338,29 @@ toast.error("An error occured! "+error.status);
                       return <option key={value} value={value}>{label}</option>;
                     })}
                   </Form.Select>
+                ) : field.type === "barcode" ? (
+                  <>
+                    <InputGroup>
+                      <Form.Control
+                        type="text"
+                        inputMode="numeric"
+                        placeholder={field.placeholder}
+                        value={formData[field.key] || ""}
+                        onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value.trim() })}
+                      />
+                      <Button
+                        variant="outline-secondary"
+                        type="button"
+                        title="Scan barcode with camera"
+                        onClick={() => setBarcodeScannerOpen(true)}
+                      >
+                        <UpcScan />
+                      </Button>
+                    </InputGroup>
+                    <Form.Text className="text-muted">
+                      Click this field and scan with a handheld scanner, or use the camera button.
+                    </Form.Text>
+                  </>
                 ) : field.type === "textarea" ? (
                   <Form.Control
                     as="textarea"
@@ -786,13 +1383,16 @@ toast.error("An error occured! "+error.status);
               </Form.Group>
             ))}
           </Form>
-          {isUpdateSuccess?<div className="bg-success fw-bold text-white p-2">Raw material updated successfully</div>:""}
-          {isUpdateError?<div className="bg-danger fw-bold text-white p-2">An error occured! {updateError}</div>:""}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowEditModal(false)}>Close</Button>
+          {saveFeedback ? (
+            <div className={`alert alert-${saveFeedback.type} py-2 px-3 mb-0 me-auto`}>
+              {saveFeedback.message}
+            </div>
+          ) : null}
+          <Button type="button" variant="secondary" onClick={closeEditRawMaterialModal} disabled={isUpdateLoading || isAnalyzingImage}>Close</Button>
           {
-            isUpdateLoading?<Button variant="primary" ><ReactLoading type="bars" color="gray" height={'30px'} width={'30px'} className=''/>updating</Button>:<Button variant="primary" onClick={handleEdit}>Save Changes</Button>
+            isUpdateLoading?<Button type="button" variant="primary" disabled><ReactLoading type="bars" color="gray" height={'30px'} width={'30px'} className=''/>updating</Button>:<Button type="button" variant="primary" onClick={handleEdit} disabled={isAnalyzingImage}>Save Changes</Button>
           }
           
         </Modal.Footer>
@@ -811,13 +1411,28 @@ toast.error("An error occured! "+error.status);
           {isDeleteError?<div className="bg-danger fw-bold text-white p-2">An error occured! {deleteError}</div>:""}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteAlertModal(false)}>Close</Button>
+          <Button type="button" variant="secondary" onClick={() => setShowDeleteAlertModal(false)}>Close</Button>
           {
-            isDeleteLoading?<Button variant="primary" ><ReactLoading type="bars" color="gray" height={'30px'} width={'30px'} className=''/>deleting</Button>: <Button variant="danger" size="sm" onClick={() => handleDelete(materialId)} >Delete</Button>
+            isDeleteLoading?<Button type="button" variant="primary" disabled><ReactLoading type="bars" color="gray" height={'30px'} width={'30px'} className=''/>deleting</Button>: <Button type="button" variant="danger" size="sm" onClick={() => handleDelete(materialId)} >Delete</Button>
           }
           
         </Modal.Footer>
       </Modal>
+
+      <BarcodeScannerDialog
+        open={barcodeScannerOpen}
+        title="Scan raw material barcode"
+        description="Use the device camera to capture the raw material barcode while creating or editing the item."
+        onClose={() => setBarcodeScannerOpen(false)}
+        onDetected={handleRawMaterialBarcodeDetected}
+      />
+      <ImageCaptureDialog
+        show={imageCaptureOpen}
+        title="Capture raw material image"
+        fileNamePrefix="raw-material-image"
+        onClose={() => setImageCaptureOpen(false)}
+        onCapture={handleRawMaterialImageCaptured}
+      />
     </Container>
   );
 };

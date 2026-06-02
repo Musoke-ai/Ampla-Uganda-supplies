@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import {
   Alert,
@@ -44,9 +44,25 @@ import { selectBranches, useGetBranchesQuery } from "../../features/api/branches
 import { selectCustomers, useGetCustomersQuery } from "../../features/api/customers";
 import { useMakeSalesMutation } from "../../features/api/salesSlice";
 import AmplaReceipt from "../receipts/AmplaReceipt";
+import BarcodeScannerDialog from "../BarcodeScannerDialog";
 import "./PosPage.css";
 
 const HOLD_SALES_STORAGE_KEY = "gemini-pos-held-sales";
+const WALK_IN_CUSTOMER_ID = "__walk_in_customer__";
+const API_ROOT = (process.env.REACT_APP_API_BASE_URL || "").replace(/\/api\/?$/, "");
+
+const assetUrl = (path) => {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_ROOT}/${String(path).replace(/^\/+/, "")}`;
+};
+
+const WALK_IN_CUSTOMER = {
+  custId: WALK_IN_CUSTOMER_ID,
+  custName: "Walk-in customer",
+  custContact: "",
+  isWalkIn: true,
+};
 
 const money = (value, currency = "UGX") =>
   `${currency} ${Number(value || 0).toLocaleString()}`;
@@ -79,6 +95,7 @@ const createCartItem = (product, priceType) => {
     itemId: product.itemId,
     itemName: product.itemName,
     itemModel: product.itemModel,
+    itemImage: product.itemImage,
     itemQuantity: toNumber(product.itemQuantity),
     saleQuantity: 1,
     salePrice: priceType === "retail" ? retailPrice : wholesalePrice,
@@ -122,6 +139,7 @@ export default function GeminiPos() {
 
   const [selectedBranchId, setSelectedBranchId] = useState(scopedBranchId);
   const [query, setQuery] = useState("");
+  const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [custId, setCustId] = useState("");
   const [priceType, setPriceType] = useState("retail");
   const [productView, setProductView] = useState("grid");
@@ -144,6 +162,7 @@ export default function GeminiPos() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [completedSale, setCompletedSale] = useState(null);
   const [debtAlertOpen, setDebtAlertOpen] = useState(false);
+  const recentBarcodeScanRef = useRef({ value: "", time: 0 });
 
   useEffect(() => {
     const savedHeldSales = JSON.parse(localStorage.getItem(HOLD_SALES_STORAGE_KEY) || "[]");
@@ -180,9 +199,13 @@ export default function GeminiPos() {
   );
 
   const selectedCustomer = useMemo(
-    () => branchCustomers.find((customer) => String(customer.custId) === String(custId)) || null,
+    () =>
+      custId === WALK_IN_CUSTOMER_ID
+        ? WALK_IN_CUSTOMER
+        : branchCustomers.find((customer) => String(customer.custId) === String(custId)) || null,
     [branchCustomers, custId]
   );
+  const isWalkInCustomer = custId === WALK_IN_CUSTOMER_ID;
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = query.toLowerCase().trim();
@@ -231,7 +254,7 @@ export default function GeminiPos() {
   const tenderedAmount = toNumber(amountPaid);
   const changeDue = tenderedAmount - total;
   const dueAmount = Math.max(0, total - tenderedAmount);
-  const requiresDueDate = dueAmount > 0;
+  const requiresDueDate = dueAmount > 0 && !isWalkInCustomer;
   const debtSalesAllowed = toBooleanSetting(
     selectedBranch?.allowDebtSales,
     toBooleanSetting(settings?.allowDebtSales, true)
@@ -270,8 +293,53 @@ export default function GeminiPos() {
     }
   }, [priceType, wholesaleThresholdReached]);
 
+  useEffect(() => {
+    if (isWalkInCustomer && paymentMethod === "Credit") {
+      setPaymentMethod("Cash");
+      setCreditEndDate("");
+    }
+  }, [isWalkInCustomer, paymentMethod]);
+
   const showFeedback = (severity, message) => {
     setFeedback({ open: true, severity, message });
+  };
+
+  const findProductByBarcode = (barcode) => {
+    const normalizedBarcode = String(barcode || "").trim().toLowerCase();
+    if (!normalizedBarcode) {
+      return null;
+    }
+
+    return branchStockItems.find((item) =>
+      [item.itemBarcode, item.itemSku, item.itemModel]
+        .filter(Boolean)
+        .some((value) => String(value).trim().toLowerCase() === normalizedBarcode)
+    );
+  };
+
+  const handleBarcodeSaleScan = (barcode) => {
+    const cleanBarcode = String(barcode || "").trim();
+    const now = Date.now();
+
+    if (
+      !cleanBarcode ||
+      (recentBarcodeScanRef.current.value === cleanBarcode && now - recentBarcodeScanRef.current.time < 2500)
+    ) {
+      return;
+    }
+
+    recentBarcodeScanRef.current = { value: cleanBarcode, time: now };
+    setBarcodeScannerOpen(false);
+    setQuery(cleanBarcode);
+    const product = findProductByBarcode(cleanBarcode);
+
+    if (!product) {
+      showFeedback("warning", `No product found for barcode ${cleanBarcode}.`);
+      return;
+    }
+
+    addToCart(product);
+    setQuery("");
   };
 
   const persistHeldSales = (nextHeldSales) => {
@@ -315,7 +383,7 @@ export default function GeminiPos() {
     if (!cart.length) return;
 
     if (!custId) {
-      showFeedback("warning", "Select a customer before continuing to payment.");
+      showFeedback("warning", "Select a registered customer or choose Walk-in customer before continuing to payment.");
       return;
     }
 
@@ -421,7 +489,7 @@ export default function GeminiPos() {
       branchId: selectedBranchId,
       branchName: selectedBranch?.branchName || "",
       custId,
-      customerName: selectedCustomer?.custName || "",
+      customerName: selectedCustomer?.custName || (isWalkInCustomer ? WALK_IN_CUSTOMER.custName : ""),
       items: cart,
       priceType,
       total,
@@ -468,12 +536,20 @@ export default function GeminiPos() {
     }
 
     if (!selectedCustomer) {
-      showFeedback("warning", "Select a customer before completing the sale.");
+      showFeedback("warning", "Select a registered customer or choose Walk-in customer before completing the sale.");
       return;
     }
 
     if (tenderedAmount < 0) {
       showFeedback("warning", "Amount paid cannot be negative.");
+      return;
+    }
+
+    if (isWalkInCustomer && (paymentMethod === "Credit" || dueAmount > 0)) {
+      showFeedback(
+        "warning",
+        "Walk-in customers cannot use credit sales. Collect full payment or select a registered customer."
+      );
       return;
     }
 
@@ -495,8 +571,11 @@ export default function GeminiPos() {
       return;
     }
 
+    const saleCustomerId = isWalkInCustomer ? null : custId;
+    const saleCustomerName = selectedCustomer?.custName || WALK_IN_CUSTOMER.custName;
+
     const saleItems = cart.map((item) => ({
-      custId,
+      custId: saleCustomerId,
       saleQuantity: toNumber(item.saleQuantity),
       salePrice: toNumber(item.salePrice),
       saleItemId: item.saleItemId,
@@ -505,8 +584,8 @@ export default function GeminiPos() {
     const saleDetails = {
       branchId: selectedBranchId,
       branchName: selectedBranch?.branchName || "",
-      custId,
-      customerName: selectedCustomer.custName,
+      custId: saleCustomerId,
+      customerName: saleCustomerName,
       paymentMethod,
       tenderedAmount,
       discount: discountAmount,
@@ -534,7 +613,7 @@ export default function GeminiPos() {
           salePrice: toNumber(item.salePrice),
         })),
         saleDetails,
-        customerName: selectedCustomer.custName,
+        customerName: saleCustomerName,
       });
       setReceiptOpen(true);
       clearCheckoutState();
@@ -574,17 +653,27 @@ export default function GeminiPos() {
     const inCartQty =
       cart.find((item) => item.saleItemId === product.itemId)?.saleQuantity || 0;
     const isOutOfStock = availableStock <= 0;
+    const imageUrl = assetUrl(product.itemImage);
 
     if (productView === "list") {
       return (
         <Card key={product.itemId} onClick={() => addToCart(product)} sx={productListCardStyle}>
-          <Box sx={productInitialStyle}>{getInitials(product.itemName)}</Box>
+          {imageUrl ? (
+            <Box component="img" src={imageUrl} alt={product.itemName || "Product"} sx={productImageStyle} />
+          ) : (
+            <Box sx={productInitialStyle}>{getInitials(product.itemName)}</Box>
+          )}
 
           <Box sx={{ minWidth: 0 }}>
             <Typography fontWeight={900}>{product.itemName}</Typography>
             <Typography variant="body2" color="#64748B">
               Model: {product.itemModel || "N/A"}
             </Typography>
+            {product.itemBarcode ? (
+              <Typography variant="body2" color="#64748B">
+                Barcode: {product.itemBarcode}
+              </Typography>
+            ) : null}
           </Box>
 
           <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
@@ -632,12 +721,21 @@ export default function GeminiPos() {
       <Card key={product.itemId} onClick={() => addToCart(product)} sx={productCardStyle}>
         <CardContent>
           <Stack alignItems="center" spacing={1}>
-            <Box sx={productInitialStyle}>{getInitials(product.itemName)}</Box>
+            {imageUrl ? (
+              <Box component="img" src={imageUrl} alt={product.itemName || "Product"} sx={productImageStyle} />
+            ) : (
+              <Box sx={productInitialStyle}>{getInitials(product.itemName)}</Box>
+            )}
             <Box textAlign="center">
               <Typography fontWeight={900}>{product.itemName}</Typography>
               <Typography variant="body2" color="#64748B">
                 Model: {product.itemModel || "N/A"}
               </Typography>
+              {product.itemBarcode ? (
+                <Typography variant="body2" color="#64748B">
+                  Barcode: {product.itemBarcode}
+                </Typography>
+              ) : null}
             </Box>
             <Stack direction="row" gap={1} justifyContent="center" flexWrap="wrap">
               <Chip
@@ -739,9 +837,15 @@ export default function GeminiPos() {
               </FormControl>
 
               <TextField
-                placeholder="Search products..."
+                placeholder="Search or scan barcode..."
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleBarcodeSaleScan(query);
+                  }
+                }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -751,6 +855,14 @@ export default function GeminiPos() {
                 }}
               />
 
+              <Button
+                variant="outlined"
+                onClick={() => setBarcodeScannerOpen(true)}
+                sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 800 }}
+              >
+                Scan Barcode
+              </Button>
+
               <FormControl fullWidth>
                 <Select
                   displayEmpty
@@ -758,6 +870,9 @@ export default function GeminiPos() {
                   onChange={(event) => setCustId(event.target.value)}
                 >
                   <MenuItem value="">Select a customer</MenuItem>
+                  <MenuItem value={WALK_IN_CUSTOMER_ID}>
+                    {WALK_IN_CUSTOMER.custName} - full payment only
+                  </MenuItem>
                   {branchCustomers.map((customer) => (
                     <MenuItem key={customer.custId} value={String(customer.custId)}>
                       {customer.custName} {customer.custContact ? `- ${customer.custContact}` : ""}
@@ -964,10 +1079,11 @@ export default function GeminiPos() {
               {selectedCustomer ? (
                 <Alert severity="success" sx={{ mb: 2, borderRadius: 3 }}>
                   Selling to {selectedCustomer.custName}
+                  {isWalkInCustomer ? " (full payment only)" : ""}
                 </Alert>
               ) : (
                 <Alert severity="warning" sx={{ mb: 2, borderRadius: 3 }}>
-                  Select a customer before charging payment.
+                  Select a registered customer or choose Walk-in customer before charging payment.
                 </Alert>
               )}
 
@@ -1199,8 +1315,15 @@ export default function GeminiPos() {
                 <MenuItem value="Cash">Cash</MenuItem>
                 <MenuItem value="Mobile Money">Mobile Money</MenuItem>
                 <MenuItem value="Bank">Bank</MenuItem>
-                <MenuItem value="Credit">Credit</MenuItem>
+                <MenuItem value="Credit" disabled={isWalkInCustomer}>
+                  Credit
+                </MenuItem>
               </Select>
+              {isWalkInCustomer ? (
+                <Typography color="#64748B" fontSize={13} mt={0.8}>
+                  Walk-in customer sales must be fully paid. Select a registered customer to allow credit.
+                </Typography>
+              ) : null}
             </FormControl>
 
             <Box>
@@ -1298,6 +1421,12 @@ export default function GeminiPos() {
                 </Button>
               ))}
             </Box>
+
+            {isWalkInCustomer && dueAmount > 0 ? (
+              <Alert severity="error" sx={{ borderRadius: 3 }}>
+                Walk-in customers cannot leave a balance. Enter the full amount paid or select a registered customer.
+              </Alert>
+            ) : null}
 
             {requiresDueDate && (
               <>
@@ -1467,6 +1596,14 @@ export default function GeminiPos() {
         customerName={completedSale?.customerName}
         cart={completedSale?.cart || []}
         saleDetails={completedSale?.saleDetails || {}}
+      />
+
+      <BarcodeScannerDialog
+        open={barcodeScannerOpen}
+        title="Scan product barcode"
+        description="Scan a product barcode to add it directly to the current POS cart."
+        onClose={() => setBarcodeScannerOpen(false)}
+        onDetected={handleBarcodeSaleScan}
       />
     </Box>
   );
@@ -1767,6 +1904,15 @@ const productInitialStyle = {
   placeItems: "center",
   fontSize: 16,
   fontWeight: 900,
+};
+
+const productImageStyle = {
+  width: 56,
+  height: 56,
+  borderRadius: 2,
+  objectFit: "cover",
+  border: "1px solid #D7EBDD",
+  bgcolor: "#E8F5EC",
 };
 
 const cartInitialStyle = {

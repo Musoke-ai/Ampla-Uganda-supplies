@@ -5,7 +5,7 @@ import imgInvoice from '../../../../mystockimg/e-invoice.png';
 import imgSales from '../../../../mystockimg/debt-equity-ratio.webp';
 import imgStock from '../../../../mystockimg/tools-for-effective-inventory-management-1920x1274.jpg.webp';
 
-const amplaLogo = `${process.env.PUBLIC_URL || ""}/logos/ampla_logo.png`;
+const amplaLogo = "/logos/ampla_logo.png";
 
 const Landing = () => {
   return (

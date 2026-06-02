@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from '../api/apiSlice';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 
 const salesAdapter = createEntityAdapter({
     selectId: (sales) => sales.saleId,
-sortComparer: (a, b) => b.saleDateCreated.localeCompare(a.saleDateCreated)
+sortComparer: (a, b) => compareDesc(a.saleDateCreated, b.saleDateCreated)
 })
 
 const initialState = salesAdapter.getInitialState();
@@ -18,9 +19,20 @@ export const extendedSalesApiSlice = apiSlice.injectEndpoints({
         getSales: builder.query({
             query: () => '/retrievals/sales',
             transformResponse:  responseData => {
-            return salesAdapter.setAll(initialState, responseData)
+            return salesAdapter.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
+        }),
+        getReceipts: builder.query({
+            query: ({ dateFrom, dateTo } = {}) => {
+                const params = new URLSearchParams();
+                if (dateFrom) params.set('date_from', dateFrom);
+                if (dateTo) params.set('date_to', dateTo);
+                const query = params.toString();
+                return `/retrievals/receipts${query ? `?${query}` : ''}`;
+            },
+            transformResponse: responseData => extractArray(responseData),
+            providesTags: [commonTags.inventory],
         }),
         makeSales: builder.mutation(
             {
@@ -48,6 +60,7 @@ export const extendedSalesApiSlice = apiSlice.injectEndpoints({
 
 export const {
     useGetSalesQuery,
+    useGetReceiptsQuery,
     useMakeSalesMutation,
     useCancelSalesMutation
 } = extendedSalesApiSlice 

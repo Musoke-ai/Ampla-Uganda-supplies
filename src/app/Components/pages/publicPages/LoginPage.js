@@ -1,7 +1,8 @@
 import {useRef, useState, useEffect } from 'react';
-import { Button, Modal, Form, Container, Alert } from "react-bootstrap";
+import { Button, Modal, Form, Container, Alert, InputGroup } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { FaIndustry, FaTools, FaCogs } from "react-icons/fa";
+import { Eye, EyeSlash } from "react-bootstrap-icons";
 // import "animate.css";
 
 import { useNavigate, Link } from 'react-router-dom';
@@ -17,12 +18,14 @@ const LoginPage = () => {
   const [role, setRole] = useState("admin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
   const handleClose = () => {
     setShow(false);
     setEmail("");
     setPassword("");
+    setShowPassword(false);
     setError("");
   };
 
@@ -87,13 +90,24 @@ const LoginPage = () => {
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Password</Form.Label>
-              <Form.Control 
-                type="password" 
-                placeholder="Password" 
-                className="bg-dark text-light border-success" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <InputGroup>
+                <Form.Control
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  className="bg-dark text-light border-success"
+                  value={password}
+                  autoComplete="current-password"
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <Button
+                  variant="outline-success"
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((value) => !value)}
+                >
+                  {showPassword ? <EyeSlash /> : <Eye />}
+                </Button>
+              </InputGroup>
             </Form.Group>
           </Form>
           <p>Forget your password <Link to="/magic-login">Use a Login Link</Link></p>

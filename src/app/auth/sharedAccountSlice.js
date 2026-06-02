@@ -31,7 +31,7 @@ export const sharedAccountApiSlice = apiSlice.injectEndpoints({
                   
                 }
             },
-           providesTags: [commonTags.profile,commonTags.inventory],
+           providesTags: [commonTags.profile],
         }),
         updateProfile: builder.mutation({
             query: credentials => ({

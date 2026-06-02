@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { Box } from "@mui/material";
@@ -12,6 +12,7 @@ import {
 } from "../../features/api/notificationsSlice";
 import ModernSidebar from "../ModernSidebar";
 import ModernNavBar from "../ModernNavBar";
+import FloatingHelpBubble from "../FloatingHelpBubble";
 import { useSettings } from "../Settings";
 
 const subscriptions = [
@@ -83,6 +84,8 @@ const ProtectedLayout = () => {
   const { settings, notificationPollingInterval } = useSettings();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [navHiddenOnScroll, setNavHiddenOnScroll] = useState(false);
+  const contentScrollRef = useRef(null);
   const [signOut] = useSendLogoutMutation();
   const isDark = settings?.theme === "dark";
 
@@ -93,6 +96,41 @@ const ProtectedLayout = () => {
       dispatch({ type: PUSHER_SUBSCRIBE, payload: subscription });
     });
   }, [dispatch]);
+
+  useEffect(() => {
+    const scrollElement = contentScrollRef.current;
+    if (!scrollElement) return undefined;
+
+    let lastScrollTop = scrollElement.scrollTop;
+    let ticking = false;
+
+    const updateNavbarVisibility = () => {
+      const nextScrollTop = Math.max(scrollElement.scrollTop, 0);
+      const delta = nextScrollTop - lastScrollTop;
+
+      if (nextScrollTop < 24) {
+        setNavHiddenOnScroll(false);
+      } else if (Math.abs(delta) > 8) {
+        setNavHiddenOnScroll(delta > 0);
+      }
+
+      lastScrollTop = nextScrollTop;
+      ticking = false;
+    };
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateNavbarVisibility);
+        ticking = true;
+      }
+    };
+
+    scrollElement.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      scrollElement.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   const unreadNotifications = useMemo(
     () => notifications.filter((item) => !item?.is_read).length,
@@ -151,9 +189,11 @@ const ProtectedLayout = () => {
           onMenuToggle={() => setMobileOpen(true)}
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={() => setSidebarCollapsed((value) => !value)}
+          hiddenOnCompactScroll={navHiddenOnScroll}
         />
 
         <Box
+          ref={contentScrollRef}
           sx={{
             flex: 1,
             minHeight: 0,
@@ -184,6 +224,7 @@ const ProtectedLayout = () => {
           <Outlet />
         </Box>
       </Box>
+      <FloatingHelpBubble roles={roles} />
     </Box>
   );
 };

@@ -5,6 +5,7 @@ import {
 import { apiSlice } from '../api/apiSlice';
 import { formatDistance, formatDistanceToNowStrict, format } from 'date-fns';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 const today = new Date();
 const passedDate = new Date(2023, 9, 24);
 const formattedDate = format(today, 'yyyy.MM.dd');
@@ -13,7 +14,7 @@ const result = formatDistance(today, passedDate)
 
 const debtAdapter = createEntityAdapter({
 selectId: (debt) => debt.indebtId,
-sortComparer: (a, b) => b.indebtDateCreated.localeCompare(a.indebtDateCreated)
+sortComparer: (a, b) => compareDesc(a.indebtDateCreated, b.indebtDateCreated)
 })
 
 const initialState = debtAdapter.getInitialState();
@@ -24,7 +25,7 @@ export const extendedDebtApiSlice = apiSlice.injectEndpoints({
         getDebts: builder.query({
             query: () => '/retrievals/debts',
             transformResponse:  responseData => {
-                responseData = responseData.map((item) => {
+                responseData = extractArray(responseData).map((item) => {
                                         const entryDate = item.indebtDateCreated && !isNaN(new Date(item.indebtDateCreated))
                                             ? format(new Date(item.indebtDateCreated), 'yyy.MM.dd')
                                             : "N/A";

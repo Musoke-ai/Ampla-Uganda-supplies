@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Dropdown, Image, Modal, Form, Button } from "react-bootstrap";
-import { Gear } from "react-bootstrap-icons";
+import { Dropdown, Image, Modal, Form, Button, InputGroup } from "react-bootstrap";
+import { Eye, EyeSlash, Gear } from "react-bootstrap-icons";
 import { useNavigate } from "react-router-dom";
 import { selectUserId } from "../../auth/authSlice";
 import { selectAccounts } from "../../features/api/AccountsSlice";
@@ -22,6 +22,8 @@ const UserAvatar = ({ user, onLogout, onChangePassword,logout }) => {
   const [showModal, setShowModal] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   const handlePasswordChange = () => {
     onChangePassword(oldPassword, newPassword);
@@ -59,21 +61,43 @@ const UserAvatar = ({ user, onLogout, onChangePassword,logout }) => {
           <Form>
             <Form.Group className="mb-3">
               <Form.Label>Old Password</Form.Label>
-              <Form.Control 
-                type="password" 
-                value={oldPassword} 
-                onChange={(e) => setOldPassword(e.target.value)} 
-                placeholder="Enter old password" 
-              />
+              <InputGroup>
+                <Form.Control
+                  type={showOldPassword ? "text" : "password"}
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  placeholder="Enter old password"
+                  autoComplete="current-password"
+                />
+                <Button
+                  type="button"
+                  variant="outline-secondary"
+                  onClick={() => setShowOldPassword((value) => !value)}
+                  aria-label={showOldPassword ? "Hide old password" : "Show old password"}
+                >
+                  {showOldPassword ? <EyeSlash /> : <Eye />}
+                </Button>
+              </InputGroup>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>New Password</Form.Label>
-              <Form.Control 
-                type="password" 
-                value={newPassword} 
-                onChange={(e) => setNewPassword(e.target.value)} 
-                placeholder="Enter new password" 
-              />
+              <InputGroup>
+                <Form.Control
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  autoComplete="new-password"
+                />
+                <Button
+                  type="button"
+                  variant="outline-secondary"
+                  onClick={() => setShowNewPassword((value) => !value)}
+                  aria-label={showNewPassword ? "Hide new password" : "Show new password"}
+                >
+                  {showNewPassword ? <EyeSlash /> : <Eye />}
+                </Button>
+              </InputGroup>
             </Form.Group>
           </Form>
         </Modal.Body>

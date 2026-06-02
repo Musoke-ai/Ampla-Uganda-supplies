@@ -14,7 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Bell, Calendar3, ChatDots, ChevronLeft, ChevronRight, Gear, List, Power, SignpostSplit, ThreeDotsVertical } from "react-bootstrap-icons";
+import { Bell, Calendar3, ChatDots, ChevronLeft, ChevronRight, Gear, List, People, Power, QuestionCircle, SignpostSplit, ThreeDotsVertical } from "react-bootstrap-icons";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -43,6 +43,7 @@ const ModernNavBar = ({
   onMenuToggle = () => {},
   sidebarCollapsed = false,
   onSidebarToggle = () => {},
+  hiddenOnCompactScroll = false,
 }) => {
   const { settings } = useSettings();
   const navigate = useNavigate();
@@ -80,6 +81,21 @@ const ModernNavBar = ({
         backdropFilter: "blur(18px)",
         borderBottom: `1px solid ${borderColor}`,
         boxShadow: "none",
+        zIndex: (theme) => theme.zIndex.drawer + 2,
+        transform: {
+          xs: hiddenOnCompactScroll ? "translateY(-110%)" : "translateY(0)",
+          lg: "translateY(0)",
+        },
+        opacity: {
+          xs: hiddenOnCompactScroll ? 0 : 1,
+          lg: 1,
+        },
+        pointerEvents: {
+          xs: hiddenOnCompactScroll ? "none" : "auto",
+          lg: "auto",
+        },
+        transition: "transform 220ms ease, opacity 180ms ease, background-color 180ms ease",
+        willChange: "transform",
       }}
     >
       <Toolbar
@@ -332,6 +348,26 @@ const ModernNavBar = ({
           >
             <ChatDots size={16} />
             <Typography variant="body2">Open Ampla Copilot</Typography>
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              setWorkspaceAnchor(null);
+              navigate("/home/help");
+            }}
+            sx={{ gap: 1.2, py: 1.2, borderRadius: 2 }}
+          >
+            <QuestionCircle size={16} />
+            <Typography variant="body2">Open Help Guide</Typography>
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              setWorkspaceAnchor(null);
+              navigate("/home/staff");
+            }}
+            sx={{ gap: 1.2, py: 1.2, borderRadius: 2 }}
+          >
+            <People size={16} />
+            <Typography variant="body2">Staff Management</Typography>
           </MenuItem>
           <MenuItem disabled sx={{ gap: 1.2, py: 1.2, borderRadius: 2 }}>
             <Calendar3 size={16} />

@@ -58,6 +58,25 @@ const debtSalePolicyLabel = (value, globalSetting = true) => {
     : "Disabled for branch";
 };
 
+const formatApiError = (error, fallback) => {
+  const message = error?.data?.message;
+  const errors = error?.data?.errors;
+
+  if (typeof message === "string" && message.trim()) {
+    return message;
+  }
+
+  if (message && typeof message === "object") {
+    return Object.values(message).filter(Boolean).join(" ");
+  }
+
+  if (errors && typeof errors === "object") {
+    return Object.values(errors).filter(Boolean).join(" ");
+  }
+
+  return error?.error || fallback;
+};
+
 const MetricCard = ({ icon, title, value, note }) => (
   <div className="workspace-metric-card" style={sectionCardStyle}>
     <div
@@ -205,7 +224,7 @@ const BranchesPage = () => {
 
       handleCloseModal();
     } catch (error) {
-      toast.error(error?.data?.message || "Branch action failed.");
+      toast.error(formatApiError(error, "Branch action failed."));
     }
   };
 
@@ -215,7 +234,7 @@ const BranchesPage = () => {
       toast.success(response?.message || "Branch deleted successfully.");
       handleCloseDelete();
     } catch (error) {
-      toast.error(error?.data?.message || "Branch deletion failed.");
+      toast.error(formatApiError(error, "Branch deletion failed."));
     }
   };
 

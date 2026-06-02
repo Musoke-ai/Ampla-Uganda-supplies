@@ -3,6 +3,11 @@ import { apiSlice } from "../features/api/apiSlice";
 import { logOut, setCredentials, setRoles, setProfile, setPermissions, setUserId, setBranchScope } from "./authSlice";
 import {tags as commonTags } from '../features/api/commonTags'
 
+const asArray = (value) => {
+    if (Array.isArray(value)) return value;
+    return value ? [value] : [];
+};
+
 export const authApiSlice = apiSlice.injectEndpoints({
     endpoints: builder => ({
         register: builder.mutation({
@@ -23,10 +28,13 @@ export const authApiSlice = apiSlice.injectEndpoints({
                 try {
                     const { data } = await queryFulfilled;
                     const { accessToken, roles, permissions, user_id, branchScope } = data?.data || {};
+                    if (!accessToken) {
+                        return;
+                    }
                     dispatch(setCredentials({ accessToken }));
                     dispatch(setUserId({ user_id }));
-                    dispatch(setRoles({ roles: Array.isArray(roles) ? roles : [roles] }));
-                    dispatch(setPermissions({ permissions: Array.isArray(permissions) ? permissions : [permissions] }));
+                    dispatch(setRoles({ roles: asArray(roles) }));
+                    dispatch(setPermissions({ permissions: asArray(permissions) }));
                     dispatch(setBranchScope({ branchScope: branchScope ?? null }));
                 } catch (err) {
                 }
@@ -47,7 +55,7 @@ export const authApiSlice = apiSlice.injectEndpoints({
                   
                 }
             },
-           providesTags: [commonTags.profile,commonTags.inventory],
+           providesTags: [commonTags.profile],
         }),
 
         updateProfile: builder.mutation({
@@ -103,11 +111,14 @@ export const authApiSlice = apiSlice.injectEndpoints({
                 try {
                     const { data } = await queryFulfilled
                     const { accessToken, roles, permissions, user_id, branchScope } = data?.data || {}
+                    if (!accessToken) {
+                        return;
+                    }
                     dispatch(setCredentials({ accessToken }))
                     dispatch(setUserId({ user_id }))
                     //make sure always the roles is an array
-                    dispatch(setRoles({ roles: Array.isArray(roles) ? roles : [roles] }));
-                    dispatch(setPermissions({ permissions: Array.isArray(permissions) ? permissions : [permissions] }));
+                    dispatch(setRoles({ roles: asArray(roles) }));
+                    dispatch(setPermissions({ permissions: asArray(permissions) }));
                     dispatch(setBranchScope({ branchScope: branchScope ?? null }));
                 } catch (err) {
                     console.log(err)

@@ -1,10 +1,11 @@
 import { createEntityAdapter, createSelector } from "@reduxjs/toolkit";
 import { apiSlice } from "./apiSlice";
 import { tags as commonTags } from "./commonTags";
+import { compareDesc, extractArray } from "./responseUtils";
 
 const productionBatchAdapter = createEntityAdapter({
   selectId: (batch) => batch.batchId,
-  sortComparer: (a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")),
+  sortComparer: (a, b) => compareDesc(a.createdAt, b.createdAt),
 });
 
 const initialState = productionBatchAdapter.getInitialState();
@@ -14,7 +15,7 @@ export const extendedProductionBatchApiSlice = apiSlice.injectEndpoints({
     getProductionBatches: builder.query({
       query: () => "/production/batches",
       transformResponse: (responseData) =>
-        productionBatchAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : []),
+        productionBatchAdapter.setAll(initialState, extractArray(responseData)),
       providesTags: [commonTags.inventory],
     }),
     getProductionBatch: builder.query({
@@ -53,9 +54,41 @@ export const extendedProductionBatchApiSlice = apiSlice.injectEndpoints({
       }),
       invalidatesTags: [commonTags.inventory],
     }),
+    updateProductionBatchMaterial: builder.mutation({
+      query: (payload) => ({
+        url: "/production/batches/materials/update",
+        method: "post",
+        body: payload,
+      }),
+      invalidatesTags: [commonTags.inventory],
+    }),
+    deleteProductionBatchMaterial: builder.mutation({
+      query: (payload) => ({
+        url: "/production/batches/materials/delete",
+        method: "post",
+        body: payload,
+      }),
+      invalidatesTags: [commonTags.inventory],
+    }),
     addProductionBatchLabor: builder.mutation({
       query: (payload) => ({
         url: "/production/batches/labor",
+        method: "post",
+        body: payload,
+      }),
+      invalidatesTags: [commonTags.inventory],
+    }),
+    updateProductionBatchLabor: builder.mutation({
+      query: (payload) => ({
+        url: "/production/batches/labor/update",
+        method: "post",
+        body: payload,
+      }),
+      invalidatesTags: [commonTags.inventory],
+    }),
+    deleteProductionBatchLabor: builder.mutation({
+      query: (payload) => ({
+        url: "/production/batches/labor/delete",
         method: "post",
         body: payload,
       }),
@@ -69,9 +102,41 @@ export const extendedProductionBatchApiSlice = apiSlice.injectEndpoints({
       }),
       invalidatesTags: [commonTags.inventory],
     }),
+    updateProductionBatchExpense: builder.mutation({
+      query: (payload) => ({
+        url: "/production/batches/expenses/update",
+        method: "post",
+        body: payload,
+      }),
+      invalidatesTags: [commonTags.inventory],
+    }),
+    deleteProductionBatchExpense: builder.mutation({
+      query: (payload) => ({
+        url: "/production/batches/expenses/delete",
+        method: "post",
+        body: payload,
+      }),
+      invalidatesTags: [commonTags.inventory],
+    }),
     postProductionBatchOutput: builder.mutation({
       query: (payload) => ({
         url: "/production/batches/output",
+        method: "post",
+        body: payload,
+      }),
+      invalidatesTags: [commonTags.inventory],
+    }),
+    updateProductionBatchOutput: builder.mutation({
+      query: (payload) => ({
+        url: "/production/batches/output/update",
+        method: "post",
+        body: payload,
+      }),
+      invalidatesTags: [commonTags.inventory],
+    }),
+    deleteProductionBatchOutput: builder.mutation({
+      query: (payload) => ({
+        url: "/production/batches/output/delete",
         method: "post",
         body: payload,
       }),
@@ -103,9 +168,17 @@ export const {
   useUpdateProductionBatchMutation,
   useDeleteProductionBatchMutation,
   useAddProductionBatchMaterialMutation,
+  useUpdateProductionBatchMaterialMutation,
+  useDeleteProductionBatchMaterialMutation,
   useAddProductionBatchLaborMutation,
+  useUpdateProductionBatchLaborMutation,
+  useDeleteProductionBatchLaborMutation,
   useAddProductionBatchExpenseMutation,
+  useUpdateProductionBatchExpenseMutation,
+  useDeleteProductionBatchExpenseMutation,
   usePostProductionBatchOutputMutation,
+  useUpdateProductionBatchOutputMutation,
+  useDeleteProductionBatchOutputMutation,
   useUpdateProductionBatchStatusMutation,
   useUpdateProductionBatchQualityMutation,
 } = extendedProductionBatchApiSlice;

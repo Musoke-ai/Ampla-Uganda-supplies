@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from './apiSlice';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 
 const rawMaterialsAdapter = createEntityAdapter({
 selectId: (rawMaterials) => rawMaterials.materialId,
-sortComparer: (a, b) => b.rawMaterialDateCreated.localeCompare(a.rawMaterialDateCreated)
+sortComparer: (a, b) => compareDesc(a.rawMaterialDateCreated, b.rawMaterialDateCreated)
 })
 
 const initialState = rawMaterialsAdapter.getInitialState();
@@ -18,7 +19,7 @@ export const extendedRawMaterialsApiSlice = apiSlice.injectEndpoints({
         getRawMaterials: builder.query({
             query: () => '/rawmaterials',
             transformResponse:  responseData => {
-            return rawMaterialsAdapter.setAll(initialState, responseData)
+            return rawMaterialsAdapter.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
         }),

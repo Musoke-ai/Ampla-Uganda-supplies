@@ -38,7 +38,7 @@ import { selectProfile, selectRoles } from "../auth/authSlice";
 import AdminAccountManager from "./production/AdminAccountManager";
 import "./pages/WorkspacePages.css";
 
-const DEVELOPER_LOGO_SRC = `${process.env.PUBLIC_URL || ""}/logos/hamuzahAndSteve.png`;
+const DEVELOPER_LOGO_SRC = "/logos/hamuzahAndSteve.png";
 
 export const SettingsContext = createContext();
 export const useSettings = () => useContext(SettingsContext);

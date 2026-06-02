@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from '../api/apiSlice';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 
 const statisticsAdapter = createEntityAdapter({
     selectId: (statistics) => statistics.statId,
-sortComparer: (a, b) => b.statDateCreated.localeCompare(a.statDateCreated)
+sortComparer: (a, b) => compareDesc(a.statDateCreated, b.statDateCreated)
 })
 
 const initialState = statisticsAdapter.getInitialState();
@@ -18,7 +19,7 @@ export const extendedStatsApiSlice = apiSlice.injectEndpoints({
         getStatistics: builder.query({
             query: () => '/retrievals/statistics',
             transformResponse:  responseData => {
-            return statisticsAdapter.setAll(initialState, responseData)
+            return statisticsAdapter.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
         }),

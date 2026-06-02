@@ -25,6 +25,9 @@ import BranchesPage from "./app/Components/pages/BranchesPage";
 import UserLanding from "./app/Components/pages/User/UserLanding";
 import Settings from "./app/Components/Settings";
 import AssistantWorkspace from "./app/Components/pages/AssistantWorkspace";
+import HelpGuide from "./app/Components/pages/HelpGuide";
+import ImportsPage from "./app/Components/pages/ImportsPage";
+import StaffManagementPage from "./app/Components/pages/StaffManagementPage";
 
 // Auth and Utility Components
 import RequireAuth from "./app/auth/RequireAuth";
@@ -77,7 +80,21 @@ const ROLE_ACCESS = {
   pos: ["admin", "salesdesk", "accountant"],
   history: ["admin", "history", "accountant"],
   settings: ALL_APP_ROLES,
+  staff: ["superadmin", "developer", "admin"],
   assistant: ALL_APP_ROLES,
+  help: ALL_APP_ROLES,
+  imports: [
+    "superadmin",
+    "developer",
+    "admin",
+    "products",
+    "stock",
+    "inventorymanager",
+    "productionmanager",
+    "productionmanger",
+    "customers",
+    "accountant",
+  ],
 };
 
 function App() {
@@ -92,6 +109,7 @@ function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Login />} />
         <Route path="/magic-login" element={<ForgetPassword />} />
+        <Route path="/help" element={<HelpGuide publicPage />} />
       </Route>
 
       {/*
@@ -136,6 +154,10 @@ function App() {
             <Route path="stock" element={<ItemsExerpt />} />
           </Route>
 
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.imports} />}>
+            <Route path="imports" element={<ImportsPage />} />
+          </Route>
+
           <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.customers} />}>
             <Route path="customers" element={<CustomerPage />} />
           </Route>
@@ -164,8 +186,16 @@ function App() {
             <Route path="settings" element={<Settings />} />
           </Route>
 
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.staff} />}>
+            <Route path="staff" element={<StaffManagementPage />} />
+          </Route>
+
           <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.assistant} />}>
             <Route path="assistant" element={<AssistantWorkspace />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.help} />}>
+            <Route path="help" element={<HelpGuide />} />
           </Route>
 
           {/* Routes accessible only to 'admin' */}

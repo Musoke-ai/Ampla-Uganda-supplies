@@ -15,7 +15,7 @@ import UserAvatar from "./production/UserProfile";
 import { useSettings } from "./Settings";
 import ConnectionStatus from './alerts/ConnectionStatus';
 
-const amplaLogo = `${process.env.PUBLIC_URL || ""}/logos/ampla_logo.png`;
+const amplaLogo = "/logos/ampla_logo.png";
 
 // =================================================================================
 // Main NavBar Component (Simplified)

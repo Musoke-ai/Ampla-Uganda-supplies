@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import {
   Alert,
   Badge,
@@ -13,6 +14,8 @@ import {
   Table,
 } from "react-bootstrap";
 import { Link } from "react-router-dom";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 import {
   ArrowRight,
   BoxSeam,
@@ -21,6 +24,8 @@ import {
   ClipboardData,
   Cpu,
   Database,
+  Download,
+  FileEarmarkPdf,
   LightningCharge,
   People,
   PlayCircle,
@@ -30,6 +35,7 @@ import {
   XCircle,
 } from "react-bootstrap-icons";
 
+import { selectProfile } from "../../auth/authSlice";
 import {
   useCancelAgentDraftMutation,
   useConfirmAgentDraftMutation,
@@ -120,6 +126,294 @@ const formatDateTime = (value) => {
   });
 };
 
+const safeReportFilename = (value, fallback = "inventory-report.pdf") => {
+  const filename = String(value || fallback)
+    .replace(/[^a-z0-9._-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+
+  return filename || fallback;
+};
+
+const titleFromReportKey = (reportKey = "report") =>
+  String(reportKey)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const labelFromKey = (key = "") =>
+  String(key)
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const findReportTable = (report = {}) => {
+  if (Array.isArray(report?.table?.rows)) {
+    return {
+      columns: Array.isArray(report.table.columns) ? report.table.columns : [],
+      rows: report.table.rows,
+    };
+  }
+
+  for (const value of Object.values(report || {})) {
+    if (Array.isArray(value?.rows)) {
+      return {
+        columns: Array.isArray(value.columns) ? value.columns : [],
+        rows: value.rows,
+      };
+    }
+  }
+
+  for (const [key, value] of Object.entries(report || {})) {
+    if (Array.isArray(value) && value.length && typeof value[0] === "object") {
+      const rows = value.slice(0, 100);
+      return {
+        columns: Object.keys(rows[0] || {}).slice(0, 8),
+        rows,
+        source: key,
+      };
+    }
+  }
+
+  return { columns: [], rows: [] };
+};
+
+const flattenSummaryMetrics = (report = {}) => {
+  const summary = report?.summary && typeof report.summary === "object" ? report.summary : {};
+
+  return Object.entries(summary)
+    .filter(([, value]) => value === null || ["string", "number", "boolean"].includes(typeof value))
+    .slice(0, 10)
+    .map(([key, value]) => [labelFromKey(key), value]);
+};
+
+const extractRecommendations = (report = {}, answer = "") => {
+  const recommendations = [];
+  const insights = Array.isArray(report.insights)
+    ? report.insights
+    : Array.isArray(report.items)
+      ? report.items
+      : [];
+
+  insights.slice(0, 5).forEach((item) => {
+    if (typeof item === "string") {
+      recommendations.push(item);
+      return;
+    }
+
+    const message = item?.suggested_action || item?.message || item?.title || item?.summary;
+    if (message) recommendations.push(message);
+  });
+
+  if (Array.isArray(report.accuracyNotes)) {
+    report.accuracyNotes.slice(0, 3).forEach((note) => recommendations.push(note));
+  }
+
+  if (!recommendations.length && answer) {
+    const answerLines = String(answer)
+      .split(/\n+/)
+      .map((line) => line.replace(/^[-*\d.]+\s*/, "").trim())
+      .filter(Boolean);
+    recommendations.push(...answerLines.slice(0, 3));
+  }
+
+  return [...new Set(recommendations)].slice(0, 6);
+};
+
+const formatReportValue = (key, value) => {
+  if (value === null || value === undefined || value === "") return "-";
+
+  const lowerKey = String(key).toLowerCase();
+  if (
+    lowerKey.includes("amount") ||
+    lowerKey.includes("value") ||
+    lowerKey.includes("price") ||
+    lowerKey.includes("cost") ||
+    lowerKey.includes("sales") ||
+    lowerKey.includes("profit") ||
+    lowerKey.includes("balance")
+  ) {
+    return formatCurrency(value);
+  }
+
+  if (typeof value === "number" || (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value))) {
+    return formatNumber(value);
+  }
+
+  return String(value);
+};
+
+const buildReportPdf = ({ report = {}, exportMeta = {}, businessInfo = {}, answer = "" }) => {
+  const summary = report.summary || {};
+  const table = findReportTable(report);
+  const rows = table.rows;
+  const columns = table.columns.length
+    ? table.columns
+    : rows.length
+      ? Object.keys(rows[0]).slice(0, 8)
+      : [];
+  const title = titleFromReportKey(exportMeta?.report_key || "business_report");
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 16;
+  const generatedAt = new Date().toLocaleString("en-UG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const metrics = flattenSummaryMetrics(report);
+  const recommendations = extractRecommendations(report, answer);
+  const businessName = businessInfo?.busName || "Ampla Uganda Supplies";
+
+  doc.setTextColor(20, 30, 38);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text(title, margin, 18);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(95, 105, 115);
+  doc.text(businessName, margin, 25);
+  doc.text(`Generated: ${generatedAt}`, margin, 31);
+  doc.text(`File: ${exportMeta?.filename || "report.pdf"}`, margin, 37);
+  doc.setDrawColor(175, 185, 196);
+  doc.line(margin, 43, pageWidth - margin, 43);
+
+  let y = 54;
+
+  doc.setTextColor(20, 30, 38);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Executive Summary", margin, y);
+  y += 7;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(55, 65, 75);
+  const summaryText = answer
+    ? String(answer)
+    : `This ${title.toLowerCase()} was generated from live Ampla ERP data.`;
+  const summaryLines = doc.splitTextToSize(summaryText.replace(/\s+/g, " "), pageWidth - margin * 2);
+  doc.text(summaryLines.slice(0, 8), margin, y);
+  y += Math.min(summaryLines.length, 8) * 4.5 + 7;
+
+  if (metrics.length) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(20, 30, 38);
+    doc.text("Key Figures", margin, y);
+    y += 6;
+    doc.setFontSize(9);
+
+    metrics.forEach(([label, value]) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(`${label}:`, margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(formatReportValue(label, value), margin + 52, y);
+      y += 5;
+    });
+
+    y += 4;
+  }
+
+  if (recommendations.length) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(20, 30, 38);
+    doc.text("Recommendations And Notes", margin, y);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(55, 65, 75);
+
+    recommendations.forEach((recommendation, index) => {
+      const lines = doc.splitTextToSize(`${index + 1}. ${recommendation}`, pageWidth - margin * 2);
+      doc.text(lines, margin, y);
+      y += lines.length * 4.5 + 2;
+    });
+
+    y += 4;
+  }
+
+  const body = rows.map((row) =>
+    columns.map((column) => {
+      return formatReportValue(column, row?.[column]);
+    })
+  );
+
+  doc.autoTable({
+    startY: Math.max(y, 60),
+    head: [columns.map(labelFromKey)],
+    body,
+    styles: {
+      font: "helvetica",
+      fontSize: 7.5,
+      cellPadding: 2.2,
+      lineColor: [222, 226, 230],
+      lineWidth: 0.1,
+      textColor: [33, 37, 41],
+    },
+    headStyles: {
+      fillColor: [52, 58, 64],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+    },
+    alternateRowStyles: {
+      fillColor: [248, 249, 250],
+    },
+    margin: { left: margin, right: margin },
+    didDrawPage: () => {
+      doc.setFontSize(8);
+      doc.setTextColor(108, 117, 125);
+      doc.text(
+        "Generated by Ampla Copilot from live ERP data.",
+        margin,
+        pageHeight - 8
+      );
+      doc.text("Powered by HamuzahAndSteve Technologies", pageWidth / 2, pageHeight - 8, {
+        align: "center",
+      });
+      doc.text(`Page ${doc.internal.getNumberOfPages()}`, pageWidth - margin, pageHeight - 8, {
+        align: "right",
+      });
+    },
+  });
+
+  return doc;
+};
+
+const downloadReportPdf = ({ report, exportMeta, businessInfo, answer }) => {
+  const doc = buildReportPdf({ report, exportMeta, businessInfo, answer });
+  doc.save(safeReportFilename(exportMeta?.filename, "report.pdf"));
+};
+
+const downloadReportCsv = ({ report = {}, exportMeta = {} }) => {
+  const table = findReportTable(report);
+  const columns = table.columns.length
+    ? table.columns
+    : table.rows.length
+      ? Object.keys(table.rows[0]).slice(0, 8)
+      : [];
+  const rows = table.rows;
+  const csv = [
+    columns.join(","),
+    ...rows.map((row) =>
+      columns
+        .map((column) => {
+          const value = String(row?.[column] ?? "");
+          return `"${value.replace(/"/g, '""')}"`;
+        })
+        .join(",")
+    ),
+  ].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = safeReportFilename(exportMeta?.filename, "inventory-report.csv");
+  link.click();
+  URL.revokeObjectURL(link.href);
+};
+
 const getToolConfig = (tool) => {
   switch (tool) {
     case "get_low_stock_products":
@@ -145,6 +439,30 @@ const getToolConfig = (tool) => {
         route: "/home/inventory",
         routeLabel: "Open inventory",
         scope: ["Inventory", "Stock value"],
+      };
+    case "get_inventory_report":
+      return {
+        title: "Inventory Report",
+        copy: "A structured inventory report with summary metrics, stock values, and an export-ready product table.",
+        route: "/home/reports",
+        routeLabel: "Open reports",
+        scope: ["Inventory", "Reports"],
+      };
+    case "get_sales_report":
+      return {
+        title: "Sales Report",
+        copy: "A structured sales report with period totals, table rows, and export-ready analysis.",
+        route: "/home/reports",
+        routeLabel: "Open reports",
+        scope: ["Sales", "Reports"],
+      };
+    case "get_customer_debt_report":
+      return {
+        title: "Customer Debt Report",
+        copy: "A credit customer report with balances, due dates, and export-ready debt details.",
+        route: "/home/reports",
+        routeLabel: "Open reports",
+        scope: ["Customers", "Reports"],
       };
     case "search_customers":
       return {
@@ -987,10 +1305,131 @@ const ToolCoveragePanel = ({ tools = [], isLoading }) => {
   );
 };
 
+const ReportExportPreview = ({ payload, businessInfo }) => {
+  const report = payload?.records && !Array.isArray(payload.records) ? payload.records : {};
+  const exportMeta = payload?.export || report?.export || null;
+  const table = findReportTable(report);
+  const rows = table.rows;
+  const columns = (table.columns.length ? table.columns : rows.length ? Object.keys(rows[0]) : []).slice(0, 6);
+  const format = exportMeta?.format || payload?.arguments?.export_format || "pdf";
+  const title = titleFromReportKey(exportMeta?.report_key || payload?.tool || "business_report");
+  const metrics = flattenSummaryMetrics(report).slice(0, 6).map(([label, value]) => ({
+    label,
+    value: formatReportValue(label, value),
+  }));
+  const recommendations = extractRecommendations(report, payload?.answer);
+
+  return (
+    <div className="assistant-report-export-preview">
+      <div className="assistant-report-preview-head">
+        <div>
+          <span>Report Preview</span>
+          <strong>{title}</strong>
+          <small>
+            Review the report explanation, recommendations, and table before downloading the {String(format).toUpperCase()} file.
+          </small>
+        </div>
+        <Badge bg={format === "csv" ? "primary" : "success"} pill>
+          {String(format).toUpperCase()}
+        </Badge>
+      </div>
+
+      <div className="assistant-report-paper">
+        <div className="assistant-report-paper-header">
+          <div>
+            <strong>{businessInfo?.busName || "Ampla Uganda Supplies"}</strong>
+            <span>{title}</span>
+          </div>
+          <small>{exportMeta?.filename || "report.pdf"}</small>
+        </div>
+
+        <div className="assistant-report-paper-section">
+          <strong>Executive Summary</strong>
+          <p>{payload?.answer || "Copilot prepared this report from live ERP data."}</p>
+        </div>
+
+        {metrics.length ? <InsightMetricGrid metrics={metrics} /> : null}
+
+        {recommendations.length ? (
+          <div className="assistant-report-paper-section">
+            <strong>Recommendations And Notes</strong>
+            <ol>
+              {recommendations.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
+
+        <div className="workspace-table-wrap mt-0">
+          <Table responsive hover className="workspace-modern-table assistant-records-table mb-0">
+            <thead>
+              <tr>
+                {columns.map((column) => (
+                  <th key={column}>{labelFromKey(column)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, 6).map((row, index) => (
+                <tr key={`inventory-report-row-${row?.productId ?? index}`}>
+                  {columns.map((column) => (
+                    <td key={column}>
+                      {formatReportValue(column, row?.[column])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+
+        <div className="assistant-report-paper-foot">
+          <span>{formatNumber(rows.length)} row(s) prepared for export</span>
+          <span>Powered by HamuzahAndSteve Technologies</span>
+        </div>
+      </div>
+
+      <div className="assistant-report-export-actions">
+        <Button
+          variant="success"
+          onClick={() =>
+            format === "csv"
+              ? downloadReportCsv({ report, exportMeta })
+              : downloadReportPdf({ report, exportMeta, businessInfo, answer: payload?.answer })
+          }
+          disabled={!rows.length}
+        >
+          <Download className="me-2" />
+          Download {String(format).toUpperCase()}
+        </Button>
+        {format !== "pdf" ? (
+          <Button
+            variant="outline-secondary"
+            onClick={() =>
+              downloadReportPdf({
+                report,
+                exportMeta: { ...exportMeta, filename: `${exportMeta?.report_key || "report"}.pdf`, format: "pdf" },
+                businessInfo,
+                answer: payload?.answer,
+              })
+            }
+            disabled={!rows.length}
+          >
+            <FileEarmarkPdf className="me-2" />
+            Download PDF
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
 const LatestToolInsight = ({ payload }) => {
   const tool = payload?.tool;
   const records = Array.isArray(payload?.records) ? payload.records : [];
   const config = getToolConfig(tool);
+  const businessInfo = useSelector(selectProfile) || {};
 
   if (!tool) {
     return (
@@ -1000,7 +1439,11 @@ const LatestToolInsight = ({ payload }) => {
     );
   }
 
-  let preview = <RecordsPreview records={records} />;
+  let preview = payload?.export ? (
+    <ReportExportPreview payload={payload} businessInfo={businessInfo} />
+  ) : (
+    <RecordsPreview records={records} />
+  );
 
   switch (tool) {
     case "get_low_stock_products":
@@ -1011,6 +1454,9 @@ const LatestToolInsight = ({ payload }) => {
       break;
     case "get_inventory_value":
       preview = <InventoryValuePreview records={records} />;
+      break;
+    case "get_inventory_report":
+      preview = <ReportExportPreview payload={payload} businessInfo={businessInfo} />;
       break;
     case "search_customers":
       preview = <CustomerResultList records={records} />;

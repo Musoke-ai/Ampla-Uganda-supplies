@@ -1,13 +1,27 @@
 // PermissionWrapper.jsx
 import { useSelector } from 'react-redux';
-import { selectPermissions } from './authSlice';
+import { selectPermissions, selectRoles } from './authSlice';
+
+const OWNER_ACCESS = new Set(["admin", "superadmin", "developer"]);
 
 const PermissionWrapper = ( { required = [], children }) => {
 
   const permissions = useSelector(selectPermissions);
+  const roles = useSelector(selectRoles);
+  const normalizedPermissions = Array.isArray(permissions)
+    ? permissions.map((permission) => String(permission).toLowerCase())
+    : [];
+  const normalizedRoles = Array.isArray(roles)
+    ? roles.map((role) => String(role).toLowerCase())
+    : [];
   
-  // The user is allowed if they have the 'admin' permission OR if they meet all required permissions.
-  const isAllowed = permissions?.includes('admin') || required?.every(permission => permissions?.includes(permission));
+  const hasOwnerAccess =
+    normalizedPermissions.some((permission) => OWNER_ACCESS.has(permission)) ||
+    normalizedRoles.some((role) => OWNER_ACCESS.has(role));
+  const hasRequiredPermissions = required?.every((permission) =>
+    normalizedPermissions.includes(String(permission).toLowerCase())
+  );
+  const isAllowed = hasOwnerAccess || hasRequiredPermissions;
 
   return isAllowed ? <>{children}</> : null;
 };

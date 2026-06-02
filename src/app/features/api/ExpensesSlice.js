@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from '../api/apiSlice';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 
 const expensesAdapter = createEntityAdapter({
 selectId: (expenses) => expenses.id,
-sortComparer: (a, b) => b.expenseDateCreated.localeCompare(a.expenseDateCreated)
+sortComparer: (a, b) => compareDesc(a.expenseDateCreated, b.expenseDateCreated)
 })
 
 const initialState = expensesAdapter.getInitialState();
@@ -18,7 +19,7 @@ export const extendedExpensesApiSlice = apiSlice.injectEndpoints({
         getExpenses: builder.query({
             query: () => '/expenses',
             transformResponse:  responseData => {
-            return expensesAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : [])
+            return expensesAdapter.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
         }),

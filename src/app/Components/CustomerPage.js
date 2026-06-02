@@ -37,14 +37,15 @@ import { toast } from "react-toastify";
 import { useSettings } from "./Settings";
 
 // --- Import your Redux selectors ---
-import { selectSales } from "../features/api/salesSlice";
-import { selectStock } from "../features/stock/stockSlice";
-import { selectOrders } from "../features/api/orderSlice";
-import { selectDebt, usePayDebtMutation } from "../features/api/debtSlice";
+import { selectSales, useGetSalesQuery } from "../features/api/salesSlice";
+import { selectStock, useGetStockQuery } from "../features/stock/stockSlice";
+import { selectOrders, useGetOrdersQuery } from "../features/api/orderSlice";
+import { selectDebt, useGetDebtsQuery, usePayDebtMutation } from "../features/api/debtSlice";
 import { selectBranches, useGetBranchesQuery } from "../features/api/branchesSlice";
 import {
   selectCustomers as selectRawCustomers,
   useDeleteCustomerMutation,
+  useGetCustomersQuery,
   useUpdateCustomerMutation,
 } from "../features/api/customers";
 
@@ -1666,6 +1667,11 @@ const CustomerListPage = ({
 // --- Main Exported Component ---
 export default function CustomerPage() {
   useGetBranchesQuery();
+  useGetCustomersQuery();
+  useGetSalesQuery();
+  useGetOrdersQuery();
+  useGetDebtsQuery();
+  useGetStockQuery();
   // Get raw data from Redux store
   const branches = useSelector(selectBranches) ?? [];
   const rawCustomersData = useSelector(selectRawCustomers);

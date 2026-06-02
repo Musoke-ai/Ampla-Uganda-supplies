@@ -18,11 +18,13 @@ import {
   BoxSeam,
   ChatDots,
   ClipboardData,
+  CloudArrowUp,
   DoorOpen,
   Buildings,
   Grid,
   HouseDoor,
   People,
+  QuestionCircle,
   Receipt,
   Shop,
   Tools,
@@ -32,7 +34,7 @@ import { useSettings } from "./Settings";
 
 const drawerWidth = 236;
 const collapsedDrawerWidth = 92;
-const AMPLA_LOGO_SRC = `${process.env.PUBLIC_URL || ""}/logos/ampla_logo.png`;
+const AMPLA_LOGO_SRC = "/logos/ampla_logo.png";
 
 const palette = {
   sidebar: "#f4faf6",
@@ -43,6 +45,28 @@ const palette = {
   muted: "#697586",
   section: "#6d7a88",
 };
+
+const hexToRgb = (hex) => {
+  const normalized = typeof hex === "string" ? hex.replace("#", "") : "";
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return null;
+
+  return {
+    r: parseInt(normalized.slice(0, 2), 16),
+    g: parseInt(normalized.slice(2, 4), 16),
+    b: parseInt(normalized.slice(4, 6), 16),
+  };
+};
+
+const isTooDarkForLightSidebar = (hex) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return true;
+
+  const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+  return luminance < 0.55;
+};
+
+const getLightSidebarBackground = (color) =>
+  color && !isTooDarkForLightSidebar(color) ? color : palette.sidebar;
 
 const ALL_APP_ROLES = [
   "superadmin",
@@ -87,13 +111,27 @@ const ROLE_GROUPS = {
   stock: ["admin", "stock", "inventorymanager", "productionmanager", "productionmanger"],
   customers: ["admin", "customers", "accountant"],
   sales: ["admin", "sales", "accountant"],
+  imports: [
+    "superadmin",
+    "developer",
+    "admin",
+    "products",
+    "stock",
+    "inventorymanager",
+    "productionmanager",
+    "productionmanger",
+    "customers",
+    "accountant",
+  ],
   reports: ["admin", "reports", "accountant"],
   pos: ["admin", "salesdesk", "accountant"],
   history: ["admin", "history", "accountant"],
   settings: ALL_APP_ROLES,
+  staff: ["superadmin", "developer", "admin"],
   branches: ["admin"],
   documents: ["admin"],
   assistant: ALL_APP_ROLES,
+  help: ALL_APP_ROLES,
 };
 
 const navGroups = [
@@ -110,8 +148,10 @@ const navGroups = [
       { id: "inventory", label: "Products", path: "/home/inventory", icon: BoxSeam },
       { id: "stock", label: "Stock", path: "/home/stock", icon: Grid },
       { id: "customers", label: "Customers", path: "/home/customers", icon: People },
+      { id: "staff", label: "Staff", path: "/home/staff", icon: People },
       { id: "branches", label: "Branches", path: "/home/branches", icon: Buildings },
       { id: "sales", label: "Sales", path: "/home/sales", icon: Shop },
+      { id: "imports", label: "Imports", path: "/home/imports", icon: CloudArrowUp },
     ],
   },
   {
@@ -119,6 +159,7 @@ const navGroups = [
     items: [
       { id: "reports", label: "Reports", path: "/home/reports", icon: BarChartLine },
       { id: "assistant", label: "AI Assistant", path: "/home/assistant", icon: ChatDots },
+      { id: "help", label: "Help Guide", path: "/home/help", icon: QuestionCircle },
       { id: "history", label: "History", path: "/home/history", icon: ClipboardData },
       { id: "documents", label: "Documents", path: "/home/documents", icon: Receipt },
     ],
@@ -156,7 +197,7 @@ const ModernSidebar = ({
   const accent = settings?.navbarColor || palette.activeStrong;
   const sidebarBackground = isDark
     ? "#101715"
-    : settings?.sidebarColor || palette.sidebar;
+    : getLightSidebarBackground(settings?.sidebarColor);
 
   const uiPalette = useMemo(
     () => ({

@@ -103,6 +103,32 @@ body textarea {
   border-color: var(--ampla-border-color, #dce7df);
 }
 
+body select,
+body .form-select {
+  min-height: 42px;
+  height: auto;
+  line-height: 1.45;
+}
+
+body .form-select {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+
+body select:not([multiple]) {
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+}
+
+body .MuiInputBase-root .MuiSelect-select,
+body .MuiSelect-select.MuiInputBase-input {
+  min-height: 1.45em;
+  line-height: 1.45;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
 body .form-control:focus,
 body .form-select:focus,
 body textarea:focus {
@@ -431,9 +457,45 @@ body.ampla-dark-theme .add-customer-modal .modal-footer {
 }
 
 body.modal-open {
-  overflow-y: auto !important;
+  overflow: hidden !important;
   padding-right: 0 !important;
   scrollbar-gutter: stable;
+}
+
+body .modal.show {
+  z-index: 1700 !important;
+}
+
+body .modal.show .modal-dialog {
+  position: relative;
+  z-index: 1710 !important;
+}
+
+body .modal {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+body .modal-dialog {
+  max-width: min(96vw, var(--bs-modal-width));
+}
+
+body .modal-dialog-scrollable {
+  height: calc(100dvh - var(--bs-modal-margin) * 2);
+  max-height: calc(100dvh - var(--bs-modal-margin) * 2);
+}
+
+body .modal-dialog-scrollable .modal-content {
+  max-height: 100%;
+  overflow: hidden;
+}
+
+body .modal-dialog-scrollable .modal-body {
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .inventory-page-modal {
@@ -1261,9 +1323,10 @@ box-shadow: rgba(0, 0, 0, 0.15) 1.95px 1.95px 2.6px;
 .formSection h2{
  text-align: center;
 }
-.formSection form input, select{
+.formSection form input,
+.formSection form select{
   outline-color: lightcoral;
-  height: 20px;
+  min-height: 42px;
 }
 
 .itemSalePurchaseInfo{
@@ -1709,7 +1772,9 @@ button {
   font-size: 0.8rem;
   outline: none; /* Removes focus outline */
   width: 80%; /* Full width */
-  height: 25px;
+  min-height: 42px;
+  height: auto;
+  line-height: 1.45;
   margin-right: 4rem;
   cursor: pointer;
 }

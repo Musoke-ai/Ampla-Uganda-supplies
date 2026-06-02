@@ -91,13 +91,31 @@ const Summary = () => {
 
   // Print Functionality (Prints only the table)
   const handlePrint = () => {
-    const printContent = document.getElementById("printable-table").innerHTML;
-    const originalContent = document.body.innerHTML;
+    const printableTable = document.getElementById("printable-table");
+    if (!printableTable) return;
 
-    document.body.innerHTML = printContent;
-    window.print();
-    document.body.innerHTML = originalContent;
-    window.location.reload();
+    const printWindow = window.open("", "_blank", "width=980,height=720");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Production Summary</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #d6d6d6; padding: 8px; text-align: left; }
+            th { background: #f2f4f7; }
+          </style>
+        </head>
+        <body>${printableTable.outerHTML}</body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
   };
 
   // Export to PDF

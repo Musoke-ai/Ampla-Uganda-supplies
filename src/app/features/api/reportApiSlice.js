@@ -29,6 +29,12 @@ export const reportApiSlice = apiSlice.injectEndpoints({
         params,
       }),
     }),
+    getCashBookReport: builder.query({
+      query: (params = {}) => ({
+        url: "/reports/finance/cash-book",
+        params,
+      }),
+    }),
     getInventoryReport: builder.query({
       query: (params = {}) => ({
         url: "/reports/inventory",
@@ -104,6 +110,7 @@ export const {
   useGetSalesReportQuery,
   useGetSalesProductProfitReportQuery,
   useGetSalesPaidVsCreditReportQuery,
+  useGetCashBookReportQuery,
   useGetInventoryReportQuery,
   useGetStockMovementsReportQuery,
   useGetPurchaseReportQuery,

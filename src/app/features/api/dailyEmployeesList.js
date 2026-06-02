@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from './apiSlice';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 
 const employeeDailyList = createEntityAdapter({
 selectId: (empDailyList) => empDailyList.ID,
-sortComparer: (a, b) => b.dailyEmployeeDateCreated.localeCompare(a.dailyEmployeeDateCreated)
+sortComparer: (a, b) => compareDesc(a.dailyEmployeeDateCreated, b.dailyEmployeeDateCreated)
 })
 
 const initialState = employeeDailyList.getInitialState();
@@ -18,7 +19,7 @@ export const extendedEmployeeDailyListApiSlice = apiSlice.injectEndpoints({
         getEmployeeDailyList: builder.query({
             query: () => '/employeedailylist',
             transformResponse:  responseData => {
-            return employeeDailyList.setAll(initialState, Array.isArray(responseData) ? responseData : [])
+            return employeeDailyList.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
         }),

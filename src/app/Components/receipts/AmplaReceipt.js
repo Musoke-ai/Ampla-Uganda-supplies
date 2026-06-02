@@ -15,13 +15,13 @@ const getDiscountAmount = (saleDetails = {}) =>
   Number(saleDetails.discountAmount ?? saleDetails.discount ?? 0);
 const getTaxAmount = (saleDetails = {}) => Number(saleDetails.taxAmount ?? saleDetails.tax ?? 0);
 const getSubtotal = (cart = []) => cart.reduce((acc, item) => acc + getQty(item) * getPrice(item), 0);
-const formatAmount = (value, currency = "UGX") =>
+export const formatAmount = (value, currency = "UGX") =>
   `${currency} ${Number(value || 0).toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;
 
-const receiptStyles = {
+export const receiptStyles = {
   shell: {
     width: "100%",
     fontFamily: '"Inter", "Segoe UI", sans-serif',
@@ -216,6 +216,142 @@ const receiptStyles = {
     marginTop: "8px",
   },
 };
+
+export const ReceiptDocumentView = forwardRef(
+  (
+    {
+      cart = [],
+      saleDetails = {},
+      companyInfo = {},
+      customerName = "",
+      productsMap = new Map(),
+      currency = "UGX",
+      receiptNumber = "N/A",
+      issuedAt = "",
+      receiptSize = "80mm",
+    },
+    ref
+  ) => {
+    const subtotal = getSubtotal(cart);
+    const paymentStatus = Number(saleDetails?.dueAmount || 0) > 0 ? "Part Paid" : "Paid";
+
+    return (
+      <div
+        ref={ref}
+        className="receipt-template-shell mx-auto"
+        style={{
+          ...receiptStyles.shell,
+          width: receiptSize,
+          transition: "width 0.3s ease-in-out",
+        }}
+      >
+        <div style={receiptStyles.hero}>
+          <div style={receiptStyles.brandRow}>
+            <div style={receiptStyles.brandBadge}>
+              {(companyInfo?.busName || "A").charAt(0).toUpperCase()}
+            </div>
+            <div style={receiptStyles.paidChip}>{paymentStatus}</div>
+          </div>
+
+          <h2 style={receiptStyles.title}>{companyInfo?.busName || "Business Name"}</h2>
+          <p style={receiptStyles.subtitle}>
+            {companyInfo?.busLocation || "Business location not set"}
+            <br />
+            {companyInfo?.busContactOne || "No contact set"}
+            {companyInfo?.busContactTwo ? ` - ${companyInfo.busContactTwo}` : ""}
+          </p>
+        </div>
+
+        <div style={receiptStyles.metaGrid}>
+          <div style={receiptStyles.metaCard}>
+            <div style={receiptStyles.metaLabel}>Receipt No.</div>
+            <div style={receiptStyles.metaValue}>{receiptNumber}</div>
+          </div>
+          <div style={receiptStyles.metaCard}>
+            <div style={receiptStyles.metaLabel}>Issued</div>
+            <div style={receiptStyles.metaValue}>{issuedAt}</div>
+          </div>
+          <div style={receiptStyles.metaCard}>
+            <div style={receiptStyles.metaLabel}>Customer</div>
+            <div style={receiptStyles.metaValue}>{customerName || "Walk-in Customer"}</div>
+          </div>
+          <div style={receiptStyles.metaCard}>
+            <div style={receiptStyles.metaLabel}>Payment</div>
+            <div style={receiptStyles.metaValue}>{saleDetails?.paymentMethod || "Cash"}</div>
+          </div>
+        </div>
+
+        <div style={receiptStyles.section}>
+          <div style={receiptStyles.sectionTitle}>Items</div>
+          <div style={receiptStyles.lineItemHeader}>
+            <span>Product</span>
+            <span style={{ textAlign: "center" }}>Qty</span>
+            <span style={{ textAlign: "right" }}>Amount</span>
+          </div>
+          {cart.map((item, index) => (
+            <div key={`${getItemId(item)}-${index}`} style={receiptStyles.lineItem}>
+              <div>
+                <div style={receiptStyles.itemName}>
+                  {item.itemName || productsMap.get(getItemId(item)) || `ID: ${getItemId(item)}`}
+                </div>
+                <div style={receiptStyles.itemMeta}>{formatAmount(getPrice(item), currency)} each</div>
+              </div>
+              <div style={receiptStyles.alignCenter}>{getQty(item)}</div>
+              <div style={receiptStyles.alignRight}>
+                {formatAmount(getQty(item) * getPrice(item), currency)}
+              </div>
+            </div>
+          ))}
+
+          <div style={receiptStyles.summaryBox}>
+            <div style={receiptStyles.summaryRow}>
+              <span>Subtotal</span>
+              <span style={receiptStyles.summaryValue}>{formatAmount(subtotal, currency)}</span>
+            </div>
+            <div style={receiptStyles.summaryRow}>
+              <span>Discount</span>
+              <span style={receiptStyles.summaryValue}>
+                -{formatAmount(getDiscountAmount(saleDetails), currency)}
+              </span>
+            </div>
+            <div style={receiptStyles.summaryRow}>
+              <span>Tax</span>
+              <span style={receiptStyles.summaryValue}>
+                {formatAmount(getTaxAmount(saleDetails), currency)}
+              </span>
+            </div>
+            <div style={receiptStyles.totalRow}>
+              <span>Total</span>
+              <span>{formatAmount(saleDetails?.total, currency)}</span>
+            </div>
+          </div>
+
+          <div style={receiptStyles.paymentBox}>
+            <div style={receiptStyles.summaryRow}>
+              <span>Tendered</span>
+              <span style={receiptStyles.summaryValue}>
+                {formatAmount(saleDetails?.tenderedAmount, currency)}
+              </span>
+            </div>
+            <div style={receiptStyles.summaryRow}>
+              <span>Balance Due</span>
+              <span style={receiptStyles.summaryValue}>
+                {formatAmount(saleDetails?.dueAmount, currency)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style={receiptStyles.footer}>
+          <div style={receiptStyles.footerNote}>
+            {saleDetails?.moreInfo || "Generated from Ampla POS."}
+            <div style={receiptStyles.footerThanks}>Thank you for your business.</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
 
 const ReceiptPreviewModal = forwardRef((props, ref) => {
   const {

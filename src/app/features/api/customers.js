@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from './apiSlice';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 
 const customersAdapter = createEntityAdapter({
     selectId: (customers) => customers.custId,
-sortComparer: (a, b) => b.custDateCreated.localeCompare(a.custDateCreated)
+sortComparer: (a, b) => compareDesc(a.custDateCreated, b.custDateCreated)
 })
 
 const initialState = customersAdapter.getInitialState();
@@ -18,7 +19,7 @@ export const extendedCustomersApiSlice = apiSlice.injectEndpoints({
         getCustomers: builder.query({
             query: () => '/getcustomers',
             transformResponse:  responseData => {
-            return customersAdapter.setAll(initialState, Array.isArray(responseData) ? responseData : [])
+            return customersAdapter.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
         }),

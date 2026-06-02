@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from '../api/apiSlice';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 
 const stokAdapter = createEntityAdapter({
 selectId: (stok) => stok.stockId,
-sortComparer: (a, b) => b.stockCreated.localeCompare(a.stockCreated)
+sortComparer: (a, b) => compareDesc(a.stockCreated, b.stockCreated)
 })
 
 const initialState = stokAdapter.getInitialState();
@@ -18,7 +19,7 @@ export const extendedStokApiSlice = apiSlice.injectEndpoints({
         getStok: builder.query({
             query: () => '/stock',
             transformResponse:  responseData => {
-            return stokAdapter.setAll(initialState, responseData)
+            return stokAdapter.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
         }),

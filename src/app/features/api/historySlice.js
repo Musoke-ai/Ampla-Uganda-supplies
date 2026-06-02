@@ -4,10 +4,11 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from '../api/apiSlice';
 import { tags as commonTags } from './commonTags'
+import { compareDesc, extractArray } from './responseUtils';
 
 const historyAdapter = createEntityAdapter({
     selectId: (history) => history.historyId,
-sortComparer: (a, b) => b.historyDateCreated.localeCompare(a.historyDateCreated)
+sortComparer: (a, b) => compareDesc(a.historyDateCreated, b.historyDateCreated)
 })
 
 const initialState = historyAdapter.getInitialState();
@@ -18,7 +19,7 @@ export const extendedHistoryApiSlice = apiSlice.injectEndpoints({
         getHistory: builder.query({
             query: () => '/retrievals/history',
             transformResponse:  responseData => {
-            return historyAdapter.setAll(initialState, responseData)
+            return historyAdapter.setAll(initialState, extractArray(responseData))
            },
            providesTags: [commonTags.inventory],
         }),

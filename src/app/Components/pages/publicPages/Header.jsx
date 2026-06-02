@@ -2,7 +2,7 @@ import React from 'react';
 import { Link,  useLocation } from "react-router-dom";
 import { useSettings } from '../../Settings';
 
-const amplaLogo = `${process.env.PUBLIC_URL || ""}/logos/ampla_logo.png`;
+const amplaLogo = "/logos/ampla_logo.png";
 
 const Header = () => {
   const { settings } = useSettings();

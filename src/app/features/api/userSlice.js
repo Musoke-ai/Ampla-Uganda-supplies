@@ -4,6 +4,7 @@ import {
     } from '@reduxjs/toolkit';
 import { apiSlice } from '../api/apiSlice';
 import { tags as commonTags } from './commonTags'
+import { extractArray } from './responseUtils';
 
 const userAdapter = createEntityAdapter({
 selectId: (user) => user.busId
@@ -17,7 +18,16 @@ export const extendedUserApiSlice = apiSlice.injectEndpoints({
         getProfile: builder.query({
             query: () => '/profile',
             transformResponse:  responseData => {
-            return userAdapter.setAll(initialState, responseData)
+            const rows = extractArray(responseData);
+            const profile =
+                rows.length
+                    ? rows
+                    : responseData?.data && typeof responseData.data === "object"
+                        ? [responseData.data]
+                        : responseData
+                            ? [responseData]
+                            : [];
+            return userAdapter.setAll(initialState, profile)
            },
         //    providesTags: [commonTags.inventory],
         }),

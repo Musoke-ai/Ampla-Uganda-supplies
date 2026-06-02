@@ -1,9 +1,9 @@
 import {useRef, useState, useEffect } from 'react';
 
-import { Button, Modal, Form, Container, Alert } from "react-bootstrap";
+import { Button, Modal, Form, Container, Alert, InputGroup } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { FaIndustry, FaTools, FaCogs } from "react-icons/fa";
-import { ChatDots, GraphUpArrow, ShieldCheck } from "react-bootstrap-icons";
+import { ChatDots, Eye, EyeSlash, GraphUpArrow, ShieldCheck } from "react-bootstrap-icons";
 // import "animate.css";
 
 import { useNavigate, Link } from 'react-router-dom';
@@ -16,7 +16,7 @@ import { LinearProgress } from '@mui/material';
 import usePersist from '../../../hooks/usePersist';
 import { useSettings } from '../../Settings';
 
-const amplaLogo = `${process.env.PUBLIC_URL || ""}/logos/ampla_logo.png`;
+const amplaLogo = "/logos/ampla_logo.png";
 
 const Login = () => {
      const { settings } = useSettings();
@@ -26,6 +26,7 @@ const Login = () => {
     const errRef = useRef()
     const [businessname, setBusinessname] = useState('')
     const [password, setPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false);
     const [errMsg, setErrMsg] = useState('');
 
     const [isChecked, setIsChecked] = useState(false);
@@ -68,12 +69,57 @@ const Login = () => {
     const handleUserInput = (e) => setBusinessname(e.target.value)
     const handlePwdInput = (e) => setPassword(e.target.value)
 
+    const loginErrorMessage = (err) => {
+        const serverMessage =
+            typeof err?.data?.message === "string"
+                ? err.data.message
+                : "";
+
+        if (!err?.status || err.status === "FETCH_ERROR") {
+            return "We cannot reach the server right now. Check your connection and try again.";
+        }
+
+        if (err.status === 400 || err.status === 422) {
+            return serverMessage || "Enter your email address and password to continue.";
+        }
+
+        if (err.status === 401) {
+            return serverMessage || "We couldn't sign you in. Check your email and password, then try again.";
+        }
+
+        if (err.status === 403) {
+            return serverMessage || "This account cannot sign in right now. Please contact an administrator.";
+        }
+
+        if (err.status === 429) {
+            return serverMessage || "Too many login attempts. Please wait a few minutes and try again.";
+        }
+
+        return serverMessage || "Sign-in could not be completed. Please try again.";
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault()
+        if (!businessname.trim() || !password) {
+            setErrMsg("Enter your email address and password to continue.");
+            setShowError(true);
+            return;
+        }
+
         try {
-            const { data: credentials } = await login ({ email: businessname, password}).unwrap();
+            const loginResponse = await login({
+                email: businessname,
+                password,
+                rememberDevice: persist,
+            }).unwrap();
+            const credentials = loginResponse?.data ?? loginResponse;
             const accessToken = credentials.accessToken;
             const roles = credentials.roles;
+            if (!accessToken) {
+                setErrMsg("Sign-in could not be completed. Please try again.");
+                setShowError(true);
+                return;
+            }
             dispatch(setCredentials({ accessToken }));
             dispatch(setRoles({ roles }));
             setBusinessname('')
@@ -89,25 +135,15 @@ const Login = () => {
             //     navigate('/login')
             // }
         } catch (err) {
-            if (!err.status) {
-                setErrMsg('No Server Response')
-                setShowError(true)
-            } else if (err.status === 400) {
-                setErrMsg('Missing Business Email or Password');
-                setShowError(true)
-            } else if (err.status === 401) {
-                setErrMsg('Unauthorised');
-                setShowError(true)
-            } else {
-                setErrMsg('Check your credentials and try again.');
-                setShowError(true)
-                // errRef.current.focus();
-            }
+            setErrMsg(loginErrorMessage(err));
+            setShowError(true);
+            errRef.current?.focus();
         }
 
     }
 
     const errClass = errMsg ? "errmsg" : "offscreen"
+    const alertVariant = errMsg.toLowerCase().includes("too many") ? "warning" : "danger";
     const isDark = settings?.theme === "dark";
     const accent = settings?.navbarColor || "#2f8f57";
     const pageStyle = {
@@ -255,14 +291,31 @@ const Login = () => {
               </Form.Group>
               <Form.Group className="mb-3">
                 <Form.Label>Password</Form.Label>
-                <Form.Control 
-                 type='password'
-                 id='password'
-                 value={password}
-                 onChange={handlePwdInput}
-                 required
-                  style={inputStyle}
-                />
+                <InputGroup>
+                  <Form.Control
+                    type={showPassword ? "text" : "password"}
+                    id='password'
+                    value={password}
+                    onChange={handlePwdInput}
+                    required
+                    autoComplete="current-password"
+                    style={inputStyle}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline-secondary"
+                    onClick={() => setShowPassword((value) => !value)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    title={showPassword ? "Hide password" : "Show password"}
+                    style={{
+                      borderColor: "var(--ampla-border-color, #dce7df)",
+                      color: "var(--ampla-text-color, #15202b)",
+                      backgroundColor: "var(--ampla-surface-bg, #ffffff)",
+                    }}
+                  >
+                    {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
+                  </Button>
+                </InputGroup>
               </Form.Group>
 
     <div>
@@ -273,16 +326,22 @@ const Login = () => {
         checked={persist}
         onChange={handleToggle}
       />
-      I trust this Device
+      Keep me signed in on this device
     </label>
-    <p>{persist ? 'You trust this Device.' : 'You do not trust this Device.'}</p>
+    <p>
+      {persist
+        ? 'We will securely restore your session after refreshes on this device.'
+        : 'For shared devices, you will need to sign in again after a refresh or browser restart.'}
+    </p>
     <Button
+      type="submit"
       variant="success"
       className='w-100'
       onClick={handleSubmit}
+      disabled={isLoading}
       style={{ backgroundColor: accent, borderColor: accent, fontWeight: 700 }}
     >
-      Login
+      {isLoading ? "Signing in..." : "Login"}
     </Button>
   </div>
     <div>
@@ -294,7 +353,17 @@ const Login = () => {
 
          </div>
          <div>
-         {showError?<div className='bg-warning w-100 p-2 text-danger mt-4 mb-3'>{errMsg}</div>:""}
+         {showError ? (
+          <Alert
+            ref={errRef}
+            tabIndex="-1"
+            variant={alertVariant}
+            className="mt-4 mb-3"
+            role="alert"
+          >
+            {errMsg}
+          </Alert>
+         ) : ""}
          </div>
         </div>
         </div>

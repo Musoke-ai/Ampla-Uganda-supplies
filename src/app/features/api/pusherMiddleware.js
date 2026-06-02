@@ -12,6 +12,18 @@ export const PUSHER_CONNECTION_STATE_CHANGED = 'pusher/connectionStateChanged';
 // --- Middleware Implementation ---
 let pusherClient = null;
 let activeChannels = {};
+const pendingInvalidationTimers = {};
+
+const invalidateTagSoon = (store, tag) => {
+  if (pendingInvalidationTimers[tag]) {
+    clearTimeout(pendingInvalidationTimers[tag]);
+  }
+
+  pendingInvalidationTimers[tag] = setTimeout(() => {
+    delete pendingInvalidationTimers[tag];
+    store.dispatch(apiSlice.util.invalidateTags([tag]));
+  }, 700);
+};
 
 export const pusherMiddleware = (store) => (next) => (action) => {
   // --- Initialize Pusher and Handle Connection State ---
@@ -59,7 +71,7 @@ export const pusherMiddleware = (store) => (next) => (action) => {
 
     const invalidateCache = (eventName, data) => {
       console.log(`Pusher event received: '${eventName}' on channel '${channelName}-${tag}'`, data);
-      store.dispatch(apiSlice.util.invalidateTags([tag]));
+      invalidateTagSoon(store, tag);
     };
     
     // MODIFIED: Directly use the 'events' array from the payload
@@ -107,6 +119,10 @@ export const pusherMiddleware = (store) => (next) => (action) => {
     pusherClient.disconnect();
     
     activeChannels = {};
+    Object.keys(pendingInvalidationTimers).forEach((tag) => {
+      clearTimeout(pendingInvalidationTimers[tag]);
+      delete pendingInvalidationTimers[tag];
+    });
     pusherClient = null;
   }
 

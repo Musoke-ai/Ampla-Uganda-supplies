@@ -9,6 +9,13 @@ export const agentApiSlice = apiSlice.injectEndpoints({
         body: payload,
       }),
     }),
+    sendHelpQuestion: builder.mutation({
+      query: (payload) => ({
+        url: "/agent/help",
+        method: "POST",
+        body: payload,
+      }),
+    }),
     getAgentBriefing: builder.query({
       query: ({ period = "today" } = {}) =>
         `/agent/briefing?period=${encodeURIComponent(period)}`,
@@ -49,6 +56,7 @@ export const agentApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useSendAgentMessageMutation,
+  useSendHelpQuestionMutation,
   useGetAgentBriefingQuery,
   useGetAgentToolsQuery,
   useGetAgentDraftQuery,

@@ -14,7 +14,7 @@ import Checkbox from '@mui/material/Checkbox';
 import { Link } from "react-router-dom";
 import { useRegisterMutation } from "../../../auth/authApiSlice";
 import { useNavigate } from "react-router-dom";
-import { WindowDesktop } from "react-bootstrap-icons";
+import { Eye, EyeSlash, WindowDesktop } from "react-bootstrap-icons";
 
 const steps = ["Basic Info", "Location", "Security", "Login"];
 
@@ -54,6 +54,8 @@ const SignUp = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [comfirmpassword, setComfirmpassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [pwMatch, setPwMatch] = useState(false);
   const [pwValidity, setPwValidity] = useState(false);
   const [emailValidity, setEmailValidity] = useState(false);
@@ -490,27 +492,47 @@ else{
                 <div className="row">
                   <div className="col-6  mt-3 mb-2">
                     <label htmlFor="password">Password:<sup className="text-danger">*</sup></label>
-                    <input
-                      type="password"
-                      id="password"
-                      value={password}
-                      className={pwMatch?"form-control border border-success":"form-control"}
-                      required
-                      autoComplete="false"
-                      onChange={onPasswordChange}
-                    />
+                    <div className="input-group">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        id="password"
+                        value={password}
+                        className={pwMatch?"form-control border border-success":"form-control"}
+                        required
+                        autoComplete="new-password"
+                        onChange={onPasswordChange}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowPassword((value) => !value)}
+                      >
+                        {showPassword ? <EyeSlash /> : <Eye />}
+                      </button>
+                    </div>
                   </div>
                   <div className="col-6  mt-3 mb-2">
                     <label htmlFor="comfirmpassword">Comfirm password:<sup className="text-danger">*</sup></label>
-                    <input
-                      type="password"
-                      id="comfirmpassword"
-                      value={comfirmpassword}
-                      className={pwMatch?"form-control border border-success":"form-control"}
-                      required
-                      autoComplete="false"
-                      onChange={onComfirmPasswordChange}
-                    />
+                    <div className="input-group">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        id="comfirmpassword"
+                        value={comfirmpassword}
+                        className={pwMatch?"form-control border border-success":"form-control"}
+                        required
+                        autoComplete="new-password"
+                        onChange={onComfirmPasswordChange}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                        onClick={() => setShowConfirmPassword((value) => !value)}
+                      >
+                        {showConfirmPassword ? <EyeSlash /> : <Eye />}
+                      </button>
+                    </div>
                   </div>
 
                   <div>
