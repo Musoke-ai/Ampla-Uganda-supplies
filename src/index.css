@@ -185,6 +185,20 @@ body .btn-primary {
   color: var(--ampla-on-accent-color, #ffffff);
 }
 
+body .ampla-login-submit-button.btn,
+body .ampla-login-submit-button.btn:focus,
+body .ampla-login-submit-button.btn:hover,
+body .ampla-login-submit-button.btn:active,
+body .ampla-login-submit-button.btn:disabled {
+  color: var(--ampla-on-accent-color, #ffffff) !important;
+  -webkit-text-fill-color: var(--ampla-on-accent-color, #ffffff) !important;
+}
+
+body .ampla-login-submit-button.btn > span {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+}
+
 body .btn-outline-success,
 body .btn-outline-primary {
   color: var(--ampla-accent-color, #2f8f57);

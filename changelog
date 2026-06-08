@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Fixed POS total/price text contrast in dark mode.
 - Fixed POS payment, hold, and quick amount button label contrast in disabled and dark-mode states.
 - Fixed login button text contrast when the active brand color is green.
+- Fixed production login submit button label visibility when brand styling overrides Bootstrap button colors.
 
 ### Security
 - Hidden administrator, super administrator, and developer accounts from Staff Management lists.

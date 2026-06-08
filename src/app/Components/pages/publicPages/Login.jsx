@@ -337,17 +337,19 @@ const Login = () => {
     <Button
       type="submit"
       variant="success"
-      className='w-100'
+      className='w-100 ampla-login-submit-button'
       onClick={handleSubmit}
       disabled={isLoading}
+      aria-label={isLoading ? "Signing in" : "Login"}
       style={{
         backgroundColor: accent,
         borderColor: accent,
         color: "var(--ampla-on-accent-color, #ffffff)",
+        WebkitTextFillColor: "var(--ampla-on-accent-color, #ffffff)",
         fontWeight: 700,
       }}
     >
-      {isLoading ? "Signing in..." : "Login"}
+      <span>{isLoading ? "Signing in..." : "Login"}</span>
     </Button>
   </div>
     <div>
