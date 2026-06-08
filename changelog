@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Fixed Staff Management dark-mode contrast for the page shell, statistics, filters, and table.
 - Fixed Create User modal dark-mode backgrounds and field contrast.
 - Fixed POS total/price text contrast in dark mode.
+- Fixed POS payment, hold, and quick amount button label contrast in disabled and dark-mode states.
 - Fixed login button text contrast when the active brand color is green.
 
 ### Security

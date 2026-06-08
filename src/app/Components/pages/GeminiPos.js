@@ -1485,7 +1485,7 @@ export default function GeminiPos() {
               </Button>
             ))}
             <Button
-              sx={{ ...quickAmount, color: "var(--ampla-text-color, #14231B)" }}
+              sx={quickAmount}
               onClick={() => openCheckout(total)}
               disabled={!canCheckout}
             >
@@ -2292,10 +2292,17 @@ const cardStyle = {
 const greenButton = {
   borderRadius: 2.5,
   bgcolor: "var(--ampla-accent-color, #2F8F57)",
+  color: "var(--ampla-on-accent-color, #FFFFFF)",
   fontWeight: 800,
   textTransform: "none",
   boxShadow: "0 10px 25px rgba(47,143,87,.22)",
   "&:hover": { bgcolor: "var(--ampla-accent-color, #267347)" },
+  "&.Mui-disabled": {
+    bgcolor: "rgba(var(--ampla-accent-rgb, 47, 143, 87), .64)",
+    color: "rgba(255, 255, 255, .86)",
+    WebkitTextFillColor: "rgba(255, 255, 255, .86)",
+    boxShadow: "none",
+  },
 };
 
 const cashDrawerMetricStyle = {
@@ -2428,8 +2435,15 @@ const holdButtonStyle = {
   height: 54,
   borderRadius: 2.5,
   bgcolor: "#9AA3AF",
+  color: "#FFFFFF",
   fontWeight: 800,
+  textTransform: "none",
   "&:hover": { bgcolor: "#7E8794" },
+  "&.Mui-disabled": {
+    bgcolor: "rgba(148, 163, 184, .54)",
+    color: "rgba(255, 255, 255, .82)",
+    WebkitTextFillColor: "rgba(255, 255, 255, .82)",
+  },
 };
 
 const quickAmount = {
@@ -2441,6 +2455,13 @@ const quickAmount = {
   fontWeight: 900,
   textTransform: "none",
   "&:hover": { bgcolor: "var(--ampla-accent-soft, #E8F5EC)" },
+  "&.Mui-disabled": {
+    bgcolor: "var(--ampla-surface-soft, #F4FAF5)",
+    borderColor: "var(--ampla-border-color, #E7EFE9)",
+    color: "var(--ampla-muted-color, #64748B)",
+    WebkitTextFillColor: "var(--ampla-muted-color, #64748B)",
+    opacity: 0.84,
+  },
 };
 
 const modeButtonStyle = {
