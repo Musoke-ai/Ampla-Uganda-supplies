@@ -46,6 +46,8 @@ import { selectStock } from "../../features/stock/stockSlice";
 import { selectSales } from "../../features/api/salesSlice";
 import { useSettings } from "../Settings";
 
+const EMPTY_ARRAY = [];
+
 const palette = {
   bg: "#f8fbf8",
   surface: "#ffffff",
@@ -162,10 +164,10 @@ const Panel = ({ title, action, children, sx = {} }) => (
 
 const Dashboard = () => {
   const { settings } = useSettings();
-  const stockItems = useSelector(selectStock) ?? [];
-  const customers = useSelector(selectCustomers) ?? [];
-  const sales = useSelector(selectSales) ?? [];
-  const orders = useSelector(selectOrders) ?? [];
+  const stockItems = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const customers = useSelector(selectCustomers) ?? EMPTY_ARRAY;
+  const sales = useSelector(selectSales) ?? EMPTY_ARRAY;
+  const orders = useSelector(selectOrders) ?? EMPTY_ARRAY;
 
   const salesChartRef = useRef(null);
   const stockChartRef = useRef(null);

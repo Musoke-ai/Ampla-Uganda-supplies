@@ -14,17 +14,20 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Bell, Calendar3, ChatDots, ChevronLeft, ChevronRight, Gear, List, People, Power, QuestionCircle, SignpostSplit, ThreeDotsVertical } from "react-bootstrap-icons";
+import { ArrowClockwise, Bell, Calendar3, ChatDots, ChevronLeft, ChevronRight, Gear, List, People, Power, QuestionCircle, SignpostSplit, ThreeDotsVertical } from "react-bootstrap-icons";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useSettings } from "./Settings";
 import BranchScopeSwitcher from "./BranchScopeSwitcher";
 import { selectBranchScope } from "../auth/authSlice";
+import { apiSlice } from "../features/api/apiSlice";
 import {
   selectBranches,
   useGetBranchesQuery,
 } from "../features/api/branchesSlice";
+
+const EMPTY_ARRAY = [];
 
 const palette = {
   white: "#ffffff",
@@ -47,8 +50,9 @@ const ModernNavBar = ({
 }) => {
   const { settings } = useSettings();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const branchScope = useSelector(selectBranchScope);
-  const branches = useSelector(selectBranches) ?? [];
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
   useGetBranchesQuery();
   const [anchorEl, setAnchorEl] = useState(null);
   const [notificationAnchor, setNotificationAnchor] = useState(null);
@@ -71,6 +75,20 @@ const ModernNavBar = ({
 
     return match?.branchName || (effectiveBranchId ? `Branch #${effectiveBranchId}` : "All Branches");
   }, [branches, effectiveBranchId]);
+  const goBack = () => navigate(-1);
+  const goForward = () => navigate(1);
+  const refreshWorkspaceData = () => {
+    dispatch(
+      apiSlice.util.invalidateTags([
+        "inventory",
+        "profile",
+        "CashDrawers",
+        "Imports",
+        "Accounts",
+        "Notifications",
+      ])
+    );
+  };
 
   return (
     <AppBar
@@ -143,6 +161,39 @@ const ModernNavBar = ({
           >
             {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </IconButton>
+
+          <Box
+            aria-label="Page history controls"
+            sx={{
+              display: { xs: "none", sm: "inline-flex" },
+              alignItems: "center",
+              gap: 0.5,
+              p: 0.35,
+              borderRadius: 999,
+              bgcolor: surface,
+              border: `1px solid ${borderColor}`,
+              flexShrink: 0,
+            }}
+          >
+            <IconButton
+              onClick={goBack}
+              size="small"
+              title="Go back"
+              aria-label="Go back"
+              sx={{ color: textColor }}
+            >
+              <ChevronLeft size={17} />
+            </IconButton>
+            <IconButton
+              onClick={goForward}
+              size="small"
+              title="Go forward"
+              aria-label="Go forward"
+              sx={{ color: textColor }}
+            >
+              <ChevronRight size={17} />
+            </IconButton>
+          </Box>
 
           <Box sx={{ minWidth: 0 }}>
             <Typography
@@ -247,6 +298,21 @@ const ModernNavBar = ({
               },
             }}
           />
+
+          <IconButton
+            onClick={refreshWorkspaceData}
+            sx={{
+              width: 40,
+              height: 40,
+              bgcolor: surface,
+              border: `1px solid ${borderColor}`,
+              color: textColor,
+            }}
+            title="Refresh data"
+            aria-label="Refresh data"
+          >
+            <ArrowClockwise size={17} />
+          </IconButton>
 
           <IconButton
             onClick={(event) => setWorkspaceAnchor(event.currentTarget)}

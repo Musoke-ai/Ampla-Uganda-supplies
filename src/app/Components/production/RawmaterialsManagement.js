@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Table, Button, Modal, Form, Container, InputGroup } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useSelector } from "react-redux";
@@ -34,6 +34,8 @@ import {
   ProductionTableFooter,
 } from "./ProductionTableControls";
 
+const EMPTY_ARRAY = [];
+
 const searchableFields = [
   "materialCode",
   "rawMaterialBarcode",
@@ -59,7 +61,12 @@ const assetUrl = (path) => {
 const toRawMaterialFormData = (data) => {
   const formData = new FormData();
   Object.entries(data).forEach(([key, value]) => {
-    if (key === "rawMaterialImageFile" || key === "rawMaterialImagePreview") return;
+    if (
+      key === "rawMaterialImageFile" ||
+      key === "rawMaterialImagePreview" ||
+      key === "rawMaterialAiImageFile" ||
+      key === "rawMaterialAiImagePreview"
+    ) return;
     if (value !== undefined && value !== null) formData.append(key, value);
   });
 
@@ -401,8 +408,8 @@ const theme = settings.theme;
     useGetBranchesQuery();
     const { refetch: refetchRawMaterials } = useGetRawMaterialsQuery();
     const { refetch: refetchRawMaterialCategories } = useGetRawMaterialCategoriesQuery();
-    const branches = useSelector(selectBranches) ?? [];
-    const rawMaterialCategories = useSelector(selectRawMaterialCategories) ?? [];
+    const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
+    const rawMaterialCategories = useSelector(selectRawMaterialCategories) ?? EMPTY_ARRAY;
     const currentBranchId = branchScope?.effective_branch_id ? String(branchScope.effective_branch_id) : "";
     const canSwitchBranches = Boolean(branchScope?.can_switch_branches);
 
@@ -413,6 +420,8 @@ const theme = settings.theme;
       rawMaterialImage: "",
       rawMaterialImageFile: null,
       rawMaterialImagePreview: "",
+      rawMaterialAiImageFile: null,
+      rawMaterialAiImagePreview: "",
       name: "",
       category: "",
       size: "",
@@ -440,15 +449,17 @@ const theme = settings.theme;
   const [showDeleteAlertModal, setShowDeleteAlertModal] = useState(false);
   const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [imageCaptureOpen, setImageCaptureOpen] = useState(false);
+  const [imageCaptureTarget, setImageCaptureTarget] = useState("ai");
   const [quickCategoryName, setQuickCategoryName] = useState("");
   const [imageAnalysisNote, setImageAnalysisNote] = useState("");
   const [imageAnalysisAlert, setImageAnalysisAlert] = useState(null);
   const [imageAnalysisSummary, setImageAnalysisSummary] = useState([]);
   const [saveFeedback, setSaveFeedback] = useState(null);
-  const [selectedMaterial, setSelectedMaterial] = useState(null);
+  const [, setSelectedMaterial] = useState(null);
   const rawMaterialModalCloseGuardRef = useRef(false);
   const rawMaterialCaptureModeRef = useRef("add");
   const pendingRawMaterialCaptureFileRef = useRef(null);
+  const pendingRawMaterialCaptureTargetRef = useRef("ai");
   const recentBarcodeScanRef = useRef({ value: "", time: 0 });
   const [forceRawMaterialModalMode, setForceRawMaterialModalMode] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -507,6 +518,8 @@ const theme = settings.theme;
       unitOfMeasure: material?.unitOfMeasure || "pcs",
       rawMaterialImageFile: null,
       rawMaterialImagePreview: assetUrl(material?.rawMaterialImage),
+      rawMaterialAiImageFile: null,
+      rawMaterialAiImagePreview: "",
     });
     setShowEditModal(true);
   };
@@ -577,6 +590,8 @@ const theme = settings.theme;
     rawMaterialImage: formData.rawMaterialImage || "",
     rawMaterialImageFile: formData.rawMaterialImageFile || null,
     rawMaterialImagePreview: formData.rawMaterialImagePreview || "",
+    rawMaterialAiImageFile: formData.rawMaterialAiImageFile || null,
+    rawMaterialAiImagePreview: formData.rawMaterialAiImagePreview || "",
   });
 
   const handleAdd = async () => {
@@ -668,18 +683,31 @@ toast.error("An error occured! "+error.status);
     toast.success(`Raw material barcode detected: ${cleanBarcode}`, { toastId: `raw-material-barcode-${cleanBarcode}` });
   };
 
-  const applyRawMaterialImageFile = (file) => {
-    setImageAnalysisNote("");
-    setImageAnalysisAlert(null);
-    setImageAnalysisSummary([]);
+  const applyRawMaterialImageFile = useCallback((file) => {
     setFormData((current) => ({
       ...current,
       rawMaterialImageFile: file,
       rawMaterialImagePreview: file ? URL.createObjectURL(file) : assetUrl(current.rawMaterialImage),
     }));
+  }, []);
+
+  const applyRawMaterialAiImageFile = useCallback((file) => {
+    setImageAnalysisNote("");
+    setImageAnalysisAlert(null);
+    setImageAnalysisSummary([]);
+    setFormData((current) => ({
+      ...current,
+      rawMaterialAiImageFile: file,
+      rawMaterialAiImagePreview: file ? URL.createObjectURL(file) : "",
+    }));
+  }, []);
+
+  const openRawMaterialImageCapture = (target = "ai") => {
+    setImageCaptureTarget(target);
+    setImageCaptureOpen(true);
   };
 
-  const matchRawMaterialCategory = (categoryName) => {
+  const matchRawMaterialCategory = useCallback((categoryName) => {
     const normalized = String(categoryName || "").trim().toLowerCase();
     if (!normalized) return null;
 
@@ -691,9 +719,9 @@ toast.error("An error occured! "+error.status);
       }) ||
       null
     );
-  };
+  }, [activeCategoryOptions]);
 
-  const applyRawMaterialImageAnalysis = (analysis) => {
+  const applyRawMaterialImageAnalysis = useCallback((analysis) => {
     const fields = analysis?.fields || {};
     const summary = buildAnalysisSummary(fields, rawMaterialAnalysisLabels);
     const suggestedName =
@@ -750,17 +778,17 @@ toast.error("An error occured! "+error.status);
       setImageAnalysisNote(analysis?.notes || "Image checked. Confirm the fields before saving.");
       setImageAnalysisAlert(null);
     }
-  };
+  }, [matchRawMaterialCategory]);
 
-  const analyzeRawMaterialImage = async (
-    file = formData.rawMaterialImageFile,
+  const analyzeRawMaterialImage = useCallback(async (
+    file = formData.rawMaterialAiImageFile,
     event = null
   ) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
 
     if (!file) {
-      toast.info("Capture or upload a raw material image first.");
+      toast.info("Capture or upload an AI raw material image first.");
       return;
     }
 
@@ -797,10 +825,18 @@ toast.error("An error occured! "+error.status);
         rawMaterialModalCloseGuardRef.current = false;
       }, 1200);
     }
-  };
+  }, [
+    analyzeCatalogImage,
+    applyRawMaterialImageAnalysis,
+    currentBranchId,
+    formData.branchId,
+    formData.rawMaterialAiImageFile,
+    showEditModal,
+  ]);
 
   const handleRawMaterialImageCaptured = (file) => {
     pendingRawMaterialCaptureFileRef.current = file;
+    pendingRawMaterialCaptureTargetRef.current = imageCaptureTarget;
     rawMaterialModalCloseGuardRef.current = true;
     rawMaterialCaptureModeRef.current = showEditModal ? "edit" : "add";
     setForceRawMaterialModalMode(rawMaterialCaptureModeRef.current);
@@ -817,6 +853,7 @@ toast.error("An error occured! "+error.status);
     }
 
     const file = pendingRawMaterialCaptureFileRef.current;
+    const target = pendingRawMaterialCaptureTargetRef.current;
     pendingRawMaterialCaptureFileRef.current = null;
     rawMaterialModalCloseGuardRef.current = true;
     setForceRawMaterialModalMode(rawMaterialCaptureModeRef.current);
@@ -827,10 +864,17 @@ toast.error("An error occured! "+error.status);
       } else {
         setShowAddModal(true);
       }
-      applyRawMaterialImageFile(file);
-      analyzeRawMaterialImage(file);
+      if (target === "catalog") {
+        applyRawMaterialImageFile(file);
+        window.setTimeout(() => {
+          rawMaterialModalCloseGuardRef.current = false;
+        }, 300);
+      } else {
+        applyRawMaterialAiImageFile(file);
+        analyzeRawMaterialImage(file);
+      }
     }, 0);
-  }, [imageCaptureOpen]);
+  }, [analyzeRawMaterialImage, applyRawMaterialAiImageFile, applyRawMaterialImageFile, imageCaptureOpen]);
 
   const createQuickRawMaterialCategory = async (event = null) => {
     event?.preventDefault?.();
@@ -892,7 +936,41 @@ toast.error("An error occured! "+error.status);
             type="button"
             variant="outline-secondary"
             className="d-inline-flex align-items-center justify-content-center gap-2"
-            onClick={() => setImageCaptureOpen(true)}
+            onClick={() => openRawMaterialImageCapture("catalog")}
+          >
+            <Camera />
+            Capture
+          </Button>
+        </div>
+      </div>
+      <Form.Text className="text-muted">Saved on the raw material record. JPEG, PNG, or WEBP up to 3MB.</Form.Text>
+    </Form.Group>
+  );
+
+  const renderAiImageField = () => (
+    <Form.Group>
+      <Form.Label>AI Image For Auto Fill</Form.Label>
+      <div className="d-flex align-items-center gap-3">
+        {formData.rawMaterialAiImagePreview ? (
+          <img
+            src={formData.rawMaterialAiImagePreview}
+            alt="AI raw material analysis preview"
+            style={rawMaterialPreviewStyle}
+          />
+        ) : (
+          <div style={rawMaterialPlaceholderStyle}>AI</div>
+        )}
+        <div className="d-flex flex-column flex-sm-row gap-2 flex-grow-1">
+          <Form.Control
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) => applyRawMaterialAiImageFile(event.target.files?.[0] || null)}
+          />
+          <Button
+            type="button"
+            variant="outline-secondary"
+            className="d-inline-flex align-items-center justify-content-center gap-2"
+            onClick={() => openRawMaterialImageCapture("ai")}
           >
             <Camera />
             Capture
@@ -901,15 +979,17 @@ toast.error("An error occured! "+error.status);
             type="button"
             variant="outline-primary"
             className="d-inline-flex align-items-center justify-content-center gap-2"
-            disabled={isAnalyzingImage || !formData.rawMaterialImageFile}
-            onClick={(event) => analyzeRawMaterialImage(formData.rawMaterialImageFile, event)}
+            disabled={isAnalyzingImage || !formData.rawMaterialAiImageFile}
+            onClick={(event) => analyzeRawMaterialImage(formData.rawMaterialAiImageFile, event)}
           >
             <Stars />
             {isAnalyzingImage ? "Reading..." : "Auto fill"}
           </Button>
         </div>
       </div>
-      <Form.Text className="text-muted">JPEG, PNG, or WEBP up to 3MB.</Form.Text>
+      <Form.Text className="text-muted">
+        Used only by AI to suggest fields. It is not saved as the raw material image.
+      </Form.Text>
       {imageAnalysisNote ? (
         <div className="small text-success fw-semibold mt-2">{imageAnalysisNote}</div>
       ) : null}
@@ -986,7 +1066,7 @@ toast.error("An error occured! "+error.status);
           </span>
         </div>
       </div>
-      
+
       <div className="production-table-card">
         <div className="production-table-scroll">
           <Table hover responsive className="production-modern-table align-middle">
@@ -1143,6 +1223,7 @@ toast.error("An error occured! "+error.status);
               </Form.Select>
             </Form.Group>
             {renderImageField()}
+            {renderAiImageField()}
             {rawMaterialFields.map((field) => (
               <Form.Group key={field.key} className={field.type === "textarea" ? "production-form-grid-single" : ""}>
                 <Form.Label>{field.label}{field.required ? " *" : ""}</Form.Label>
@@ -1290,6 +1371,7 @@ toast.error("An error occured! "+error.status);
               </Form.Select>
             </Form.Group>
             {renderImageField()}
+            {renderAiImageField()}
             {rawMaterialFields.map((field) => (
               <Form.Group key={field.key} className={field.type === "textarea" ? "production-form-grid-single" : ""}>
                 <Form.Label>{field.label}{field.required ? " *" : ""}</Form.Label>
@@ -1428,8 +1510,8 @@ toast.error("An error occured! "+error.status);
       />
       <ImageCaptureDialog
         show={imageCaptureOpen}
-        title="Capture raw material image"
-        fileNamePrefix="raw-material-image"
+        title={imageCaptureTarget === "catalog" ? "Capture raw material image" : "Capture raw material AI image"}
+        fileNamePrefix={imageCaptureTarget === "catalog" ? "raw-material-image" : "raw-material-ai-image"}
         onClose={() => setImageCaptureOpen(false)}
         onCapture={handleRawMaterialImageCaptured}
       />

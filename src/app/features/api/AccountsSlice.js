@@ -110,7 +110,7 @@ export const extendedAccountsApiSlice = apiSlice.injectEndpoints({
                         body: payload
                     }
                 ),
-                invalidatesTags: [commonTags.inventory],
+                invalidatesTags: ['Accounts', commonTags.inventory],
                     }),
     })
 })

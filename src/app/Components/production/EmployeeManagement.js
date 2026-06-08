@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { useEffect, useMemo, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { Table, Button, Modal, Form, InputGroup } from "react-bootstrap";
@@ -20,6 +21,8 @@ import {
 } from "./ProductionTableControls";
 
 // Define which fields in the employee object are searchable
+const EMPTY_ARRAY = [];
+
 const searchableFields = ['empName', 'empRole', 'empContact', 'empEmail', 'empLocation', 'branchName'];
 
 /**
@@ -41,7 +44,7 @@ const theme = settings.theme;
   // --- Redux and RTK Query Hooks ---
   // Selectors to get data from the Redux store.
   const employees = useSelector(selectEmployees);
-  const branches = useSelector(selectBranches) ?? [];
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
   // RTK Query mutations for adding, updating, and deleting employees.
   // These hooks return a tuple: a trigger function and an object with metadata (isLoading, isError, etc.).
   const [addEmployee, {isLoading,isError,Error,isSuccess}] = useAddEmployeeMutation();

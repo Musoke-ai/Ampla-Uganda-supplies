@@ -26,6 +26,7 @@ import {
   People,
   QuestionCircle,
   Receipt,
+  CashStack,
   Shop,
   Tools,
 } from "react-bootstrap-icons";
@@ -125,6 +126,7 @@ const ROLE_GROUPS = {
   ],
   reports: ["admin", "reports", "accountant"],
   pos: ["admin", "salesdesk", "accountant"],
+  cashDrawer: ["admin", "salesdesk", "accountant"],
   history: ["admin", "history", "accountant"],
   settings: ALL_APP_ROLES,
   staff: ["superadmin", "developer", "admin"],
@@ -151,6 +153,7 @@ const navGroups = [
       { id: "staff", label: "Staff", path: "/home/staff", icon: People },
       { id: "branches", label: "Branches", path: "/home/branches", icon: Buildings },
       { id: "sales", label: "Sales", path: "/home/sales", icon: Shop },
+      { id: "cashDrawer", label: "Cash Drawer", path: "/home/cash-drawer", icon: CashStack },
       { id: "imports", label: "Imports", path: "/home/imports", icon: CloudArrowUp },
     ],
   },

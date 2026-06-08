@@ -14,14 +14,16 @@ import {
 } from "../../features/api/categorySlice";
 import { selectStock } from "../../features/stock/stockSlice";
 
+const EMPTY_ARRAY = [];
+
 const normalize = (value) => String(value || "").trim();
 
 export default function CategoryManagement({ context = "products" }) {
   useGetCategoriesQuery();
 
-  const roles = useSelector(selectRoles) ?? [];
-  const categories = useSelector(selectCategories) ?? [];
-  const products = useSelector(selectStock) ?? [];
+  const roles = useSelector(selectRoles) ?? EMPTY_ARRAY;
+  const categories = useSelector(selectCategories) ?? EMPTY_ARRAY;
+  const products = useSelector(selectStock) ?? EMPTY_ARRAY;
   const isAdmin = roles.includes("admin") || roles.includes("superadmin");
 
   const [categoryName, setCategoryName] = useState("");

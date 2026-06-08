@@ -55,9 +55,9 @@ const Header = () => {
         </li>
 
         <li className="nav-item">
-<a className='nav-link disabled text-white' href="#">V1.1<small><sup className='text-success fw-bold'>Whats's new?</sup></small>
-
-</a>
+          <span className='nav-link disabled text-white' aria-disabled="true">
+            V1.1<small><sup className='text-success fw-bold'>Whats's new?</sup></small>
+          </span>
         </li>
 
       </ul>

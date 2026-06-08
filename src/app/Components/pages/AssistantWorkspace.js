@@ -46,6 +46,7 @@ import {
   useSendAgentMessageMutation,
 } from "../../features/api/agentSlice";
 import TypewriterResponse from "../misc/TypewriterResponse";
+import { formatCurrency as formatCurrencyValue, formatNumberWithSeparators } from "../../utils/currency";
 import "../misc/agentTypewriter.css";
 import "./WorkspacePages.css";
 
@@ -101,14 +102,14 @@ const formatCurrency = (value) => {
   const numericValue = Number(value ?? 0);
   if (!Number.isFinite(numericValue)) return "UGX 0";
 
-  return `UGX ${numericValue.toLocaleString()}`;
+  return formatCurrencyValue(numericValue, "UGX");
 };
 
 const formatNumber = (value) => {
   const numericValue = Number(value ?? 0);
   if (!Number.isFinite(numericValue)) return "0";
 
-  return numericValue.toLocaleString();
+  return formatNumberWithSeparators(numericValue);
 };
 
 const formatDateTime = (value) => {
@@ -243,7 +244,6 @@ const formatReportValue = (key, value) => {
 };
 
 const buildReportPdf = ({ report = {}, exportMeta = {}, businessInfo = {}, answer = "" }) => {
-  const summary = report.summary || {};
   const table = findReportTable(report);
   const rows = table.rows;
   const columns = table.columns.length

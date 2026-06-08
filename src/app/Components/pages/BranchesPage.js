@@ -19,6 +19,8 @@ import { useTableSortSearch } from "../../hooks/useTableSortSearch";
 import { paginateItems, ProductionTableFooter } from "../production/ProductionTableControls";
 import "./WorkspacePages.css";
 
+const EMPTY_ARRAY = [];
+
 const searchableFields = [
   "branchName",
   "branchCode",
@@ -30,9 +32,9 @@ const searchableFields = [
 
 const sectionCardStyle = {
   borderRadius: 28,
-  backgroundColor: "#ffffff",
+  backgroundColor: "var(--ampla-surface-bg, #ffffff)",
   boxShadow: "0 12px 32px rgba(15, 23, 42, 0.05)",
-  border: "1px solid #e7efe9",
+  border: "1px solid var(--ampla-border-color, #e7efe9)",
 };
 
 const emptyBranchState = {
@@ -81,7 +83,7 @@ const MetricCard = ({ icon, title, value, note }) => (
   <div className="workspace-metric-card" style={sectionCardStyle}>
     <div
       className="workspace-metric-icon"
-      style={{ backgroundColor: "#e8f5ec", color: "#2f8f57" }}
+      style={{ backgroundColor: "var(--ampla-accent-soft, #e8f5ec)", color: "var(--ampla-accent-color, #2f8f57)" }}
     >
       {icon}
     </div>
@@ -103,7 +105,7 @@ const BranchesPage = () => {
     error: branchesError,
   } = useGetBranchesQuery();
 
-  const branches = useSelector(selectBranches) ?? [];
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
   const [addBranch, { isLoading: isAddLoading }] = useAddBranchMutation();
   const [updateBranch, { isLoading: isUpdateLoading }] = useUpdateBranchMutation();
   const [deleteBranch, { isLoading: isDeleteLoading }] = useDeleteBranchMutation();

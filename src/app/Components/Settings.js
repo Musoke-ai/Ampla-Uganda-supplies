@@ -26,6 +26,7 @@ import {
   GearWideConnected,
   MoonStars,
   Palette,
+  Printer,
 } from "react-bootstrap-icons";
 import { BsExclamationCircleFill } from "react-icons/bs";
 import { useSelector } from "react-redux";
@@ -55,6 +56,9 @@ export const defaultSettings = {
   sidebarColor: "#f4faf6",
   taxRate: 0,
   allowDebtSales: true,
+  receiptTemplate: "modern",
+  receiptPaperWidth: "80mm",
+  receiptPrinterMode: "browser",
 };
 
 const palette = {
@@ -111,6 +115,12 @@ const notificationIntervals = {
   Never: 0,
 };
 
+const receiptTemplates = {
+  modern: "Standard POS",
+  compact: "Compact POS",
+  classic: "Classic Retail",
+};
+
 const clampNumber = (value, fallback = 0) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
@@ -163,6 +173,18 @@ const mergeSettings = (candidate) => {
       typeof source.sidebarColor === "string" && source.sidebarColor.trim()
         ? source.sidebarColor
         : defaultSettings.sidebarColor,
+    receiptTemplate:
+      source.receiptTemplate in receiptTemplates
+        ? source.receiptTemplate
+        : defaultSettings.receiptTemplate,
+    receiptPaperWidth:
+      ["80mm", "58mm"].includes(source.receiptPaperWidth)
+        ? source.receiptPaperWidth
+        : defaultSettings.receiptPaperWidth,
+    receiptPrinterMode:
+      ["browser", "system"].includes(source.receiptPrinterMode)
+        ? source.receiptPrinterMode
+        : defaultSettings.receiptPrinterMode,
   };
 };
 
@@ -202,14 +224,42 @@ const hexToRgb = (hex) => {
   };
 };
 
+const mixRgb = (base, tint, tintRatio) => {
+  const ratio = Math.min(1, Math.max(0, tintRatio));
+  const channel = (key) => Math.round(base[key] * (1 - ratio) + tint[key] * ratio);
+
+  return {
+    r: channel("r"),
+    g: channel("g"),
+    b: channel("b"),
+  };
+};
+
+const rgbCss = ({ r, g, b }) => `rgb(${r}, ${g}, ${b})`;
+
 const applyAppearanceSettings = (settings) => {
   const accentRgb = hexToRgb(settings.navbarColor);
-  const surface = settings.theme === "dark" ? "#111917" : "#ffffff";
-  const surfaceSoft = settings.theme === "dark" ? "#16211e" : "#fbfdfb";
-  const appBg = settings.theme === "dark" ? "#0c1210" : "#f8fbf8";
+  const sidebarRgb = hexToRgb(settings.sidebarColor);
+  const white = { r: 255, g: 255, b: 255 };
+  const black = { r: 7, g: 12, b: 10 };
+  const appBg =
+    settings.theme === "dark"
+      ? rgbCss(mixRgb(black, accentRgb, 0.08))
+      : rgbCss(mixRgb(white, sidebarRgb, 0.14));
+  const surface =
+    settings.theme === "dark"
+      ? rgbCss(mixRgb({ r: 15, g: 22, b: 20 }, accentRgb, 0.08))
+      : "#ffffff";
+  const surfaceSoft =
+    settings.theme === "dark"
+      ? rgbCss(mixRgb({ r: 20, g: 31, b: 28 }, accentRgb, 0.12))
+      : rgbCss(mixRgb(white, accentRgb, 0.07));
   const text = settings.theme === "dark" ? "#edf3ef" : "#15202b";
   const muted = settings.theme === "dark" ? "#9fb0a7" : "#6f7d8c";
-  const border = settings.theme === "dark" ? "rgba(255,255,255,0.12)" : "#e7efe9";
+  const border =
+    settings.theme === "dark"
+      ? "rgba(255,255,255,0.12)"
+      : `rgba(${accentRgb.r}, ${accentRgb.g}, ${accentRgb.b}, 0.16)`;
 
   document.documentElement.setAttribute("data-bs-theme", settings.theme);
   document.documentElement.style.setProperty("--ampla-navbar-color", settings.navbarColor);
@@ -217,6 +267,7 @@ const applyAppearanceSettings = (settings) => {
   document.documentElement.style.setProperty("--ampla-accent-color", settings.navbarColor);
   document.documentElement.style.setProperty("--ampla-accent-rgb", `${accentRgb.r}, ${accentRgb.g}, ${accentRgb.b}`);
   document.documentElement.style.setProperty("--ampla-accent-soft", `rgba(${accentRgb.r}, ${accentRgb.g}, ${accentRgb.b}, ${settings.theme === "dark" ? 0.18 : 0.12})`);
+  document.documentElement.style.setProperty("--ampla-on-accent-color", "#ffffff");
   document.documentElement.style.setProperty("--ampla-app-bg", appBg);
   document.documentElement.style.setProperty("--ampla-surface-bg", surface);
   document.documentElement.style.setProperty("--ampla-surface-soft", surfaceSoft);
@@ -224,6 +275,7 @@ const applyAppearanceSettings = (settings) => {
   document.documentElement.style.setProperty("--ampla-muted-color", muted);
   document.documentElement.style.setProperty("--ampla-border-color", border);
   document.documentElement.style.setProperty("--ampla-input-bg", settings.theme === "dark" ? "#101715" : "#ffffff");
+  document.documentElement.style.setProperty("--ampla-input-focus", `rgba(${accentRgb.r}, ${accentRgb.g}, ${accentRgb.b}, ${settings.theme === "dark" ? 0.26 : 0.16})`);
   document.documentElement.style.setProperty("--ampla-shadow", settings.theme === "dark" ? "0 16px 36px rgba(0, 0, 0, 0.24)" : "0 12px 32px rgba(15, 23, 42, 0.05)");
   document.documentElement.style.setProperty("--bs-body-bg", appBg);
   document.documentElement.style.setProperty("--bs-body-color", text);
@@ -255,7 +307,7 @@ export const SettingsProvider = ({ children }) => {
         ? previous
         : mergedSettings
     );
-  }, [profile?.appSettings, profile?.appSettingsConfigured]);
+  }, [profile, profile?.appSettings, profile?.appSettingsConfigured]);
 
   useEffect(() => {
     try {
@@ -515,6 +567,14 @@ const Settings = () => {
         accent: palette.redSoft,
         color: palette.red,
       },
+      {
+        icon: <Printer size={18} />,
+        title: "Receipt",
+        value: receiptTemplates[settings.receiptTemplate] || "Standard POS",
+        note: `${settings.receiptPaperWidth} POS printer layout`,
+        accent: palette.greenSoft,
+        color: palette.green,
+      },
     ],
     [settings]
   );
@@ -753,6 +813,120 @@ const Settings = () => {
                             }
                             label="Allow POS sales with an outstanding customer balance"
                           />
+                        </SettingField>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+              ) : null}
+
+              {isAllowed ? (
+                <Card style={sectionCardStyle}>
+                  <Card.Body className="p-4">
+                    <div className="workspace-section-head mb-3">
+                      <div>
+                        <h3 className="workspace-section-title">
+                          Receipt And POS Printing
+                        </h3>
+                        <p className="workspace-section-copy">
+                          Choose the receipt design and paper size used by POS printers.
+                        </p>
+                      </div>
+                      <Button
+                        variant="success"
+                        style={{
+                          ...actionButtonStyle,
+                          backgroundColor: palette.green,
+                          borderColor: palette.green,
+                          color: "#ffffff",
+                        }}
+                        onClick={handleSaveSettings}
+                        disabled={isSavingSettings}
+                      >
+                        <Printer className="me-2" />
+                        {isSavingSettings ? "Saving..." : "Save Receipt Settings"}
+                      </Button>
+                    </div>
+
+                    <Row className="g-3">
+                      <Col md={6}>
+                        <SettingField
+                          label="Receipt Template"
+                          helpText="Standard POS matches most thermal receipts. Compact is faster for small rolls, and Classic keeps a retail document feel."
+                        >
+                          <Form.Select
+                            style={controlStyle}
+                            value={settings.receiptTemplate}
+                            onChange={(event) =>
+                              updateSetting("receiptTemplate", event.target.value)
+                            }
+                          >
+                            <option value="modern">Standard POS</option>
+                            <option value="compact">Compact POS</option>
+                            <option value="classic">Classic Retail</option>
+                          </Form.Select>
+                        </SettingField>
+                      </Col>
+                      <Col md={6}>
+                        <SettingField
+                          label="POS Paper Width"
+                          helpText="80mm fits most receipt printers. Use 58mm for smaller portable and counter printers."
+                        >
+                          <Form.Select
+                            style={controlStyle}
+                            value={settings.receiptPaperWidth}
+                            onChange={(event) =>
+                              updateSetting("receiptPaperWidth", event.target.value)
+                            }
+                          >
+                            <option value="80mm">80mm thermal roll</option>
+                            <option value="58mm">58mm compact roll</option>
+                          </Form.Select>
+                        </SettingField>
+                      </Col>
+                      <Col md={6}>
+                        <SettingField
+                          label="Printer Compatibility"
+                          helpText="Browser print works with USB, Bluetooth, Wi-Fi, and network POS printers after their drivers are installed."
+                        >
+                          <Form.Select
+                            style={controlStyle}
+                            value={settings.receiptPrinterMode}
+                            onChange={(event) =>
+                              updateSetting("receiptPrinterMode", event.target.value)
+                            }
+                          >
+                            <option value="browser">Browser POS print</option>
+                            <option value="system">System print dialog</option>
+                          </Form.Select>
+                        </SettingField>
+                      </Col>
+                      <Col md={6}>
+                        <SettingField
+                          label="Active Receipt Setup"
+                          helpText="These values are used in POS receipt preview, print, and PDF export."
+                        >
+                          <div
+                            className="d-flex flex-wrap gap-2 p-3"
+                            style={{
+                              minHeight: 46,
+                              borderRadius: 16,
+                              border: `1px solid ${palette.border}`,
+                              backgroundColor: "var(--ampla-surface-soft, #fbfdfb)",
+                            }}
+                          >
+                            <span className="badge text-bg-light">
+                              {receiptTemplates[settings.receiptTemplate]}
+                            </span>
+                            <span className="badge text-bg-light">
+                              {settings.receiptPaperWidth}
+                            </span>
+                            <span className="badge text-bg-light">
+                              {settings.receiptPrinterMode === "browser"
+                                ? "Browser print"
+                                : "System dialog"}
+                            </span>
+                          </div>
                         </SettingField>
                       </Col>
                     </Row>
@@ -1179,6 +1353,18 @@ const Settings = () => {
                       <span style={{ color: palette.muted }}>Notification Refresh</span>
                       <strong style={{ color: palette.text }}>
                         {settings.notificationFrequency}
+                      </strong>
+                    </div>
+                    <div className="d-flex justify-content-between">
+                      <span style={{ color: palette.muted }}>Receipt Template</span>
+                      <strong style={{ color: palette.text }}>
+                        {receiptTemplates[settings.receiptTemplate]}
+                      </strong>
+                    </div>
+                    <div className="d-flex justify-content-between">
+                      <span style={{ color: palette.muted }}>POS Paper</span>
+                      <strong style={{ color: palette.text }}>
+                        {settings.receiptPaperWidth}
                       </strong>
                     </div>
                   </Stack>

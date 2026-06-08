@@ -50,6 +50,10 @@ const permissionsConfig = [
   { name: "Update", icon: "bi-pencil-square" },
   { name: "Delete", icon: "bi-trash" },
 ];
+const PROTECTED_ACCOUNT_ROLES = new Set(["admin", "superadmin", "super_admin", "super admin", "developer"]);
+const normalizeRole = (role) => String(role || "").trim().toLowerCase();
+const isProtectedAccount = (user) =>
+  (user?.roles ?? []).some((role) => PROTECTED_ACCOUNT_ROLES.has(normalizeRole(role)));
 
 /**
  * Transforms user data into a structured format with grouped permissions,
@@ -77,18 +81,20 @@ function transformUsers(usersData) {
   };
 
   return usersData.map((user) => {
+    const userRoles = Array.isArray(user.roles) ? user.roles : [];
+    const userPermissions = Array.isArray(user.permissions) ? user.permissions : [];
     const newPermissions = {};
 
     // Determine if the user has granular permissions (e.g., "employeesview")
     // or generic permissions (e.g., "edit", "create").
-    const isGranular = user.roles.some((role) =>
-      user.permissions.some((perm) => perm.startsWith(role) && perm !== role)
+    const isGranular = userRoles.some((role) =>
+      userPermissions.some((perm) => perm.startsWith(role) && perm !== role)
     );
 
     if (isGranular) {
       // --- Logic for new Granular Permissions ---
-      user.permissions.forEach((perm) => {
-        const roleKey = user.roles.find((r) => perm.startsWith(r));
+      userPermissions.forEach((perm) => {
+        const roleKey = userRoles.find((r) => perm.startsWith(r));
         if (roleKey) {
           const moduleName = formatRoleName(roleKey);
           const action = capitalize(perm.substring(roleKey.length));
@@ -103,8 +109,8 @@ function transformUsers(usersData) {
       });
     } else {
       // --- Logic for old Generic Permissions ---
-      const actions = user.permissions.map(capitalize);
-      user.roles.forEach((roleKey) => {
+      const actions = userPermissions.map(capitalize);
+      userRoles.forEach((roleKey) => {
         const roleName = formatRoleName(roleKey);
         newPermissions[roleName] = actions;
       });
@@ -116,6 +122,7 @@ function transformUsers(usersData) {
       id: user.id,
       username: cleanUsername,
       email: user.email,
+      roles: userRoles,
       permissions: newPermissions,
     };
   });
@@ -128,7 +135,10 @@ export default function AdminAccountManager() {
   const [updateUser, { isLoading: isUpdateLoading }] = useEditAccountMutation();
   const [deleteUser, { isLoading: isDeleteLoading }] = useDeleteUserMutation();
 //   const initialUsers = transformUsers(accounts);
-const users = useMemo(() => transformUsers(accounts), [accounts]);
+const users = useMemo(
+  () => transformUsers(accounts.filter((account) => !isProtectedAccount(account))),
+  [accounts]
+);
 const [isEdit, setIsEdit] = useState(false);
 const [currentPage, setCurrentPage] = useState(1);
 const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -270,6 +280,10 @@ const downloadAccountDetailsPdf = (userData) => {
   };
 
   const handleOpenConfirmModal = (user) => {
+    if (isProtectedAccount(user)) {
+      toast.error("Administrator accounts cannot be deleted from Staff Management.");
+      return;
+    }
     setUserToDelete(user);
     setShowConfirmModal(true);
   };
@@ -292,6 +306,11 @@ const downloadAccountDetailsPdf = (userData) => {
 
   // --- CRUD Operations ---
   const handleDeleteUser = async () => {
+    if (!userToDelete || isProtectedAccount(userToDelete)) {
+      toast.error("Administrator accounts cannot be deleted from Staff Management.");
+      handleCloseConfirmModal();
+      return;
+    }
     // setUsers(users.filter((u) => u.id !== userToDelete.id));
     // handleShowToast(`User "${userToDelete.username}" has been deleted.`);
    

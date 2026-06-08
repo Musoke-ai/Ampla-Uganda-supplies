@@ -21,6 +21,8 @@ import {
 } from "../features/api/branchesSlice";
 import { useSettings } from "./Settings";
 
+const EMPTY_ARRAY = [];
+
 const palette = {
   green: "#2f8f57",
   muted: "#697586",
@@ -29,9 +31,9 @@ const palette = {
 
 const BranchScopeSwitcher = () => {
   const { settings } = useSettings();
-  const roles = useSelector(selectRoles) ?? [];
+  const roles = useSelector(selectRoles) ?? EMPTY_ARRAY;
   const branchScope = useSelector(selectBranchScope);
-  const branches = useSelector(selectBranches) ?? [];
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
   const { isFetching } = useGetBranchesQuery();
   const [switchBranch, { isLoading: isSwitching }] = useSwitchBranchMutation();
 

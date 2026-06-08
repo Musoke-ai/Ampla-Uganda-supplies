@@ -63,7 +63,10 @@ import { selectCategories, useGetCategoriesQuery } from "../../features/api/cate
 import { selectCustomers, useGetCustomersQuery } from "../../features/api/customers";
 import { selectStock, useGetStockQuery } from "../../features/stock/stockSlice";
 import { selectBranchScope } from "../../auth/authSlice";
+import { formatCurrency, formatNumberWithSeparators } from "../../utils/currency";
 import "./WorkspacePages.css";
+
+const EMPTY_ARRAY = [];
 
 const periods = [
   { value: "today", label: "Today" },
@@ -110,8 +113,8 @@ const creditStatuses = [
   { value: "unpaid_credit", label: "Unpaid credit" },
 ];
 
-const currency = (value) => `UGX ${Number(value || 0).toLocaleString()}`;
-const number = (value) => Number(value || 0).toLocaleString();
+const currency = (value) => formatCurrency(value, "UGX");
+const number = (value) => formatNumberWithSeparators(value || 0);
 
 function ReportsSample() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -134,10 +137,10 @@ function ReportsSample() {
   useGetCategoriesQuery();
   useGetCustomersQuery();
 
-  const branches = useSelector(selectBranches) ?? [];
-  const products = useSelector(selectStock) ?? [];
-  const categories = useSelector(selectCategories) ?? [];
-  const customers = useSelector(selectCustomers) ?? [];
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
+  const products = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const categories = useSelector(selectCategories) ?? EMPTY_ARRAY;
+  const customers = useSelector(selectCustomers) ?? EMPTY_ARRAY;
   const branchScope = useSelector(selectBranchScope);
   const canSwitchBranches = Boolean(branchScope?.can_switch_branches);
 
@@ -777,7 +780,7 @@ function formatSummaryValue(key, value) {
   const numericValue = Number(value || 0);
   const lower = key.toLowerCase();
 
-  if (lower.includes("percent")) return `${numericValue.toLocaleString()}%`;
+  if (lower.includes("percent")) return `${formatNumberWithSeparators(numericValue)}%`;
   if (/(sales|cost|profit|amount|balance|expense|salary|value|margin|discount|credit|collected|paid|cash|movement|outstanding)/.test(lower)) {
     return currency(value);
   }
@@ -787,7 +790,7 @@ function formatSummaryValue(key, value) {
 
 function formatCell(value) {
   if (value === null || value === undefined) return "";
-  if (typeof value === "number") return Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (typeof value === "number") return formatNumberWithSeparators(value);
   return String(value);
 }
 

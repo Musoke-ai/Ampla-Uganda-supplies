@@ -45,6 +45,8 @@ import {
 import { selectRawMaterials, useGetRawMaterialsQuery } from "../../features/api/rawmaterialsSlice";
 import { selectStock, useGetStockQuery } from "../../features/stock/stockSlice";
 
+const EMPTY_ARRAY = [];
+
 const toNumber = (value) => Number(value || 0);
 const today = () => new Date().toISOString().slice(0, 10);
 const safeText = (value, fallback = "") => (value === undefined || value === null || value === "" ? fallback : String(value));
@@ -184,12 +186,12 @@ export default function ProductionBatches() {
     ? String(branchScope.effective_branch_id)
     : "";
   const canSwitchBranches = Boolean(branchScope?.can_switch_branches);
-  const branches = useSelector(selectBranches) ?? [];
-  const products = useSelector(selectStock) ?? [];
-  const rawMaterials = useSelector(selectRawMaterials) ?? [];
-  const orders = useSelector(selectOrders) ?? [];
-  const employees = useSelector(selectEmployees) ?? [];
-  const batches = useSelector(selectProductionBatches) ?? [];
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
+  const products = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const rawMaterials = useSelector(selectRawMaterials) ?? EMPTY_ARRAY;
+  const orders = useSelector(selectOrders) ?? EMPTY_ARRAY;
+  const employees = useSelector(selectEmployees) ?? EMPTY_ARRAY;
+  const batches = useSelector(selectProductionBatches) ?? EMPTY_ARRAY;
 
   useGetBranchesQuery();
   useGetStockQuery();
@@ -241,10 +243,6 @@ export default function ProductionBatches() {
   const branchOrders = useMemo(
     () => scopedOptions(orders, branchId),
     [branchId, orders]
-  );
-  const branchMaterials = useMemo(
-    () => scopedOptions(rawMaterials, branchId),
-    [branchId, rawMaterials]
   );
   const branchEmployees = useMemo(
     () => scopedOptions(employees, branchId),

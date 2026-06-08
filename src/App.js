@@ -28,6 +28,7 @@ import AssistantWorkspace from "./app/Components/pages/AssistantWorkspace";
 import HelpGuide from "./app/Components/pages/HelpGuide";
 import ImportsPage from "./app/Components/pages/ImportsPage";
 import StaffManagementPage from "./app/Components/pages/StaffManagementPage";
+import CashDrawerPage from "./app/Components/pages/CashDrawerPage";
 
 // Auth and Utility Components
 import RequireAuth from "./app/auth/RequireAuth";
@@ -78,6 +79,7 @@ const ROLE_ACCESS = {
   sales: ["admin", "sales", "accountant"],
   reports: ["admin", "reports", "accountant"],
   pos: ["admin", "salesdesk", "accountant"],
+  cashDrawer: ["admin", "salesdesk", "accountant"],
   history: ["admin", "history", "accountant"],
   settings: ALL_APP_ROLES,
   staff: ["superadmin", "developer", "admin"],
@@ -176,6 +178,10 @@ function App() {
 
           <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.pos} />}>
             <Route path="pos" element={<PosPage />} />
+          </Route>
+
+          <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.cashDrawer} />}>
+            <Route path="cash-drawer" element={<CashDrawerPage />} />
           </Route>
 
           <Route element={<RequireAuth allowedRoles={ROLE_ACCESS.history} />}>

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, default-case */
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Modal,

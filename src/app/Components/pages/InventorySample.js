@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Container,
   Row,
@@ -19,6 +19,7 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import {
   BoxSeam,
+  ArrowClockwise,
   ExclamationTriangle,
   GraphUpArrow,
   ChatDots,
@@ -47,6 +48,11 @@ import {
 } from "../../features/api/categorySlice";
 import { useAnalyzeCatalogImageMutation } from "../../features/api/catalogImageAnalysisSlice";
 import {
+  formatCurrency,
+  formatCurrencyInputValue,
+  parseCurrencyInput,
+} from "../../utils/currency";
+import {
   selectStock,
   useAddStockMutation,
   useDeleteStockMutation,
@@ -54,14 +60,16 @@ import {
   useUpdateStockMutation,
 } from "../../features/stock/stockSlice";
 
+const EMPTY_ARRAY = [];
+
 const palette = {
-  bg: "#f8fbf8",
-  surface: "#ffffff",
-  border: "#e7efe9",
-  text: "#15202b",
-  muted: "#6f7d8c",
-  green: "#2f8f57",
-  greenSoft: "#e8f5ec",
+  bg: "var(--ampla-app-bg, #f8fbf8)",
+  surface: "var(--ampla-surface-bg, #ffffff)",
+  border: "var(--ampla-border-color, #e7efe9)",
+  text: "var(--ampla-text-color, #15202b)",
+  muted: "var(--ampla-muted-color, #6f7d8c)",
+  green: "var(--ampla-accent-color, #2f8f57)",
+  greenSoft: "var(--ampla-accent-soft, #e8f5ec)",
   blue: "#2f80ed",
   blueSoft: "#e8f1ff",
   amber: "#f59e0b",
@@ -163,13 +171,15 @@ export default function InventoryPage() {
 
   const {
     isLoading: isStockLoading,
+    isFetching: isStockFetching,
     isError: isStockError,
     error: stockError,
+    refetch: refetchStock,
   } = useGetStockQuery();
 
-  const inventory = useSelector(selectStock) ?? [];
-  const branches = useSelector(selectBranches) ?? [];
-  const categories = useSelector(selectCategories) ?? [];
+  const inventory = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
+  const categories = useSelector(selectCategories) ?? EMPTY_ARRAY;
   const createInitialFormState = () => ({
     itemId: null,
     branchId: currentBranchId,
@@ -181,6 +191,8 @@ export default function InventoryPage() {
     itemImage: "",
     itemImageFile: null,
     itemImagePreview: "",
+    itemAiImageFile: null,
+    itemAiImagePreview: "",
     itemBrand: "",
     itemProductType: "purchased",
     itemUnit: "pcs",
@@ -216,6 +228,7 @@ export default function InventoryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [imageCaptureOpen, setImageCaptureOpen] = useState(false);
+  const [imageCaptureTarget, setImageCaptureTarget] = useState("ai");
   const [quickCategoryName, setQuickCategoryName] = useState("");
   const [imageAnalysisNote, setImageAnalysisNote] = useState("");
   const [imageAnalysisAlert, setImageAnalysisAlert] = useState(null);
@@ -223,14 +236,20 @@ export default function InventoryPage() {
   const [saveFeedback, setSaveFeedback] = useState(null);
   const productModalCloseGuardRef = useRef(false);
   const pendingProductCaptureFileRef = useRef(null);
+  const pendingProductCaptureTargetRef = useRef("ai");
   const recentBarcodeScanRef = useRef({ value: "", time: 0 });
   const [forceProductModalOpen, setForceProductModalOpen] = useState(false);
 
-  const formatCurrency = (amount) =>
-    `${currency} ${Number(amount || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    })}`;
+  const money = (amount) => formatCurrency(amount, currency);
+
+  const refreshInventory = async () => {
+    try {
+      await Promise.all([refetchStock(), refetchCategories()]);
+      toast.success("Inventory refreshed.");
+    } catch (error) {
+      toast.error("Could not refresh inventory. Please try again.");
+    }
+  };
 
   const processedInventory = useMemo(() => {
     const branchMap = new Map(
@@ -340,7 +359,13 @@ export default function InventoryPage() {
     setForceProductModalOpen(false);
     setCurrentItem(
       item
-        ? { ...item, itemImageFile: null, itemImagePreview: assetUrl(item.itemImage) }
+        ? {
+            ...item,
+            itemImageFile: null,
+            itemImagePreview: assetUrl(item.itemImage),
+            itemAiImageFile: null,
+            itemAiImagePreview: "",
+          }
         : createInitialFormState()
     );
     setShowFormModal(true);
@@ -376,18 +401,31 @@ export default function InventoryPage() {
     toast.success(`Barcode detected: ${cleanBarcode}`, { toastId: `product-barcode-${cleanBarcode}` });
   };
 
-  const applyProductImageFile = (file) => {
-    setImageAnalysisNote("");
-    setImageAnalysisAlert(null);
-    setImageAnalysisSummary([]);
+  const applyProductImageFile = useCallback((file) => {
     setCurrentItem((item) => ({
       ...item,
       itemImageFile: file,
       itemImagePreview: file ? URL.createObjectURL(file) : assetUrl(item.itemImage),
     }));
+  }, []);
+
+  const applyProductAiImageFile = useCallback((file) => {
+    setImageAnalysisNote("");
+    setImageAnalysisAlert(null);
+    setImageAnalysisSummary([]);
+    setCurrentItem((item) => ({
+      ...item,
+      itemAiImageFile: file,
+      itemAiImagePreview: file ? URL.createObjectURL(file) : "",
+    }));
+  }, []);
+
+  const openProductImageCapture = (target = "ai") => {
+    setImageCaptureTarget(target);
+    setImageCaptureOpen(true);
   };
 
-  const matchProductCategory = (categoryName) => {
+  const matchProductCategory = useCallback((categoryName) => {
     const normalized = String(categoryName || "").trim().toLowerCase();
     if (!normalized) return null;
 
@@ -399,9 +437,9 @@ export default function InventoryPage() {
       }) ||
       null
     );
-  };
+  }, [categories]);
 
-  const applyProductImageAnalysis = (analysis) => {
+  const applyProductImageAnalysis = useCallback((analysis) => {
     const fields = analysis?.fields || {};
     const summary = buildAnalysisSummary(fields, productAnalysisLabels);
     const suggestedCategory =
@@ -466,14 +504,14 @@ export default function InventoryPage() {
       setImageAnalysisNote(analysis?.notes || "Image checked. Confirm the fields before saving.");
       setImageAnalysisAlert(null);
     }
-  };
+  }, [categories, matchProductCategory]);
 
-  const analyzeProductImage = async (file = currentItem.itemImageFile, event = null) => {
+  const analyzeProductImage = useCallback(async (file = currentItem.itemAiImageFile, event = null) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
 
     if (!file) {
-      toast.info("Capture or upload a product image first.");
+      toast.info("Capture or upload an AI image first.");
       return;
     }
 
@@ -501,10 +539,17 @@ export default function InventoryPage() {
         productModalCloseGuardRef.current = false;
       }, 1200);
     }
-  };
+  }, [
+    analyzeCatalogImage,
+    applyProductImageAnalysis,
+    currentBranchId,
+    currentItem.branchId,
+    currentItem.itemAiImageFile,
+  ]);
 
   const handleProductImageCaptured = (file) => {
     pendingProductCaptureFileRef.current = file;
+    pendingProductCaptureTargetRef.current = imageCaptureTarget;
     productModalCloseGuardRef.current = true;
     setForceProductModalOpen(true);
     setShowFormModal(true);
@@ -516,6 +561,7 @@ export default function InventoryPage() {
     }
 
     const file = pendingProductCaptureFileRef.current;
+    const target = pendingProductCaptureTargetRef.current;
     pendingProductCaptureFileRef.current = null;
     productModalCloseGuardRef.current = true;
     setForceProductModalOpen(true);
@@ -523,10 +569,17 @@ export default function InventoryPage() {
 
     window.setTimeout(() => {
       setShowFormModal(true);
-      applyProductImageFile(file);
-      analyzeProductImage(file);
+      if (target === "catalog") {
+        applyProductImageFile(file);
+        window.setTimeout(() => {
+          productModalCloseGuardRef.current = false;
+        }, 300);
+      } else {
+        applyProductAiImageFile(file);
+        analyzeProductImage(file);
+      }
     }, 0);
-  }, [imageCaptureOpen]);
+  }, [analyzeProductImage, applyProductAiImageFile, applyProductImageFile, imageCaptureOpen]);
 
   const createQuickProductCategory = async (event = null) => {
     event?.preventDefault?.();
@@ -590,6 +643,7 @@ export default function InventoryPage() {
       try {
         setSaveFeedback({ type: "info", message: "Updating item. Please wait..." });
         await updateInventory(toProductFormData(itemData)).unwrap();
+        await refetchStock();
         setSaveFeedback({ type: "success", message: "Item updated successfully." });
         toast.success("Item updated successfully.");
         window.setTimeout(() => {
@@ -612,6 +666,7 @@ export default function InventoryPage() {
     try {
       setSaveFeedback({ type: "info", message: "Saving item. Please wait..." });
       await createInventory(toProductFormData(itemData)).unwrap();
+      await refetchStock();
       setSaveFeedback({ type: "success", message: "Item added successfully." });
       toast.success("Item added successfully.");
       window.setTimeout(() => {
@@ -633,6 +688,7 @@ export default function InventoryPage() {
 
     try {
       await deleteInventory({ itemId: itemToDelete.itemId }).unwrap();
+      await refetchStock();
       toast.success("Item deleted successfully.");
       handleCloseDeleteModal();
     } catch (error) {
@@ -684,8 +740,8 @@ export default function InventoryPage() {
         item.itemModel,
         item.branchName,
         item.itemQuantity,
-        formatCurrency(item.itemStockPrice),
-        formatCurrency(item.itemLeastPrice),
+        money(item.itemStockPrice),
+        money(item.itemLeastPrice),
         item.itemCondition,
         item.itemQuality,
       ]),
@@ -744,6 +800,16 @@ export default function InventoryPage() {
           </Col>
           <Col xs="auto" className="d-flex gap-2 flex-wrap">
             <Button
+              type="button"
+              variant="light"
+              style={toolbarButtonStyle}
+              onClick={refreshInventory}
+              disabled={isStockFetching}
+            >
+              <ArrowClockwise className="me-2" />
+              {isStockFetching ? "Refreshing..." : "Refresh"}
+            </Button>
+            <Button
               as={Link}
               to="/home/assistant"
               variant="light"
@@ -787,7 +853,7 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {isStockLoading && (
+      {(isStockLoading || isStockFetching) && (
         <div className="mb-3">
           <div className="progress" style={{ height: 6, borderRadius: 999 }}>
             <div className="progress-bar progress-bar-striped progress-bar-animated w-100" />
@@ -812,7 +878,7 @@ export default function InventoryPage() {
             accent={palette.blueSoft}
             color={palette.blue}
             title="Total Stock Value"
-            value={formatCurrency(metrics.stockValue)}
+            value={money(metrics.stockValue)}
             note="Across all products"
           />
         </Col>
@@ -953,8 +1019,8 @@ export default function InventoryPage() {
                       <td style={{ ...bodyCellStyle, color: status.text, fontWeight: 800 }}>
                         {item.itemQuantity}
                       </td>
-                      <td style={bodyCellStyle}>{formatCurrency(item.itemStockPrice)}</td>
-                      <td style={bodyCellStyle}>{formatCurrency(item.itemLeastPrice)}</td>
+                      <td style={bodyCellStyle}>{money(item.itemStockPrice)}</td>
+                      <td style={bodyCellStyle}>{money(item.itemLeastPrice)}</td>
                       <td style={bodyCellStyle}>
                         <span style={conditionBadgeStyle(item.itemCondition)}>{item.itemCondition || "N/A"}</span>
                       </td>
@@ -1073,13 +1139,13 @@ export default function InventoryPage() {
               <div className="text-start text-lg-end">
                 <small style={{ color: palette.muted }}>Total Cost Value</small>
                 <p className="fw-bold h5 mb-0" style={{ color: palette.text }}>
-                  {formatCurrency(totals.stockValue)}
+                  {money(totals.stockValue)}
                 </p>
               </div>
               <div className="text-start text-lg-end">
                 <small style={{ color: palette.muted }}>Total Retail Value</small>
                 <p className="fw-bold h5 mb-0" style={{ color: palette.text }}>
-                  {formatCurrency(totals.leastValue)}
+                  {money(totals.leastValue)}
                 </p>
               </div>
               </div>
@@ -1194,7 +1260,42 @@ export default function InventoryPage() {
                           type="button"
                           variant="outline-secondary"
                           className="d-inline-flex align-items-center justify-content-center gap-2"
-                          onClick={() => setImageCaptureOpen(true)}
+                          onClick={() => openProductImageCapture("catalog")}
+                        >
+                          <Camera />
+                          Capture
+                        </Button>
+                      </div>
+                    </div>
+                    <Form.Text className="text-muted">Saved on the product card. JPEG, PNG, or WEBP up to 3MB.</Form.Text>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>AI Image For Auto Fill</Form.Label>
+                    <div className="d-flex align-items-center gap-3">
+                      {currentItem.itemAiImagePreview ? (
+                        <img
+                          src={currentItem.itemAiImagePreview}
+                          alt="AI product analysis preview"
+                          style={formImagePreviewStyle}
+                        />
+                      ) : (
+                        <div style={formImagePlaceholderStyle}>
+                          AI
+                        </div>
+                      )}
+                      <div className="d-flex flex-column flex-sm-row gap-2 flex-grow-1">
+                        <Form.Control
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={(event) => applyProductAiImageFile(event.target.files?.[0] || null)}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline-secondary"
+                          className="d-inline-flex align-items-center justify-content-center gap-2"
+                          onClick={() => openProductImageCapture("ai")}
                         >
                           <Camera />
                           Capture
@@ -1203,15 +1304,17 @@ export default function InventoryPage() {
                           type="button"
                           variant="outline-primary"
                           className="d-inline-flex align-items-center justify-content-center gap-2"
-                          disabled={isAnalyzingImage || !currentItem.itemImageFile}
-                          onClick={(event) => analyzeProductImage(currentItem.itemImageFile, event)}
+                          disabled={isAnalyzingImage || !currentItem.itemAiImageFile}
+                          onClick={(event) => analyzeProductImage(currentItem.itemAiImageFile, event)}
                         >
                           <Stars />
                           {isAnalyzingImage ? "Reading..." : "Auto fill"}
                         </Button>
                       </div>
                     </div>
-                    <Form.Text className="text-muted">JPEG, PNG, or WEBP up to 3MB.</Form.Text>
+                    <Form.Text className="text-muted">
+                      Used only by AI to suggest fields. It is not saved as the product image.
+                    </Form.Text>
                     {imageAnalysisNote ? (
                       <div className="small text-success fw-semibold mt-2">{imageAnalysisNote}</div>
                     ) : null}
@@ -1420,15 +1523,14 @@ export default function InventoryPage() {
                     <InputGroup>
                       <InputGroup.Text>{currency}</InputGroup.Text>
                       <Form.Control
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Optional"
-                        value={currentItem.itemStockPrice || ""}
+                        value={formatCurrencyInputValue(currentItem.itemStockPrice)}
                         onChange={(event) =>
                           setCurrentItem({
                             ...currentItem,
-                            itemStockPrice: parseFloat(event.target.value) || 0,
+                            itemStockPrice: parseCurrencyInput(event.target.value),
                           })
                         }
                       />
@@ -1441,14 +1543,14 @@ export default function InventoryPage() {
                     <InputGroup>
                       <InputGroup.Text>{currency}</InputGroup.Text>
                       <Form.Control
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         required
-                        value={currentItem.itemLeastPrice || ""}
+                        value={formatCurrencyInputValue(currentItem.itemLeastPrice)}
                         onChange={(event) =>
                           setCurrentItem({
                             ...currentItem,
-                            itemLeastPrice: parseFloat(event.target.value) || 0,
+                            itemLeastPrice: parseCurrencyInput(event.target.value),
                           })
                         }
                       />
@@ -1461,15 +1563,14 @@ export default function InventoryPage() {
                     <InputGroup>
                       <InputGroup.Text>{currency}</InputGroup.Text>
                       <Form.Control
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Optional"
-                        value={currentItem.itemWholesalePrice || ""}
+                        value={formatCurrencyInputValue(currentItem.itemWholesalePrice)}
                         onChange={(event) =>
                           setCurrentItem({
                             ...currentItem,
-                            itemWholesalePrice: parseFloat(event.target.value) || "",
+                            itemWholesalePrice: parseCurrencyInput(event.target.value),
                           })
                         }
                       />
@@ -1478,9 +1579,9 @@ export default function InventoryPage() {
                 </Col>
                 <Col xs={12}>
                   <div style={pricePreviewStyle}>
-                    <span>Retail profit: {formatCurrency(pricePreview.profit)}</span>
+                    <span>Retail profit: {money(pricePreview.profit)}</span>
                     <span>Margin: {pricePreview.margin.toFixed(1)}%</span>
-                    <span>Wholesale profit: {formatCurrency(pricePreview.wholesaleProfit)}</span>
+                    <span>Wholesale profit: {money(pricePreview.wholesaleProfit)}</span>
                   </div>
                 </Col>
               </Row>
@@ -1638,8 +1739,8 @@ export default function InventoryPage() {
       />
       <ImageCaptureDialog
         show={imageCaptureOpen}
-        title="Capture product image"
-        fileNamePrefix="product-image"
+        title={imageCaptureTarget === "catalog" ? "Capture product image" : "Capture product AI image"}
+        fileNamePrefix={imageCaptureTarget === "catalog" ? "product-image" : "product-ai-image"}
         onClose={() => setImageCaptureOpen(false)}
         onCapture={handleProductImageCaptured}
       />
@@ -1699,7 +1800,7 @@ const toolbarButtonStyle = {
   padding: "0.65rem 1.1rem",
   borderRadius: 16,
   border: `1px solid ${palette.border}`,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   color: palette.text,
   fontWeight: 700,
   boxShadow: "none",
@@ -1711,7 +1812,7 @@ const addButtonStyle = {
   borderRadius: 16,
   border: "none",
   backgroundColor: palette.green,
-  color: "#ffffff",
+  color: "var(--ampla-on-accent-color, #ffffff)",
   fontWeight: 800,
   boxShadow: "0 12px 24px rgba(47, 143, 87, 0.18)",
 };
@@ -1725,11 +1826,11 @@ const searchGroupStyle = {
   borderRadius: 18,
   overflow: "hidden",
   border: `1px solid ${palette.border}`,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
 };
 
 const searchAdornmentStyle = {
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   border: "none",
   color: palette.muted,
 };
@@ -1745,7 +1846,7 @@ const headerCellStyle = {
   fontWeight: 800,
   fontSize: 14,
   whiteSpace: "nowrap",
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   paddingTop: 18,
   paddingBottom: 18,
 };
@@ -1808,7 +1909,7 @@ const iconButtonStyle = (color) => ({
   padding: 0,
   border: `1px solid ${palette.border}`,
   color,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
 });
 
 const conditionBadgeStyle = (condition) => ({
@@ -1845,7 +1946,7 @@ const sectionCardStyle = {
   borderRadius: 20,
   padding: "1rem 1rem 0.35rem",
   marginBottom: "1rem",
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   boxShadow: "0 8px 24px rgba(15, 23, 42, 0.04)",
 };
 

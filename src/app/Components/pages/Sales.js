@@ -2,13 +2,11 @@ import React, { useMemo, useState } from "react";
 import {
   Button,
   Card,
-  Col,
   Container,
   Dropdown,
   Form,
   InputGroup,
   Pagination,
-  Row,
   Table,
 } from "react-bootstrap";
 import {
@@ -18,27 +16,31 @@ import {
   Download,
   PeopleFill,
   Printer,
+  ArrowClockwise,
   Search,
 } from "react-bootstrap-icons";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { useSelector } from "react-redux";
 
-import { selectCustomers } from "../../features/api/customers";
-import { selectSales } from "../../features/api/salesSlice";
-import { selectStock } from "../../features/stock/stockSlice";
+import { selectCustomers, useGetCustomersQuery } from "../../features/api/customers";
+import { selectSales, useGetSalesQuery } from "../../features/api/salesSlice";
+import { selectStock, useGetStockQuery } from "../../features/stock/stockSlice";
 import PermissionWrapper from "../../auth/PermissionWrapper";
 import { useSettings } from "../Settings";
+import { formatCurrency } from "../../utils/currency";
 import "./WorkspacePages.css";
 
+const EMPTY_ARRAY = [];
+
 const palette = {
-  bg: "#f8fbf8",
-  surface: "#ffffff",
-  border: "#e7efe9",
-  text: "#15202b",
-  muted: "#6f7d8c",
-  green: "#2f8f57",
-  greenSoft: "#e8f5ec",
+  bg: "var(--ampla-app-bg, #f8fbf8)",
+  surface: "var(--ampla-surface-bg, #ffffff)",
+  border: "var(--ampla-border-color, #e7efe9)",
+  text: "var(--ampla-text-color, #15202b)",
+  muted: "var(--ampla-muted-color, #6f7d8c)",
+  green: "var(--ampla-accent-color, #2f8f57)",
+  greenSoft: "var(--ampla-accent-soft, #e8f5ec)",
   blue: "#2f80ed",
   blueSoft: "#e8f1ff",
   amber: "#f59e0b",
@@ -58,7 +60,7 @@ const toolbarButtonStyle = {
   padding: "0.65rem 1.1rem",
   borderRadius: 16,
   border: `1px solid ${palette.border}`,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   color: palette.text,
   fontWeight: 700,
   boxShadow: "none",
@@ -75,7 +77,7 @@ const headerCellStyle = {
   fontWeight: 800,
   fontSize: 14,
   whiteSpace: "nowrap",
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   paddingTop: 18,
   paddingBottom: 18,
 };
@@ -138,9 +140,12 @@ const SalesPage = () => {
   const { settings } = useSettings();
   const currency = settings?.currency !== "none" ? settings?.currency : "";
 
-  const customers = useSelector(selectCustomers) ?? [];
-  const sales = useSelector(selectSales) ?? [];
-  const inventory = useSelector(selectStock) ?? [];
+  const customers = useSelector(selectCustomers) ?? EMPTY_ARRAY;
+  const sales = useSelector(selectSales) ?? EMPTY_ARRAY;
+  const inventory = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const { refetch: refetchSales, isFetching: isSalesFetching } = useGetSalesQuery();
+  const { refetch: refetchCustomers } = useGetCustomersQuery();
+  const { refetch: refetchStock } = useGetStockQuery();
 
   const [filter, setFilter] = useState("");
   const [viewBy, setViewBy] = useState("product");
@@ -150,11 +155,11 @@ const SalesPage = () => {
   const [dailyPage, setDailyPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(8);
 
-  const formatMoney = (value) =>
-    `${currency} ${Number(value || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    })}`;
+  const formatMoney = (value) => formatCurrency(value, currency || "UGX");
+
+  const refreshSalesData = async () => {
+    await Promise.all([refetchSales(), refetchCustomers(), refetchStock()]);
+  };
 
   const processedData = useMemo(
     () =>
@@ -325,6 +330,15 @@ const SalesPage = () => {
             </p>
           </div>
           <div className="workspace-page-actions">
+            <Button
+              variant="light"
+              onClick={refreshSalesData}
+              disabled={isSalesFetching}
+              style={toolbarButtonStyle}
+            >
+              <ArrowClockwise className="me-2" />
+              {isSalesFetching ? "Refreshing..." : "Refresh"}
+            </Button>
             <Button variant="light" onClick={printData} style={toolbarButtonStyle}>
               <Printer className="me-2" />
               Print

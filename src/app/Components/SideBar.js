@@ -9,7 +9,7 @@ import HelpIcon from "@mui/icons-material/Help";
 import { Link, useLocation } from "react-router-dom";
 import SettingsIcon from "@mui/icons-material/Settings";
 import { Avatar, Divider, Menu, MenuList } from "@mui/material";
-import { Add, Approval, Campaign, EditNote, History, HotTub, Inventory, InventorySharp, KeyboardArrowRight, ListRounded, MenuOpen, PointOfSale, Receipt, Report, RequestQuote, Scale, ShoppingCart } from "@mui/icons-material";
+import { AccountBalanceWallet, Add, Approval, Campaign, EditNote, History, HotTub, Inventory, InventorySharp, KeyboardArrowRight, ListRounded, MenuOpen, PointOfSale, Receipt, Report, RequestQuote, Scale, ShoppingCart } from "@mui/icons-material";
 import { ChevronDown, ChevronUp, List, MenuButton, MenuButtonFill, Pencil, Person, PersonFill, ReceiptCutoff } from "react-bootstrap-icons";
 import Button from '@mui/material/Button';
 // import Menu from '@mui/material/Menu';
@@ -72,6 +72,9 @@ const SideBar = ({
         </li>
         <li style={styles.navItem}>
         <Link to="sales" className="Link nav-link"> <a href="#" style={styles.navLink}>  <Scale /> Sales</a></Link>
+        </li>
+        <li style={styles.navItem}>
+        <Link to="cash-drawer" className="Link nav-link"> <a href="#" style={styles.navLink}>  <AccountBalanceWallet /> Cash Drawer</a></Link>
         </li>
         <li style={styles.navItem}>
         <Link to="customers" className="Link nav-link"> <a href="#" style={styles.navLink}>  <PersonFill size={25} /> Customers</a></Link>

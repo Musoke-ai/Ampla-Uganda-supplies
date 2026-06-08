@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { Cancel } from '@mui/icons-material';
 import React, { useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';

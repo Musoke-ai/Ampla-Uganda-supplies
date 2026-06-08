@@ -15,11 +15,17 @@ import jsPDF from "jspdf";
 
 import { selectProfile } from "../../auth/authSlice";
 import { useGetReceiptsQuery } from "../../features/api/salesSlice";
-import { ReceiptDocumentView, formatAmount } from "../receipts/AmplaReceipt";
+import {
+  ReceiptDocumentView,
+  formatAmount,
+  getReceiptPaperWidth,
+  receiptTemplateOptions,
+} from "../receipts/AmplaReceipt";
 import { useSettings } from "../Settings";
 import "./WorkspacePages.css";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
+const POWERED_BY_TEXT = "Powered by HamuzahAndSteve Technologies";
 
 const formatDateTime = (value) => {
   if (!value) return "Not recorded";
@@ -39,6 +45,8 @@ const normalizeReceiptForPreview = (receipt = {}) => ({
   customerName: receipt.customerName || "Walk-in Customer",
   saleDetails: {
     receiptNumber: receipt.receiptNumber || receipt.receiptId,
+    branchName: receipt.branchName || "Main branch",
+    cashierName: receipt.cashierName || (receipt.createdBy ? `User #${receipt.createdBy}` : "Current user"),
     paymentMethod: receipt.paymentMethod || "Cash",
     tenderedAmount: Number(receipt.tenderedAmount || 0),
     dueAmount: Number(receipt.dueAmount || 0),
@@ -53,8 +61,8 @@ const receiptTotal = (receipt) => Number(receipt?.total || 0);
 const receiptPaid = (receipt) => Number(receipt?.tenderedAmount || 0);
 const receiptDue = (receipt) => Number(receipt?.dueAmount || 0);
 
-function drawReceiptPdfPage(doc, receipt, companyInfo, currency) {
-  const paperWidth = 80;
+function drawReceiptPdfPage(doc, receipt, companyInfo, currency, receiptPaperWidth = "80mm", receiptTemplate = "modern") {
+  const paperWidth = receiptPaperWidth === "58mm" ? 58 : 80;
   const margin = 5;
   const rightAlign = paperWidth - margin;
   const center = paperWidth / 2;
@@ -65,6 +73,110 @@ function drawReceiptPdfPage(doc, receipt, companyInfo, currency) {
   let y = 10;
 
   const money = (value) => formatAmount(value, currency);
+
+  if (receiptTemplate !== "modern") {
+    const line = () => {
+      doc.setDrawColor(31, 41, 55);
+      doc.setLineWidth(0.2);
+      doc.line(margin, y, rightAlign, y);
+      y += 5;
+    };
+    const summaryLine = (label, value, strong = false) => {
+      doc.setFont("Helvetica", strong ? "bold" : "normal");
+      doc.setFontSize(strong ? 10 : 8);
+      doc.setTextColor(17, 24, 39);
+      doc.text(label, margin, y);
+      doc.text(value, rightAlign, y, { align: "right" });
+      y += strong ? 7 : 5;
+    };
+
+    doc.setTextColor(17, 24, 39);
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(receiptTemplate === "compact" ? 11 : 13);
+    doc.text(companyInfo?.busName || "Business Name", center, y, { align: "center" });
+    y += 6;
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(7);
+    doc.text(companyInfo?.busLocation || "Business location not set", center, y, {
+      align: "center",
+      maxWidth: paperWidth - margin * 2,
+    });
+    y += 4;
+    doc.text(companyInfo?.busContactOne || "No contact set", center, y, { align: "center" });
+    y += 5;
+    line();
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("SALES RECEIPT", center, y, { align: "center" });
+    y += 6;
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(7);
+    doc.text(`Receipt: ${receipt.receiptNumber || receipt.receiptId || "N/A"}`, margin, y);
+    doc.text(formatDateTime(receipt.issuedAt), rightAlign, y, { align: "right", maxWidth: 34 });
+    y += 5;
+    doc.text(`Customer: ${receipt.customerName || "Walk-in Customer"}`, margin, y, {
+      maxWidth: paperWidth - margin * 2,
+    });
+    y += 5;
+    doc.text(`Branch: ${receipt.branchName || "Main branch"}`, margin, y, {
+      maxWidth: paperWidth - margin * 2,
+    });
+    y += 5;
+    doc.text(`Cashier: ${receipt.cashierName || (receipt.createdBy ? `User #${receipt.createdBy}` : "Current user")}`, margin, y, {
+      maxWidth: paperWidth - margin * 2,
+    });
+    y += 5;
+    line();
+    doc.setFont("Helvetica", "bold");
+    doc.text("ITEM", margin, y);
+    doc.text("QTY", center, y, { align: "center" });
+    doc.text("AMOUNT", rightAlign, y, { align: "right" });
+    y += 4;
+    line();
+
+    items.forEach((item) => {
+      const name = item.itemName || `Item #${item.saleItemId || ""}`;
+      const quantity = Number(item.saleQuantity || 0);
+      const price = Number(item.salePrice || 0);
+      const wrappedName = doc.splitTextToSize(name, paperWidth / 2 - 6);
+
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(7);
+      doc.text(wrappedName, margin, y);
+      doc.text(String(quantity), center, y, { align: "center" });
+      doc.text(money(quantity * price), rightAlign, y, { align: "right" });
+      y += wrappedName.length * 3.5 + 2;
+      if (receiptTemplate !== "compact") {
+        doc.setFontSize(6);
+        doc.text(`${money(price)} each`, margin, y);
+        y += 4;
+      }
+    });
+
+    line();
+    summaryLine("Subtotal", money(subtotal));
+    summaryLine("Discount", `-${money(discount)}`);
+    summaryLine("Tax", money(tax));
+    line();
+    summaryLine("Total", money(receiptTotal(receipt)), true);
+    summaryLine("Tendered", money(receiptPaid(receipt)));
+    summaryLine("Balance Due", money(receiptDue(receipt)), true);
+    line();
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(7);
+    doc.text(receipt.moreInfo || "Generated from Ampla POS.", center, y, {
+      align: "center",
+      maxWidth: paperWidth - margin * 2,
+    });
+    y += 7;
+    doc.setFont("Helvetica", "bold");
+    doc.text("Thank you for your business.", center, y, { align: "center" });
+    y += 5;
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(6);
+    doc.text(POWERED_BY_TEXT, center, y, { align: "center" });
+    return;
+  }
 
   doc.setFillColor(247, 252, 248);
   doc.roundedRect(margin, 5, paperWidth - margin * 2, 28, 3, 3, "F");
@@ -96,7 +208,7 @@ function drawReceiptPdfPage(doc, receipt, companyInfo, currency) {
 
   y = 39;
   doc.setDrawColor(223, 233, 226);
-  doc.roundedRect(margin, y, paperWidth - margin * 2, 25, 3, 3);
+  doc.roundedRect(margin, y, paperWidth - margin * 2, 35, 3, 3);
 
   doc.setFont("Helvetica", "bold");
   doc.setFontSize(7);
@@ -105,6 +217,8 @@ function drawReceiptPdfPage(doc, receipt, companyInfo, currency) {
   doc.text("ISSUED", center + 2, y + 5);
   doc.text("CUSTOMER", margin + 3, y + 16);
   doc.text("PAYMENT", center + 2, y + 16);
+  doc.text("BRANCH", margin + 3, y + 27);
+  doc.text("CASHIER", center + 2, y + 27);
 
   doc.setFontSize(8);
   doc.setTextColor(24, 48, 35);
@@ -112,8 +226,10 @@ function drawReceiptPdfPage(doc, receipt, companyInfo, currency) {
   doc.text(formatDateTime(receipt.issuedAt), center + 2, y + 9, { maxWidth: 30 });
   doc.text(receipt.customerName || "Walk-in Customer", margin + 3, y + 20, { maxWidth: 32 });
   doc.text(receipt.paymentMethod || "Cash", center + 2, y + 20, { maxWidth: 28 });
+  doc.text(receipt.branchName || "Main branch", margin + 3, y + 31, { maxWidth: 32 });
+  doc.text(receipt.cashierName || (receipt.createdBy ? `User #${receipt.createdBy}` : "Current user"), center + 2, y + 31, { maxWidth: 28 });
 
-  y += 32;
+  y += 42;
   doc.setFont("Helvetica", "bold");
   doc.setFontSize(7);
   doc.setTextColor(47, 143, 87);
@@ -192,20 +308,26 @@ function drawReceiptPdfPage(doc, receipt, companyInfo, currency) {
   doc.setFont("Helvetica", "bold");
   doc.setTextColor(24, 48, 35);
   doc.text("Thank you for your business.", center, y, { align: "center" });
+  y += 5;
+  doc.setFont("Helvetica", "normal");
+  doc.setFontSize(6);
+  doc.setTextColor(115, 134, 121);
+  doc.text(POWERED_BY_TEXT, center, y, { align: "center" });
 }
 
-function exportReceiptsAsPdf(receipts, companyInfo, currency, filename) {
+function exportReceiptsAsPdf(receipts, companyInfo, currency, filename, receiptPaperWidth = "80mm", receiptTemplate = "modern") {
   if (!receipts.length) return;
 
+  const paperWidth = receiptPaperWidth === "58mm" ? 58 : 80;
   const pageHeight = (receipt) => Math.max(185, 118 + (receipt.items?.length || 0) * 13);
   const firstHeight = pageHeight(receipts[0]);
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, firstHeight] });
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [paperWidth, firstHeight] });
 
   receipts.forEach((receipt, index) => {
     if (index > 0) {
-      doc.addPage([80, pageHeight(receipt)], "portrait");
+      doc.addPage([paperWidth, pageHeight(receipt)], "portrait");
     }
-    drawReceiptPdfPage(doc, receipt, companyInfo, currency);
+    drawReceiptPdfPage(doc, receipt, companyInfo, currency, receiptPaperWidth, receiptTemplate);
   });
 
   doc.save(filename);
@@ -228,6 +350,9 @@ const Documents = () => {
   const companyProfile = useSelector(selectProfile) || {};
   const { settings } = useSettings();
   const currency = settings?.currency && settings.currency !== "none" ? settings.currency : "UGX";
+  const receiptPaperWidth = getReceiptPaperWidth(settings?.receiptPaperWidth);
+  const receiptTemplate =
+    settings?.receiptTemplate in receiptTemplateOptions ? settings.receiptTemplate : "modern";
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
@@ -323,8 +448,8 @@ const Documents = () => {
       <style>
         body { margin: 0; background: #ffffff; font-family: Inter, "Segoe UI", sans-serif; color: #183023; }
         @media print {
-          @page { size: 80mm auto; margin: 4mm; }
-          body { width: 80mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          @page { size: ${receiptPaperWidth} auto; margin: 4mm; }
+          body { width: ${receiptPaperWidth}; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .receipt-template-shell { width: 100% !important; max-width: 100% !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; }
         }
       </style>
@@ -348,13 +473,22 @@ const Documents = () => {
       [currentReceipt],
       companyProfile,
       currency,
-      `receipt-${currentReceipt.receiptNumber || currentReceipt.receiptId}.pdf`
+      `receipt-${currentReceipt.receiptNumber || currentReceipt.receiptId}.pdf`,
+      receiptPaperWidth,
+      receiptTemplate
     );
   };
 
   const exportSelected = () => {
     const targets = selectedReceipts.length ? selectedReceipts : filteredReceipts;
-    exportReceiptsAsPdf(targets, companyProfile, currency, `receipts-${todayIso()}.pdf`);
+    exportReceiptsAsPdf(
+      targets,
+      companyProfile,
+      currency,
+      `receipts-${todayIso()}.pdf`,
+      receiptPaperWidth,
+      receiptTemplate
+    );
   };
 
   return (
@@ -532,8 +666,11 @@ const Documents = () => {
                       <strong>{currentReceipt.branchName || "Not recorded"}</strong>
                     </div>
                     <div>
-                      <span>Customer Contact</span>
-                      <strong>{currentReceipt.customerContact || "Not recorded"}</strong>
+                      <span>Cashier</span>
+                      <strong>
+                        {currentReceipt.cashierName ||
+                          (currentReceipt.createdBy ? `User #${currentReceipt.createdBy}` : "Not recorded")}
+                      </strong>
                     </div>
                     <div>
                       <span>Lines</span>
@@ -555,7 +692,8 @@ const Documents = () => {
                       currency={currency}
                       receiptNumber={currentPreview.saleDetails.receiptNumber}
                       issuedAt={formatDateTime(currentReceipt.issuedAt)}
-                      receiptSize="80mm"
+                      receiptSize={receiptPaperWidth}
+                      receiptTemplate={receiptTemplate}
                     />
                   </div>
                 </>

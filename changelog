@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-06-08
+### Added
+- Added POS cash drawer workspace and API integration hooks for drawer opening, movement tracking, expense posting, and shift closure.
+- Added receipt template, paper width, and printer mode settings for POS/document printing.
+- Added receipt cashier, branch, powered-by, compact, classic, and thermal paper rendering support.
+
+### Changed
+- Improved workspace dark-mode theming across Staff, POS, documents, reports, inventory, customer, production, and shared controls.
+- Updated POS cart behavior so checkout and hold actions stay accessible on smaller screens.
+- Improved floating help positioning so the panel clamps to the visible viewport when opened or resized.
+
+### Fixed
+- Fixed Staff Management dark-mode contrast for the page shell, statistics, filters, and table.
+- Fixed Create User modal dark-mode backgrounds and field contrast.
+- Fixed POS total/price text contrast in dark mode.
+- Fixed login button text contrast when the active brand color is green.
+
+### Security
+- Hidden administrator, super administrator, and developer accounts from Staff Management lists.
+- Added frontend safeguards so protected administrative accounts cannot be deleted from staff controls.
+- Excluded environment files, logs, archives, and generated build artifacts from version control.
+
 ## [1.1] - 2024-07-22
 ### Added
 - New user authentication system using JWT with codeigniter shield library.

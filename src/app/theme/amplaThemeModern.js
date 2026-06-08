@@ -173,11 +173,11 @@ const amplaThemeModern = createTheme({
       styleOverrides: {
         head: {
           fontWeight: 700,
-          backgroundColor: "#F8FAFC",
-          borderColor: "#E2E8F0",
+          backgroundColor: "var(--ampla-surface-soft, #F8FAFC)",
+          borderColor: "var(--ampla-border-color, #E2E8F0)",
         },
         body: {
-          borderColor: "#E2E8F0",
+          borderColor: "var(--ampla-border-color, #E2E8F0)",
         },
       },
     },
@@ -186,7 +186,7 @@ const amplaThemeModern = createTheme({
         root: {
           transition: "background-color 0.2s",
           "&:hover": {
-            backgroundColor: "#F8FAFC",
+            backgroundColor: "var(--ampla-surface-soft, #F8FAFC)",
           },
         },
       },

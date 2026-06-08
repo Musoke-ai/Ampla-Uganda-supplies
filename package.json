@@ -102,5 +102,10 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "baseline-browser-mapping": "^2.10.34",
+    "caniuse-lite": "^1.0.30001797"
   }
 }

@@ -42,12 +42,12 @@ import RawMaterialsTable from "./production/RawmaterialsManagement";
 import "./pages/WorkspacePages.css";
 
 const palette = {
-  surface: "#ffffff",
-  border: "#e7efe9",
-  text: "#15202b",
-  muted: "#6f7d8c",
-  green: "#2f8f57",
-  greenSoft: "#e8f5ec",
+  surface: "var(--ampla-surface-bg, #ffffff)",
+  border: "var(--ampla-border-color, #e7efe9)",
+  text: "var(--ampla-text-color, #15202b)",
+  muted: "var(--ampla-muted-color, #6f7d8c)",
+  green: "var(--ampla-accent-color, #2f8f57)",
+  greenSoft: "var(--ampla-accent-soft, #e8f5ec)",
   blue: "#2f80ed",
   blueSoft: "#e8f1ff",
   amber: "#f59e0b",
@@ -69,7 +69,7 @@ const toolbarButtonStyle = {
   padding: "0.65rem 1.1rem",
   borderRadius: 16,
   border: `1px solid ${palette.border}`,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   color: palette.text,
   fontWeight: 700,
   boxShadow: "none",

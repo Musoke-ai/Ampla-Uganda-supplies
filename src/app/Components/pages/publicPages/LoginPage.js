@@ -116,7 +116,13 @@ const LoginPage = () => {
           <Button variant="secondary" onClick={handleClose}>
             Close
           </Button>
-          <Button variant="success" onClick={handleLogin}>Login</Button>
+          <Button
+            variant="success"
+            onClick={handleLogin}
+            style={{ color: "var(--ampla-on-accent-color, #ffffff)" }}
+          >
+            Login
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>

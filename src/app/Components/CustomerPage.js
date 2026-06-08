@@ -4,8 +4,6 @@ import { useSelector } from "react-redux";
 // npm install react-bootstrap bootstrap react-bootstrap-icons jspdf jspdf-autotable react-redux
 import {
   Container,
-  Row,
-  Col,
   Form,
   Table,
   Button,
@@ -14,7 +12,6 @@ import {
   Tab,
   Pagination,
   InputGroup,
-  Badge,
   Alert,
   Dropdown,
 } from "react-bootstrap";
@@ -23,6 +20,7 @@ import {
   Pencil,
   Trash,
   ArrowLeft,
+  ArrowClockwise,
   Download,
   Printer,
   Person,
@@ -35,6 +33,11 @@ import { useUpdateOrderMutation } from "../features/api/orderSlice";
 import { toast } from "react-toastify";
 
 import { useSettings } from "./Settings";
+import {
+  formatCurrency,
+  formatCurrencyInputValue,
+  parseCurrencyInput,
+} from "../utils/currency";
 
 // --- Import your Redux selectors ---
 import { selectSales, useGetSalesQuery } from "../features/api/salesSlice";
@@ -52,14 +55,16 @@ import {
 import AddCustomer from "./Models/AddCustomer";
 import "./CustomerPage.css";
 
+const EMPTY_ARRAY = [];
+
 const palette = {
-  bg: "#f8fbf8",
-  surface: "#ffffff",
-  border: "#e7efe9",
-  text: "#15202b",
-  muted: "#6f7d8c",
-  green: "#2f8f57",
-  greenSoft: "#e8f5ec",
+  bg: "var(--ampla-app-bg, #f8fbf8)",
+  surface: "var(--ampla-surface-bg, #ffffff)",
+  border: "var(--ampla-border-color, #e7efe9)",
+  text: "var(--ampla-text-color, #15202b)",
+  muted: "var(--ampla-muted-color, #6f7d8c)",
+  green: "var(--ampla-accent-color, #2f8f57)",
+  greenSoft: "var(--ampla-accent-soft, #e8f5ec)",
   blue: "#2f80ed",
   blueSoft: "#e8f1ff",
   amber: "#f59e0b",
@@ -136,7 +141,7 @@ const toolbarButtonStyle = {
   padding: "0.65rem 1.1rem",
   borderRadius: 16,
   border: `1px solid ${palette.border}`,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   color: palette.text,
   fontWeight: 700,
   boxShadow: "none",
@@ -148,7 +153,7 @@ const primaryButtonStyle = {
   borderRadius: 16,
   border: "none",
   backgroundColor: palette.green,
-  color: "#ffffff",
+  color: "var(--ampla-on-accent-color, #ffffff)",
   fontWeight: 800,
   boxShadow: "0 12px 24px rgba(47, 143, 87, 0.18)",
 };
@@ -164,11 +169,11 @@ const searchGroupStyle = {
   borderRadius: 18,
   overflow: "hidden",
   border: `1px solid ${palette.border}`,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
 };
 
 const searchAdornmentStyle = {
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   border: "none",
   color: palette.muted,
 };
@@ -184,7 +189,7 @@ const headerCellStyle = {
   fontWeight: 800,
   fontSize: 14,
   whiteSpace: "nowrap",
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   paddingTop: 18,
   paddingBottom: 18,
 };
@@ -204,7 +209,7 @@ const actionIconButtonStyle = (color) => ({
   borderRadius: 12,
   border: `1px solid ${palette.border}`,
   color,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
 });
 
 function CustomerMetricCard({ icon, title, value, note, accent, color }) {
@@ -277,6 +282,7 @@ const ToastMessage = ({ show, message, variant, onClose }) => {
 const SaleDetailModal = ({ show, onHide, saleGroup, customerName }) => {
   const { settings } = useSettings();
   const currency = settings.currency !== "none" ? settings.currency : "";
+  const money = (value) => formatCurrency(value, currency || "UGX");
   if (!saleGroup) return null;
 
   const receiptId = saleGroup.SR_ID;
@@ -316,11 +322,11 @@ const SaleDetailModal = ({ show, onHide, saleGroup, customerName }) => {
       body: items.map((item, index) => [
         index + 1,
         item.productName,
-        `${currency}${item.salePrice.toFixed(2)}`,
+        money(item.salePrice),
         item.saleQuantity,
-        `${currency}${(item.salePrice * item.saleQuantity).toFixed(2)}`,
+        money(item.salePrice * item.saleQuantity),
       ]),
-      foot: [["", "", "", "Total", `${currency}${total.toFixed(2)}`]],
+      foot: [["", "", "", "Total", money(total)]],
       footStyles: { fontStyle: "bold" },
     });
     doc.save(`Sale-Receipt-${receiptId}.pdf`);
@@ -359,13 +365,11 @@ const SaleDetailModal = ({ show, onHide, saleGroup, customerName }) => {
                   <td>{index + 1}</td>
                   <td>{item.productName}</td>
                   <td>
-                    {currency}
-                    {item.salePrice.toFixed(2)}
+                    {money(item.salePrice)}
                   </td>
                   <td>{item.saleQuantity}</td>
                   <td>
-                    {currency}
-                    {(item.salePrice * item.saleQuantity).toFixed(2)}
+                    {money(item.salePrice * item.saleQuantity)}
                   </td>
                 </tr>
               ))}
@@ -376,8 +380,7 @@ const SaleDetailModal = ({ show, onHide, saleGroup, customerName }) => {
                   Total
                 </th>
                 <th>
-                  {currency}
-                  {total.toFixed(2)}
+                  {money(total)}
                 </th>
               </tr>
             </tfoot>
@@ -404,6 +407,7 @@ const SaleDetailModal = ({ show, onHide, saleGroup, customerName }) => {
 const OrderDetailModal = ({ show, onHide, order, customerName }) => {
   const { settings } = useSettings();
   const currency = settings.currency !== "none" ? settings.currency : "";
+  const money = (value) => formatCurrency(value, currency || "UGX");
   if (!order) return null;
 
   const handlePrint = () => {
@@ -438,13 +442,11 @@ const OrderDetailModal = ({ show, onHide, order, customerName }) => {
         ["Custom Size", order.customSize || "N/A"],
         ["Layers", order.layers],
         ["Quantity", order.quantity],
-        ["Total Cost", `${currency}${order.totalAmount.toFixed(2)}`],
-        ["Amount Paid", `${currency}${order.depositedAmount.toFixed(2)}`],
+        ["Total Cost", money(order.totalAmount)],
+        ["Amount Paid", money(order.depositedAmount)],
         [
           "Balance",
-          `${currency}${(order.totalAmount - order.depositedAmount).toFixed(
-            2
-          )}`,
+          money(order.totalAmount - order.depositedAmount),
         ],
       ],
     });
@@ -482,16 +484,13 @@ const OrderDetailModal = ({ show, onHide, order, customerName }) => {
           </p>
           <hr />
           <p>
-            <strong>Total Cost:</strong> {currency}
-            {order.totalAmount.toFixed(2)}
+            <strong>Total Cost:</strong> {money(order.totalAmount)}
           </p>
           <p>
-            <strong>Amount Paid:</strong> {currency}
-            {order.depositedAmount.toFixed(2)}
+            <strong>Amount Paid:</strong> {money(order.depositedAmount)}
           </p>
           <p>
-            <strong>Balance:</strong> {currency}
-            {(order.totalAmount - order.depositedAmount).toFixed(2)}
+            <strong>Balance:</strong> {money(order.totalAmount - order.depositedAmount)}
           </p>
         </div>
       </Modal.Body>
@@ -515,11 +514,12 @@ const OrderDetailModal = ({ show, onHide, order, customerName }) => {
 const PaymentModal = ({ show, onHide, paymentInfo, onMakePayment }) => {
   const { settings } = useSettings();
   const currency = settings.currency !== "none" ? settings.currency : "";
+  const money = (value) => formatCurrency(value, currency || "UGX");
 
-  const [paying, { isLoading, isSuccess }] = usePayDebtMutation();
+  const [paying, { isLoading }] = usePayDebtMutation();
   const [
     payOrder,
-    { isLoading: isPayOrderLoading, isSuccess: isPayOrderSuccess },
+    { isLoading: isPayOrderLoading },
   ] = useUpdateOrderMutation();
 
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -536,14 +536,14 @@ const PaymentModal = ({ show, onHide, paymentInfo, onMakePayment }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const amount = parseFloat(paymentAmount);
+    const amount = Number(paymentAmount);
     if (isNaN(amount) || amount <= 0 || amount > paymentInfo.remainingDue) {
       alert("Invalid payment amount.");
       return;
     }
     if (paymentInfo.type === "order") {
       try {
-        const data = await payOrder({
+        await payOrder({
           ...paymentInfo,
           amountPaid: amount,
         }).unwrap();
@@ -555,7 +555,7 @@ const PaymentModal = ({ show, onHide, paymentInfo, onMakePayment }) => {
       }
     } else {
       try {
-        const data = await paying({
+        await paying({
           ...paymentInfo,
           amountPaid: amount,
         }).unwrap();
@@ -590,8 +590,7 @@ const PaymentModal = ({ show, onHide, paymentInfo, onMakePayment }) => {
           <strong>Transaction ID:</strong> {paymentInfo.transactionId}
         </p>
         <p>
-          <strong>Remaining Due:</strong> {currency}
-          {paymentInfo.remainingDue?.toFixed(2)}
+          <strong>Remaining Due:</strong> {money(paymentInfo.remainingDue)}
         </p>
         <Form onSubmit={handleSubmit}>
           <Form.Group className="mb-3">
@@ -606,12 +605,10 @@ const PaymentModal = ({ show, onHide, paymentInfo, onMakePayment }) => {
           <Form.Group className="mb-3">
             <Form.Label>Payment Amount</Form.Label>
             <Form.Control
-              type="number"
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
-              step="0.01"
-              min="0.01"
-              max={paymentInfo.remainingDue}
+              type="text"
+              inputMode="decimal"
+              value={formatCurrencyInputValue(paymentAmount)}
+              onChange={(e) => setPaymentAmount(parseCurrencyInput(e.target.value))}
               required
             />
           </Form.Group>
@@ -633,9 +630,8 @@ const PaymentModal = ({ show, onHide, paymentInfo, onMakePayment }) => {
 
 const EditCustomerModal = ({ show, onHide, customer, onSave }) => {
   useGetBranchesQuery();
-  const branches = useSelector(selectBranches) ?? [];
-  const [upDateCustomer, { data, isLoading, isSuccess, isError, error }] =
-    useUpdateCustomerMutation();
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
+  const [upDateCustomer, { isLoading }] = useUpdateCustomerMutation();
   const [formData, setFormData] = useState(customer);
   useEffect(() => {
     setFormData(customer);
@@ -762,33 +758,23 @@ const DeleteCustomerModal = ({
 }) => {
   const [
     DeleteCustomer,
-    {
-      data: deleteData,
-      isLoading: isDeleteLoading,
-      isSuccess: isDeleteSuccess,
-      isError: isDeleteError,
-    },
+    { isLoading: isDeleteLoading },
   ] = useDeleteCustomerMutation();
 
-  const [toast, setToast] = useState({
-    show: false,
-    message: "",
-    variant: "light",
-  });
-
   const showToast = (message, variant = "success") => {
-    setToast({ show: true, message, variant });
-    setTimeout(
-      () => setToast({ show: false, message: "", variant: "light" }),
-      3000
-    );
+    if (variant === "danger") {
+      toast.error(message);
+      return;
+    }
+
+    toast.success(message);
   };
 
   const handleDeleteCustomer = async (customerId) => {
     // window.alert("Hi");
     await new Promise((resolve) => setTimeout(resolve, 500));
     try {
-      const deleteCust = await DeleteCustomer({ cust_id: customerId }).unwrap();
+      await DeleteCustomer({ cust_id: customerId }).unwrap();
       setDeletingCustomer(null);
       showToast("Customer deleted successfully.", "warning");
       // setCustomers(prev => prev.filter(c => c.id !== customerId));
@@ -842,6 +828,7 @@ const DeleteCustomerModal = ({
 const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
   const { settings } = useSettings();
   const currency = settings.currency !== "none" ? settings.currency : "";
+  const money = (value) => formatCurrency(value, currency || "UGX");
   const [paymentInfo, setPaymentInfo] = useState(null);
   const [showSaleDetail, setShowSaleDetail] = useState(false);
   const [selectedSaleGroup, setSelectedSaleGroup] = useState(null);
@@ -1039,7 +1026,7 @@ const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
             <CustomerMetricCard
               icon={<Download size={18} />}
               title="Total Sales"
-              value={`${currency}${totalSales.toFixed(2)}`}
+              value={money(totalSales)}
               note="All grouped sales for this customer"
               accent={palette.greenSoft}
               color={palette.green}
@@ -1047,15 +1034,15 @@ const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
             <CustomerMetricCard
               icon={<Person size={18} />}
               title="Total Orders"
-              value={`${currency}${totalOrders.toFixed(2)}`}
-              note="Combined order value"
+              value={totalOrders}
+              note="Orders recorded for this customer"
               accent={palette.blueSoft}
               color={palette.blue}
             />
             <CustomerMetricCard
               icon={<Trash size={18} />}
               title="Outstanding Dues"
-              value={`${currency}${totalDues.toFixed(2)}`}
+              value={money(totalDues)}
               note="Orders and sales balances still unpaid"
               accent={palette.redSoft}
               color={palette.red}
@@ -1110,7 +1097,7 @@ const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
                           <td style={bodyCellStyle}>{(salesPage - 1) * detailRowsPerPage + index + 1}</td>
                           <td style={bodyCellStyle}>{group.SR_ID}</td>
                           <td style={bodyCellStyle}>{group.date}</td>
-                          <td style={bodyCellStyle}>{currency}{group.totalAmount.toFixed(2)}</td>
+                          <td style={bodyCellStyle}>{money(group.totalAmount)}</td>
                           <td style={bodyCellStyle}>
                             <span className={group.status === "paid" ? "customer-badge customer-badge-solid-green" : "customer-badge customer-badge-solid-red"}>
                               {group.status}
@@ -1132,7 +1119,7 @@ const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
                 </div>
                 <div className="customer-table-footer">
                   <div className="customer-table-summary">
-                    Filtered sales total: <strong>{currency}{salesTotal.toFixed(2)}</strong>
+                    Filtered sales total: <strong>{money(salesTotal)}</strong>
                   </div>
                   <CustomerPagination
                     currentPage={salesPage}
@@ -1163,8 +1150,8 @@ const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
                             <td style={bodyCellStyle}>{(ordersPage - 1) * detailRowsPerPage + index + 1}</td>
                             <td style={bodyCellStyle}>{o.id}</td>
                             <td style={bodyCellStyle}>{o.date}</td>
-                            <td style={bodyCellStyle}>{currency}{o.totalAmount.toFixed(2)}</td>
-                            <td style={bodyCellStyle}>{currency}{balance.toFixed(2)}</td>
+                            <td style={bodyCellStyle}>{money(o.totalAmount)}</td>
+                            <td style={bodyCellStyle}>{money(balance)}</td>
                             <td style={{ ...bodyCellStyle, textAlign: "center" }}>
                               <div className="customer-action-row">
                                 <Button
@@ -1193,9 +1180,9 @@ const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
                 </div>
                 <div className="customer-table-footer">
                   <div className="customer-table-summary">
-                    Orders total: <strong>{currency}{totalOrdersAmount.toFixed(2)}</strong>
+                    Orders total: <strong>{money(totalOrdersAmount)}</strong>
                     <span className="customer-summary-spacer" />
-                    Balance: <strong>{currency}{totalOrdersBalance.toFixed(2)}</strong>
+                    Balance: <strong>{money(totalOrdersBalance)}</strong>
                   </div>
                   <CustomerPagination
                     currentPage={ordersPage}
@@ -1227,9 +1214,9 @@ const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
                             <td style={bodyCellStyle}>{(duesPage - 1) * detailRowsPerPage + index + 1}</td>
                             <td style={bodyCellStyle}>{d.SR_ID}</td>
                             <td style={bodyCellStyle}>{d.date}</td>
-                            <td style={bodyCellStyle}>{currency}{d.totalAmount.toFixed(2)}</td>
-                            <td style={bodyCellStyle}>{currency}{d.paidAmount.toFixed(2)}</td>
-                            <td style={bodyCellStyle}>{currency}{balance.toFixed(2)}</td>
+                            <td style={bodyCellStyle}>{money(d.totalAmount)}</td>
+                            <td style={bodyCellStyle}>{money(d.paidAmount)}</td>
+                            <td style={bodyCellStyle}>{money(balance)}</td>
                             <td style={{ ...bodyCellStyle, textAlign: "center" }}>
                               {balance > 0 ? (
                                 <Button
@@ -1251,11 +1238,11 @@ const CustomerDetailPage = ({ customer, details, onBack, onMakePayment }) => {
                 </div>
                 <div className="customer-table-footer">
                   <div className="customer-table-summary">
-                    Dues total: <strong>{currency}{duesTotals.totalAmount.toFixed(2)}</strong>
+                    Dues total: <strong>{money(duesTotals.totalAmount)}</strong>
                     <span className="customer-summary-spacer" />
-                    Paid: <strong>{currency}{duesTotals.paidAmount.toFixed(2)}</strong>
+                    Paid: <strong>{money(duesTotals.paidAmount)}</strong>
                     <span className="customer-summary-spacer" />
-                    Balance: <strong>{currency}{duesTotals.balance.toFixed(2)}</strong>
+                    Balance: <strong>{money(duesTotals.balance)}</strong>
                   </div>
                   <CustomerPagination
                     currentPage={duesPage}
@@ -1297,9 +1284,12 @@ const CustomerListPage = ({
   onSaveCustomer,
   onDeleteCustomer,
   onSelectCustomer,
+  onRefresh,
+  isRefreshing = false,
 }) => {
   const { settings } = useSettings();
   const currency = settings.currency !== "none" ? settings.currency : "";
+  const money = (value) => formatCurrency(value, currency || "UGX");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1399,9 +1389,9 @@ const CustomerListPage = ({
       c.name,
       c.email,
       c.phone,
-      c.totalSales.toFixed(2),
+      money(c.totalSales),
       c.totalOrders,
-      c.dues.toFixed(2),
+      money(c.dues),
     ]);
 
     if (format === "csv") {
@@ -1435,6 +1425,15 @@ const CustomerListPage = ({
             </p>
           </div>
           <div className="customer-header-actions">
+            <Button
+              variant="light"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              style={toolbarButtonStyle}
+            >
+              <ArrowClockwise className="me-2" />
+              {isRefreshing ? "Refreshing..." : "Refresh"}
+            </Button>
             <Button variant="light" onClick={() => window.print()} style={toolbarButtonStyle}>
               <Printer className="me-2" />
               Print
@@ -1481,7 +1480,7 @@ const CustomerListPage = ({
           <CustomerMetricCard
             icon={<Download size={18} />}
             title="Total Sales"
-            value={`${currency}${totals.totalSales.toFixed(2)}`}
+            value={money(totals.totalSales)}
             note="Combined sales across visible customers"
             accent={palette.amberSoft}
             color={palette.amber}
@@ -1489,7 +1488,7 @@ const CustomerListPage = ({
           <CustomerMetricCard
             icon={<Trash size={18} />}
             title="Outstanding Dues"
-            value={`${currency}${totals.totalDues.toFixed(2)}`}
+            value={money(totals.totalDues)}
             note="Total unpaid balances in view"
             accent={palette.redSoft}
             color={palette.red}
@@ -1577,11 +1576,11 @@ const CustomerListPage = ({
                     <td style={bodyCellStyle}>{c.branchName}</td>
                     <td style={bodyCellStyle}>{c.address}</td>
                     <td style={bodyCellStyle}>{c.phone}</td>
-                    <td style={bodyCellStyle}>{currency}{c.totalSales.toFixed(2)}</td>
+                    <td style={bodyCellStyle}>{money(c.totalSales)}</td>
                     <td style={bodyCellStyle}>{c.totalOrders}</td>
                     <td style={bodyCellStyle}>
                       <span className={c.dues > 0 ? "customer-badge customer-badge-red" : "customer-badge customer-badge-green"}>
-                        {currency}{c.dues.toFixed(2)}
+                        {money(c.dues)}
                       </span>
                     </td>
                     <td style={{ ...bodyCellStyle, textAlign: "center" }}>
@@ -1631,9 +1630,9 @@ const CustomerListPage = ({
           </div>
           <div className="customer-table-footer">
             <div className="customer-table-summary">
-              Sales total: <strong>{currency}{totals.totalSales.toFixed(2)}</strong>
+              Sales total: <strong>{money(totals.totalSales)}</strong>
               <span className="customer-summary-spacer" />
-              Dues total: <strong>{currency}{totals.totalDues.toFixed(2)}</strong>
+              Dues total: <strong>{money(totals.totalDues)}</strong>
             </div>
             {rowsPerPage !== "all" && (
               <CustomerPagination
@@ -1666,32 +1665,19 @@ const CustomerListPage = ({
 
 // --- Main Exported Component ---
 export default function CustomerPage() {
-  useGetBranchesQuery();
-  useGetCustomersQuery();
-  useGetSalesQuery();
-  useGetOrdersQuery();
-  useGetDebtsQuery();
-  useGetStockQuery();
+  const { refetch: refetchBranches } = useGetBranchesQuery();
+  const { refetch: refetchCustomers, isFetching: isCustomersFetching } = useGetCustomersQuery();
+  const { refetch: refetchSales, isFetching: isSalesFetching } = useGetSalesQuery();
+  const { refetch: refetchOrders, isFetching: isOrdersFetching } = useGetOrdersQuery();
+  const { refetch: refetchDebts, isFetching: isDebtsFetching } = useGetDebtsQuery();
+  const { refetch: refetchStock, isFetching: isStockFetching } = useGetStockQuery();
   // Get raw data from Redux store
-  const branches = useSelector(selectBranches) ?? [];
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
   const rawCustomersData = useSelector(selectRawCustomers);
   const rawSalesData = useSelector(selectSales);
   const rawOrdersData = useSelector(selectOrders);
   const rawDuesData = useSelector(selectDebt);
   const rawInventoryData = useSelector(selectStock);
-
-  const [
-    upDateCustomer,
-    {
-      data,
-      isLoading,
-      isLoading: isUpdateLoading,
-      isSuccess: isUpdateSuccess,
-      isError: isUpdateError,
-    },
-  ] = useUpdateCustomerMutation();
-
-  const [showAddModal, setShowAddModal] = useState(false);
 
   // Local state for UI
   const [customers, setCustomers] = useState([]);
@@ -1702,6 +1688,18 @@ export default function CustomerPage() {
     message: "",
     variant: "light",
   });
+  const isRefreshing =
+    isCustomersFetching || isSalesFetching || isOrdersFetching || isDebtsFetching || isStockFetching;
+  const refreshCustomerData = async () => {
+    await Promise.all([
+      refetchBranches(),
+      refetchCustomers(),
+      refetchSales(),
+      refetchOrders(),
+      refetchDebts(),
+      refetchStock(),
+    ]);
+  };
 
   // Process data from Redux store when it changes
   useEffect(() => {
@@ -1875,6 +1873,8 @@ export default function CustomerPage() {
             // onSaveCustomer={handleSaveCustomer}
             onDeleteCustomer={handleDeleteCustomer}
             onSelectCustomer={setSelectedCustomer}
+            onRefresh={refreshCustomerData}
+            isRefreshing={isRefreshing}
           />
         </Container>
       )}

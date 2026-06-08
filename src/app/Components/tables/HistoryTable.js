@@ -6,11 +6,11 @@ import { Button, Card, Form, InputGroup, Pagination, Table } from "react-bootstr
 import { Download, Search } from "react-bootstrap-icons";
 
 const palette = {
-  surface: "#ffffff",
-  border: "#e7efe9",
-  text: "#15202b",
-  muted: "#6f7d8c",
-  green: "#2f8f57",
+  surface: "var(--ampla-surface-bg, #ffffff)",
+  border: "var(--ampla-border-color, #e7efe9)",
+  text: "var(--ampla-text-color, #15202b)",
+  muted: "var(--ampla-muted-color, #6f7d8c)",
+  green: "var(--ampla-accent-color, #2f8f57)",
   shadow: "0 12px 32px rgba(15, 23, 42, 0.05)",
 };
 
@@ -26,7 +26,7 @@ const toolbarButtonStyle = {
   padding: "0.65rem 1.1rem",
   borderRadius: 16,
   border: `1px solid ${palette.border}`,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   color: palette.text,
   fontWeight: 700,
   boxShadow: "none",
@@ -37,7 +37,7 @@ const headerCellStyle = {
   fontWeight: 800,
   fontSize: 14,
   whiteSpace: "nowrap",
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   paddingTop: 18,
   paddingBottom: 18,
 };

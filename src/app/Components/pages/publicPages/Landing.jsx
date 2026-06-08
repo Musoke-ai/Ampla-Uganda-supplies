@@ -41,7 +41,7 @@ Whether you're a small hardware store or a large enterprise, our system can help
 
   <div style={{zIndex: 2}} className="mt-2">
   <Link className="nav-link  d-none d-lg-block d-xl-block" to="/signup"  >
-            <button type="button" className="btn mainColor btn-outline-primary rounded fw-bold shadow-sm fs-4 text-center" style={{backgroundColor: "#1C4E80"}}>
+            <button type="button" className="btn mainColor btn-outline-primary rounded fw-bold shadow-sm fs-4 text-center" style={{backgroundColor: "var(--ampla-accent-color, #1C4E80)"}}>
              <span className="fw-bold text-white">Try Ampla Uganda</span>
              </button>
              </Link>

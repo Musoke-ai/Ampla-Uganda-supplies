@@ -25,27 +25,43 @@ import {
 } from "@mui/material";
 import {
   Add,
+  AccountBalanceWallet,
   ChevronRight,
   Close,
   DeleteOutline,
   GridView,
   LockOutlined,
   PauseCircleOutline,
+  Payments,
   Remove,
+  Refresh,
   Search,
   ShoppingCartOutlined,
   ViewList,
 } from "@mui/icons-material";
 
-import { selectBranchScope, selectProfile } from "../../auth/authSlice";
+import { selectBranchScope, selectProfile, selectUserId } from "../../auth/authSlice";
 import { useSettings } from "../Settings";
 import { selectStock, useGetStockQuery } from "../../features/stock/stockSlice";
 import { selectBranches, useGetBranchesQuery } from "../../features/api/branchesSlice";
 import { selectCustomers, useGetCustomersQuery } from "../../features/api/customers";
 import { useMakeSalesMutation } from "../../features/api/salesSlice";
+import {
+  useCloseCashDrawerMutation,
+  useGetActiveCashDrawerQuery,
+  useOpenCashDrawerMutation,
+  useRecordCashDrawerMovementMutation,
+} from "../../features/api/cashDrawerSlice";
 import AmplaReceipt from "../receipts/AmplaReceipt";
 import BarcodeScannerDialog from "../BarcodeScannerDialog";
+import {
+  formatCurrency,
+  formatCurrencyInputValue,
+  parseCurrencyInput,
+} from "../../utils/currency";
 import "./PosPage.css";
+
+const EMPTY_ARRAY = [];
 
 const HOLD_SALES_STORAGE_KEY = "gemini-pos-held-sales";
 const WALK_IN_CUSTOMER_ID = "__walk_in_customer__";
@@ -64,8 +80,7 @@ const WALK_IN_CUSTOMER = {
   isWalkIn: true,
 };
 
-const money = (value, currency = "UGX") =>
-  `${currency} ${Number(value || 0).toLocaleString()}`;
+const money = (value, currency = "UGX") => formatCurrency(value, currency);
 
 const getInitials = (name = "") =>
   name
@@ -114,10 +129,11 @@ export default function GeminiPos() {
   const autoPriceDetermination = Boolean(settings?.autoPriceDetermination);
 
   const companyProfile = useSelector(selectProfile) ?? {};
+  const userId = useSelector(selectUserId);
   const branchScope = useSelector(selectBranchScope) ?? {};
-  const stockItems = useSelector(selectStock) ?? [];
-  const customers = useSelector(selectCustomers) ?? [];
-  const branches = useSelector(selectBranches) ?? [];
+  const stockItems = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const customers = useSelector(selectCustomers) ?? EMPTY_ARRAY;
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
   const canSwitchBranches = Boolean(branchScope?.can_switch_branches);
   const scopedBranchId = branchScope?.effective_branch_id
     ? String(branchScope.effective_branch_id)
@@ -126,8 +142,10 @@ export default function GeminiPos() {
   useGetBranchesQuery();
   const {
     isLoading: isStockLoading,
+    isFetching: isStockFetching,
     isError: isStockError,
     error: stockError,
+    refetch: refetchStock,
   } = useGetStockQuery();
   const {
     isLoading: isCustomersLoading,
@@ -162,7 +180,23 @@ export default function GeminiPos() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [completedSale, setCompletedSale] = useState(null);
   const [debtAlertOpen, setDebtAlertOpen] = useState(false);
+  const [cashDrawerDialog, setCashDrawerDialog] = useState({ open: false, action: "open" });
+  const [cashDrawerAmount, setCashDrawerAmount] = useState("");
+  const [cashDrawerNote, setCashDrawerNote] = useState("");
   const recentBarcodeScanRef = useRef({ value: "", time: 0 });
+
+  const {
+    data: activeCashDrawer,
+    isFetching: isCashDrawerFetching,
+    refetch: refetchCashDrawer,
+  } = useGetActiveCashDrawerQuery(
+    { branchId: selectedBranchId },
+    { skip: !selectedBranchId }
+  );
+  const [openCashDrawer, { isLoading: isOpeningDrawer }] = useOpenCashDrawerMutation();
+  const [recordCashDrawerMovement, { isLoading: isRecordingDrawerMovement }] =
+    useRecordCashDrawerMovementMutation();
+  const [closeCashDrawer, { isLoading: isClosingDrawer }] = useCloseCashDrawerMutation();
 
   useEffect(() => {
     const savedHeldSales = JSON.parse(localStorage.getItem(HOLD_SALES_STORAGE_KEY) || "[]");
@@ -302,6 +336,81 @@ export default function GeminiPos() {
 
   const showFeedback = (severity, message) => {
     setFeedback({ open: true, severity, message });
+  };
+
+  const drawerMoney = (value) => money(Number(value || 0), currency);
+  const cashlessSummary = activeCashDrawer?.paymentSummary || {};
+  const recentDrawerMovements = activeCashDrawer?.movements?.slice(0, 4) || [];
+
+  const openCashDrawerAction = (action) => {
+    setCashDrawerDialog({ open: true, action });
+    setCashDrawerAmount("");
+    setCashDrawerNote("");
+  };
+
+  const closeCashDrawerDialog = () => {
+    setCashDrawerDialog({ open: false, action: "open" });
+    setCashDrawerAmount("");
+    setCashDrawerNote("");
+  };
+
+  const handleCashDrawerSubmit = async () => {
+    const amount = toNumber(cashDrawerAmount);
+    const action = cashDrawerDialog.action;
+
+    if (!selectedBranchId) {
+      showFeedback("warning", "Select a branch before using the cash drawer.");
+      return;
+    }
+
+    if (action !== "close" && amount < 0) {
+      showFeedback("warning", "Amount cannot be negative.");
+      return;
+    }
+
+    try {
+      if (action === "open") {
+        await openCashDrawer({
+          branchId: selectedBranchId,
+          openingFloat: amount,
+          note: cashDrawerNote,
+        }).unwrap();
+        showFeedback("success", "Cash drawer opened.");
+      } else if (action === "cash_in" || action === "cash_out") {
+        if (!activeCashDrawer?.drawerId) {
+          showFeedback("warning", "Open the cash drawer first.");
+          return;
+        }
+
+        await recordCashDrawerMovement({
+          drawerId: activeCashDrawer.drawerId,
+          movementType: action,
+          amount,
+          reason: cashDrawerNote,
+        }).unwrap();
+        showFeedback("success", action === "cash_in" ? "Cash in recorded." : "Cash out recorded.");
+      } else if (action === "close") {
+        if (!activeCashDrawer?.drawerId) {
+          showFeedback("warning", "Open the cash drawer first.");
+          return;
+        }
+
+        await closeCashDrawer({
+          drawerId: activeCashDrawer.drawerId,
+          countedCash: amount,
+          note: cashDrawerNote,
+        }).unwrap();
+        showFeedback("success", "Cash drawer closed.");
+      }
+
+      closeCashDrawerDialog();
+      refetchCashDrawer();
+    } catch (error) {
+      showFeedback(
+        "error",
+        error?.data?.message || error?.error || "Cash drawer action could not be completed."
+      );
+    }
   };
 
   const findProductByBarcode = (barcode) => {
@@ -458,6 +567,52 @@ export default function GeminiPos() {
     );
   };
 
+  const updateQtyTo = (itemId, value) => {
+    setCart((currentCart) =>
+      currentCart.map((item) => {
+        if (item.saleItemId !== itemId) return item;
+
+        if (value === "") {
+          return { ...item, saleQuantity: "" };
+        }
+
+        const maxStock = toNumber(item.itemQuantity);
+        const nextQuantity = Math.floor(Number(value));
+
+        if (!Number.isFinite(nextQuantity) || nextQuantity < 1) {
+          return { ...item, saleQuantity: "" };
+        }
+
+        if (nextQuantity > maxStock) {
+          showFeedback(
+            "warning",
+            `Cannot sell more than ${maxStock} of ${item.itemName}.`
+          );
+          return { ...item, saleQuantity: maxStock };
+        }
+
+        return { ...item, saleQuantity: nextQuantity };
+      })
+    );
+  };
+
+  const normalizeQtyInput = (itemId) => {
+    setCart((currentCart) =>
+      currentCart.map((item) => {
+        if (item.saleItemId !== itemId) return item;
+
+        const maxStock = toNumber(item.itemQuantity);
+        const nextQuantity = Math.floor(Number(item.saleQuantity));
+
+        if (!Number.isFinite(nextQuantity) || nextQuantity < 1) {
+          return { ...item, saleQuantity: Math.min(1, maxStock || 1) };
+        }
+
+        return { ...item, saleQuantity: Math.min(nextQuantity, maxStock || nextQuantity) };
+      })
+    );
+  };
+
   const updateCartItemPriceMode = (itemId, nextPriceMode) => {
     setCart((currentCart) =>
       currentCart.map((item) => {
@@ -540,6 +695,12 @@ export default function GeminiPos() {
       return;
     }
 
+    const invalidQuantityItem = cart.find((item) => toNumber(item.saleQuantity) <= 0);
+    if (invalidQuantityItem) {
+      showFeedback("warning", `Enter a valid quantity for ${invalidQuantityItem.itemName}.`);
+      return;
+    }
+
     if (tenderedAmount < 0) {
       showFeedback("warning", "Amount paid cannot be negative.");
       return;
@@ -604,7 +765,14 @@ export default function GeminiPos() {
     };
 
     try {
-      await makeSale({ branchId: selectedBranchId, saleItems, saleDetails }).unwrap();
+      const saleResponse = await makeSale({ branchId: selectedBranchId, saleItems, saleDetails }).unwrap();
+      const receiptSaleDetails = {
+        ...saleDetails,
+        receiptNumber: saleResponse?.receiptNumber || saleDetails.receiptNumber,
+        createdBy: saleResponse?.createdBy || userId,
+        cashierName: saleResponse?.cashierName || (userId ? `User #${userId}` : "Current user"),
+        branchName: selectedBranch?.branchName || saleDetails.branchName || "Main branch",
+      };
 
       setCompletedSale({
         cart: cart.map((item) => ({
@@ -612,9 +780,11 @@ export default function GeminiPos() {
           saleQuantity: toNumber(item.saleQuantity),
           salePrice: toNumber(item.salePrice),
         })),
-        saleDetails,
+        saleDetails: receiptSaleDetails,
         customerName: saleCustomerName,
       });
+      refetchCashDrawer();
+      refetchStock();
       setReceiptOpen(true);
       clearCheckoutState();
       showFeedback("success", "Sale completed successfully.");
@@ -666,11 +836,11 @@ export default function GeminiPos() {
 
           <Box sx={{ minWidth: 0 }}>
             <Typography fontWeight={900}>{product.itemName}</Typography>
-            <Typography variant="body2" color="#64748B">
+            <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
               Model: {product.itemModel || "N/A"}
             </Typography>
             {product.itemBarcode ? (
-              <Typography variant="body2" color="#64748B">
+              <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
                 Barcode: {product.itemBarcode}
               </Typography>
             ) : null}
@@ -688,14 +858,14 @@ export default function GeminiPos() {
           </Stack>
 
           <Box>
-            <Typography variant="body2" color="#64748B">
+            <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
               Stock
             </Typography>
             <Typography fontWeight={900}>{availableStock}</Typography>
           </Box>
 
           <Box>
-            <Typography variant="body2" color="#64748B">
+            <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
               Price
             </Typography>
             <Typography fontWeight={900}>{money(displayPrice, currency)}</Typography>
@@ -728,11 +898,11 @@ export default function GeminiPos() {
             )}
             <Box textAlign="center">
               <Typography fontWeight={900}>{product.itemName}</Typography>
-              <Typography variant="body2" color="#64748B">
+              <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
                 Model: {product.itemModel || "N/A"}
               </Typography>
               {product.itemBarcode ? (
-                <Typography variant="body2" color="#64748B">
+                <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
                   Barcode: {product.itemBarcode}
                 </Typography>
               ) : null}
@@ -748,7 +918,7 @@ export default function GeminiPos() {
               )}
             </Stack>
             <Stack direction="row" justifyContent="space-between" width="100%">
-              <Typography variant="body2" color="#64748B">
+              <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
                 Qty
               </Typography>
               <Typography fontWeight={900}>{availableStock}</Typography>
@@ -762,12 +932,53 @@ export default function GeminiPos() {
     );
   };
 
+  const renderQuantityEditor = (item, compact = false) => (
+    <Stack
+      direction="row"
+      alignItems="center"
+      gap={compact ? 0.75 : 1}
+      justifyContent={compact ? "flex-start" : "flex-end"}
+      flexWrap="nowrap"
+    >
+      <IconButton
+        size="small"
+        onClick={() => updateQty(item.saleItemId, -1)}
+        sx={qtyButton}
+        aria-label={`Reduce ${item.itemName} quantity`}
+      >
+        <Remove fontSize="small" />
+      </IconButton>
+      <TextField
+        type="number"
+        value={item.saleQuantity}
+        onChange={(event) => updateQtyTo(item.saleItemId, event.target.value)}
+        onBlur={() => normalizeQtyInput(item.saleItemId)}
+        inputProps={{
+          min: 1,
+          max: toNumber(item.itemQuantity),
+          inputMode: "numeric",
+          pattern: "[0-9]*",
+          "aria-label": `${item.itemName} quantity`,
+        }}
+        sx={compact ? quantityInputCompactStyle : quantityInputStyle}
+      />
+      <IconButton
+        size="small"
+        onClick={() => updateQty(item.saleItemId, 1)}
+        sx={qtyButton}
+        aria-label={`Increase ${item.itemName} quantity`}
+      >
+        <Add fontSize="small" />
+      </IconButton>
+    </Stack>
+  );
+
   if (isStockLoading || isCustomersLoading) {
     return (
       <Box sx={loadingShellStyle}>
         <Stack spacing={2} alignItems="center">
-          <CircularProgress sx={{ color: "#2F8F57" }} />
-          <Typography color="#64748B">Loading POS data...</Typography>
+          <CircularProgress sx={{ color: "var(--ampla-accent-color, #2F8F57)" }} />
+          <Typography color="var(--ampla-muted-color, #64748B)">Loading POS data...</Typography>
         </Stack>
       </Box>
     );
@@ -798,15 +1009,24 @@ export default function GeminiPos() {
           mb={3}
         >
           <Box>
-            <Typography variant="h4" fontWeight={800} color="#14231B">
+            <Typography variant="h4" fontWeight={800} color="var(--ampla-text-color, #14231B)">
               Point of Sale
             </Typography>
-            <Typography color="#64748B">
+            <Typography color="var(--ampla-muted-color, #64748B)">
               Monitor stock, sales, and production from one live workspace.
             </Typography>
           </Box>
 
           <Stack direction="row" gap={1} flexWrap="wrap">
+            <Button
+              variant="outlined"
+              startIcon={<Refresh />}
+              onClick={() => refetchStock()}
+              disabled={isStockFetching}
+              sx={{ borderRadius: 999, textTransform: "none", fontWeight: 900 }}
+            >
+              {isStockFetching ? "Refreshing..." : "Refresh"}
+            </Button>
             <Chip label={`${branchStockItems.length} products ready`} sx={chipStyle} />
             <Chip label={`${cart.length} cart lines`} sx={chipStyle} />
             <Chip label={`${heldSales.length} held sales`} sx={chipStyle} />
@@ -937,7 +1157,7 @@ export default function GeminiPos() {
                   <Typography fontWeight={900} fontSize={20}>
                     Products for this sale
                   </Typography>
-                  <Typography color="#64748B" fontSize={14}>
+                  <Typography color="var(--ampla-muted-color, #64748B)" fontSize={14}>
                     {selectedBranch
                       ? `Live inventory for ${selectedBranch.branchName}.`
                       : "Choose a branch to load sale products."}
@@ -963,7 +1183,7 @@ export default function GeminiPos() {
                 gap={1}
                 mt={3}
               >
-                <Typography color="#64748B">
+                <Typography color="var(--ampla-muted-color, #64748B)">
                   Showing 1 to {filteredProducts.length} of {branchStockItems.length} products
                 </Typography>
                 <Stack direction="row" gap={1}>
@@ -978,7 +1198,7 @@ export default function GeminiPos() {
           </Card>
 
           <Card sx={cartCardStyle}>
-            <Box sx={{ p: 2.5, borderBottom: "1px solid #E7EFE9" }}>
+            <Box sx={{ p: 2.5, borderBottom: "1px solid var(--ampla-border-color, #E7EFE9)" }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
                 <Typography variant="h6" fontWeight={900}>
                   Current Sale
@@ -1000,9 +1220,111 @@ export default function GeminiPos() {
               </Stack>
             </Box>
 
+            <Box sx={{ p: 2.5, borderBottom: "1px solid var(--ampla-border-color, #E7EFE9)", bgcolor: "var(--ampla-surface-soft, #F8FCF9)" }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1.5} mb={1.5}>
+                <Box>
+                  <Stack direction="row" gap={1} alignItems="center">
+                    <AccountBalanceWallet sx={{ color: "var(--ampla-accent-color, #2F8F57)" }} />
+                    <Typography fontWeight={900}>Cash Drawer</Typography>
+                  </Stack>
+                  <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
+                    {activeCashDrawer
+                      ? `Opened ${new Date(activeCashDrawer.openedAt).toLocaleString()}`
+                      : isCashDrawerFetching
+                        ? "Checking drawer status..."
+                        : "No open drawer for this branch."}
+                  </Typography>
+                </Box>
+                <Chip
+                  label={activeCashDrawer ? "Open" : "Closed"}
+                  sx={{
+                    bgcolor: activeCashDrawer ? "var(--ampla-accent-soft, #E7F6ED)" : "var(--ampla-surface-soft, #F1F5F9)",
+                    color: activeCashDrawer ? "var(--ampla-accent-color, #237B49)" : "var(--ampla-muted-color, #64748B)",
+                    fontWeight: 900,
+                  }}
+                />
+              </Stack>
+
+              {activeCashDrawer ? (
+                <>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                      gap: 1,
+                      mb: 1.5,
+                    }}
+                  >
+                    <Box sx={cashDrawerMetricStyle}>
+                      <Typography variant="caption" color="var(--ampla-muted-color, #64748B)">Expected Cash</Typography>
+                      <Typography fontWeight={900}>{drawerMoney(activeCashDrawer.expectedCash)}</Typography>
+                    </Box>
+                    <Box sx={cashDrawerMetricStyle}>
+                      <Typography variant="caption" color="var(--ampla-muted-color, #64748B)">Cash Sales</Typography>
+                      <Typography fontWeight={900}>{drawerMoney(activeCashDrawer.cashSalesTotal)}</Typography>
+                    </Box>
+                    <Box sx={cashDrawerMetricStyle}>
+                      <Typography variant="caption" color="var(--ampla-muted-color, #64748B)">Cashless</Typography>
+                      <Typography fontWeight={900}>{drawerMoney(cashlessSummary.cashless)}</Typography>
+                    </Box>
+                    <Box sx={cashDrawerMetricStyle}>
+                      <Typography variant="caption" color="var(--ampla-muted-color, #64748B)">Credit Due</Typography>
+                      <Typography fontWeight={900}>{drawerMoney(cashlessSummary.creditDue)}</Typography>
+                    </Box>
+                  </Box>
+
+                  <Stack direction="row" gap={1} flexWrap="wrap" mb={1.5}>
+                    <Button size="small" variant="outlined" onClick={() => openCashDrawerAction("cash_in")} sx={drawerButtonStyle}>
+                      Cash In
+                    </Button>
+                    <Button size="small" variant="outlined" onClick={() => openCashDrawerAction("cash_out")} sx={drawerButtonStyle}>
+                      Cash Out
+                    </Button>
+                    <Button size="small" variant="contained" onClick={() => openCashDrawerAction("close")} sx={greenButton}>
+                      Close Drawer
+                    </Button>
+                  </Stack>
+
+                  <Stack gap={0.8}>
+                    {recentDrawerMovements.length ? (
+                      recentDrawerMovements.map((movement) => (
+                        <Stack
+                          key={movement.movementId}
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          sx={{ fontSize: 12, color: "var(--ampla-muted-color, #64748B)" }}
+                        >
+                          <span>{String(movement.movementType).replace(/_/g, " ")}</span>
+                          <strong style={{ color: Number(movement.amount) < 0 ? "#C2410C" : "var(--ampla-accent-color, #237B49)" }}>
+                            {drawerMoney(movement.amount)}
+                          </strong>
+                        </Stack>
+                      ))
+                    ) : (
+                      <Typography variant="caption" color="var(--ampla-muted-color, #64748B)">
+                        No drawer movements yet.
+                      </Typography>
+                    )}
+                  </Stack>
+                </>
+              ) : (
+                <Button
+                  fullWidth
+                  variant="contained"
+                  startIcon={<Payments />}
+                  onClick={() => openCashDrawerAction("open")}
+                  disabled={!selectedBranchId}
+                  sx={greenButton}
+                >
+                  Open Cash Drawer
+                </Button>
+              )}
+            </Box>
+
             <Box sx={cartItemsStyle}>
               {cart.length === 0 ? (
-                <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 250 }} color="#94A3B8">
+                <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 250 }} color="var(--ampla-muted-color, #94A3B8)">
                   <ShoppingCartOutlined sx={{ fontSize: 46, mb: 1 }} />
                   <Typography>Cart is empty.</Typography>
                 </Stack>
@@ -1014,7 +1336,7 @@ export default function GeminiPos() {
 
                       <Box>
                         <Typography fontWeight={900}>{item.itemName}</Typography>
-                        <Typography variant="body2" color="#64748B">
+                        <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
                           {item.itemModel || "No model"}
                         </Typography>
                         <Stack direction="row" gap={0.8} mt={0.8} flexWrap="wrap">
@@ -1034,34 +1356,27 @@ export default function GeminiPos() {
                           </Button>
                         </Stack>
                         <Stack direction="row" gap={1.2} mt={0.8} flexWrap="wrap">
-                          <Typography variant="caption" color="#64748B">
+                          <Typography variant="caption" color="var(--ampla-muted-color, #64748B)">
                             Retail: {money(item.retailPrice, currency)}
                           </Typography>
-                          <Typography variant="caption" color="#64748B">
+                          <Typography variant="caption" color="var(--ampla-muted-color, #64748B)">
                             Wholesale: {money(item.wholesalePrice, currency)}
                           </Typography>
                         </Stack>
-                        <Typography color="#237B49" fontWeight={900}>
+                        <Typography color="var(--ampla-accent-color, #237B49)" fontWeight={900}>
                           {money(item.salePrice, currency)}
                         </Typography>
                       </Box>
 
-                      <Stack direction="row" alignItems="center" gap={1} justifyContent="flex-end">
-                        <IconButton
-                          size="small"
-                          onClick={() => updateQty(item.saleItemId, -1)}
-                          sx={qtyButton}
-                        >
-                          <Remove fontSize="small" />
-                        </IconButton>
-                        <Typography fontWeight={900}>{item.saleQuantity}</Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() => updateQty(item.saleItemId, 1)}
-                          sx={qtyButton}
-                        >
-                          <Add fontSize="small" />
-                        </IconButton>
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        gap={1}
+                        justifyContent="flex-end"
+                        flexWrap="wrap"
+                        sx={{ gridColumn: { xs: "2 / -1", sm: "auto" } }}
+                      >
+                        {renderQuantityEditor(item)}
                         <Typography fontWeight={900} minWidth={88} textAlign="right">
                           {money(getLineTotal(item), currency)}
                         </Typography>
@@ -1075,7 +1390,16 @@ export default function GeminiPos() {
               )}
             </Box>
 
-            <Box sx={{ p: 2.5, bgcolor: "#FBFEFC", borderTop: "1px solid #E7EFE9" }}>
+            <Box
+              sx={{
+                p: 2.5,
+                bgcolor: "var(--ampla-surface-soft, #FBFEFC)",
+                borderTop: "1px solid var(--ampla-border-color, #E7EFE9)",
+                position: { xl: "sticky" },
+                bottom: 0,
+                zIndex: 2,
+              }}
+            >
               {selectedCustomer ? (
                 <Alert severity="success" sx={{ mb: 2, borderRadius: 3 }}>
                   Selling to {selectedCustomer.custName}
@@ -1140,7 +1464,7 @@ export default function GeminiPos() {
                 Hold Sale
               </Button>
 
-              <Stack direction="row" justifyContent="center" gap={0.8} color="#64748B" mt={2}>
+              <Stack direction="row" justifyContent="center" gap={0.8} color="var(--ampla-muted-color, #64748B)" mt={2}>
                 <LockOutlined fontSize="small" />
                 <Typography variant="body2">All transactions are secure and encrypted</Typography>
               </Stack>
@@ -1161,7 +1485,7 @@ export default function GeminiPos() {
               </Button>
             ))}
             <Button
-              sx={{ ...quickAmount, color: "#14231B" }}
+              sx={{ ...quickAmount, color: "var(--ampla-text-color, #14231B)" }}
               onClick={() => openCheckout(total)}
               disabled={!canCheckout}
             >
@@ -1215,11 +1539,19 @@ export default function GeminiPos() {
                   <Box sx={cartInitialStyle}>{getInitials(item.itemName)}</Box>
                   <Box sx={{ minWidth: 0 }}>
                     <Typography fontWeight={800}>{item.itemName}</Typography>
-                    <Typography variant="body2" color="#64748B">
+                    <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
                       {item.saleQuantity} x {money(item.salePrice, currency)}
                     </Typography>
+                    <Box sx={{ mt: 1 }}>
+                      {renderQuantityEditor(item, true)}
+                    </Box>
                   </Box>
-                  <Typography fontWeight={900}>{money(getLineTotal(item), currency)}</Typography>
+                  <Typography
+                    fontWeight={900}
+                    sx={{ gridColumn: { xs: "2 / -1", sm: "auto" }, justifySelf: { xs: "start", sm: "end" } }}
+                  >
+                    {money(getLineTotal(item), currency)}
+                  </Typography>
                 </Box>
               ))}
             </Stack>
@@ -1242,6 +1574,19 @@ export default function GeminiPos() {
               disabled={!canCheckout}
             >
               Checkout
+            </Button>
+
+            <Button
+              fullWidth
+              variant="contained"
+              sx={{ ...holdButtonStyle, mb: 1.2 }}
+              onClick={() => {
+                holdCurrentSale();
+                setCartDrawerOpen(false);
+              }}
+              disabled={cart.length === 0}
+            >
+              Hold Sale
             </Button>
 
             <Button fullWidth variant="outlined" onClick={() => setCartDrawerOpen(false)} sx={{ borderRadius: 2.5 }}>
@@ -1294,14 +1639,14 @@ export default function GeminiPos() {
         <DialogContent dividers>
           <Stack gap={2.2}>
             <Box sx={checkoutTotalStyle}>
-              <Typography color="#64748B" fontWeight={800}>
+              <Typography color="var(--ampla-muted-color, #64748B)" fontWeight={800}>
                 TOTAL TO PAY
               </Typography>
-              <Typography fontSize={34} fontWeight={950} color="#237B49">
+              <Typography fontSize={34} fontWeight={950} color="var(--ampla-accent-color, #237B49)">
                 {money(total, currency)}
               </Typography>
               {selectedCustomer && (
-                <Typography color="#64748B" mt={1}>
+                <Typography color="var(--ampla-muted-color, #64748B)" mt={1}>
                   Customer: {selectedCustomer.custName}
                 </Typography>
               )}
@@ -1320,7 +1665,7 @@ export default function GeminiPos() {
                 </MenuItem>
               </Select>
               {isWalkInCustomer ? (
-                <Typography color="#64748B" fontSize={13} mt={0.8}>
+                <Typography color="var(--ampla-muted-color, #64748B)" fontSize={13} mt={0.8}>
                   Walk-in customer sales must be fully paid. Select a registered customer to allow credit.
                 </Typography>
               ) : null}
@@ -1332,9 +1677,10 @@ export default function GeminiPos() {
               </Typography>
               <TextField
                 fullWidth
-                type="number"
-                value={amountPaid}
-                onChange={(event) => setAmountPaid(event.target.value)}
+                type="text"
+                inputMode="decimal"
+                value={formatCurrencyInputValue(amountPaid)}
+                onChange={(event) => setAmountPaid(parseCurrencyInput(event.target.value))}
                 placeholder="Enter amount paid"
               />
             </Box>
@@ -1360,9 +1706,16 @@ export default function GeminiPos() {
                 </Stack>
                 <TextField
                   fullWidth
-                  type="number"
-                  value={discountValue}
-                  onChange={(event) => setDiscountValue(event.target.value)}
+                  type="text"
+                  inputMode="decimal"
+                  value={discountType === "percent" ? discountValue : formatCurrencyInputValue(discountValue)}
+                  onChange={(event) =>
+                    setDiscountValue(
+                      discountType === "percent"
+                        ? event.target.value
+                        : parseCurrencyInput(event.target.value)
+                    )
+                  }
                   placeholder={discountType === "percent" ? "Enter discount %" : "Enter discount amount"}
                   inputProps={discountType === "percent" ? { min: 0, max: 100 } : { min: 0 }}
                 />
@@ -1394,9 +1747,22 @@ export default function GeminiPos() {
                 </Stack>
                 <TextField
                   fullWidth
-                  type="number"
-                  value={taxType === "none" ? "" : taxValue}
-                  onChange={(event) => setTaxValue(event.target.value)}
+                  type="text"
+                  inputMode="decimal"
+                  value={
+                    taxType === "none"
+                      ? ""
+                      : taxType === "percent"
+                        ? taxValue
+                        : formatCurrencyInputValue(taxValue)
+                  }
+                  onChange={(event) =>
+                    setTaxValue(
+                      taxType === "percent"
+                        ? event.target.value
+                        : parseCurrencyInput(event.target.value)
+                    )
+                  }
                   placeholder={
                     taxType === "amount"
                       ? "Enter tax amount"
@@ -1517,7 +1883,7 @@ export default function GeminiPos() {
             </Box>
 
             {selectedCustomer ? (
-              <Typography color="#64748B">
+              <Typography color="var(--ampla-muted-color, #64748B)">
                 Debt will be linked to {selectedCustomer.custName}.
               </Typography>
             ) : null}
@@ -1552,7 +1918,7 @@ export default function GeminiPos() {
         <DialogTitle sx={{ fontWeight: 900 }}>Held Sales</DialogTitle>
         <DialogContent dividers>
           {heldSales.length === 0 ? (
-            <Stack alignItems="center" justifyContent="center" sx={{ py: 5 }} color="#94A3B8">
+            <Stack alignItems="center" justifyContent="center" sx={{ py: 5 }} color="var(--ampla-muted-color, #94A3B8)">
               <PauseCircleOutline sx={{ fontSize: 44, mb: 1 }} />
               <Typography>No held sales yet.</Typography>
             </Stack>
@@ -1564,7 +1930,7 @@ export default function GeminiPos() {
                     <Typography fontWeight={900}>
                       {sale.customerName || "Selected customer"}
                     </Typography>
-                    <Typography variant="body2" color="#64748B">
+                    <Typography variant="body2" color="var(--ampla-muted-color, #64748B)">
                       {sale.items.length} items - {sale.time}
                     </Typography>
                   </Box>
@@ -1585,6 +1951,75 @@ export default function GeminiPos() {
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setShowHeldSales(false)} sx={{ borderRadius: 2, fontWeight: 800 }}>
             Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={cashDrawerDialog.open}
+        onClose={closeCashDrawerDialog}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 4 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900 }}>
+          {cashDrawerDialog.action === "open"
+            ? "Open Cash Drawer"
+            : cashDrawerDialog.action === "close"
+              ? "Close Cash Drawer"
+              : cashDrawerDialog.action === "cash_in"
+                ? "Record Cash In"
+                : "Record Cash Out"}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack gap={2}>
+            {cashDrawerDialog.action === "close" && activeCashDrawer ? (
+              <Alert severity="info" sx={{ borderRadius: 3 }}>
+                Expected cash is {drawerMoney(activeCashDrawer.expectedCash)}. Count the
+                physical cash and enter the counted amount.
+              </Alert>
+            ) : null}
+
+            <TextField
+              fullWidth
+              type="number"
+              label={
+                cashDrawerDialog.action === "open"
+                  ? "Opening float"
+                  : cashDrawerDialog.action === "close"
+                    ? "Counted cash"
+                    : "Amount"
+              }
+              value={cashDrawerAmount}
+              onChange={(event) => setCashDrawerAmount(event.target.value)}
+            />
+            <TextField
+              fullWidth
+              multiline
+              minRows={2}
+              label={
+                cashDrawerDialog.action === "cash_in" || cashDrawerDialog.action === "cash_out"
+                  ? "Reason"
+                  : "Note"
+              }
+              value={cashDrawerNote}
+              onChange={(event) => setCashDrawerNote(event.target.value)}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={closeCashDrawerDialog} sx={{ borderRadius: 2, fontWeight: 800 }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            sx={greenButton}
+            onClick={handleCashDrawerSubmit}
+            disabled={isOpeningDrawer || isRecordingDrawerMovement || isClosingDrawer}
+          >
+            {isOpeningDrawer || isRecordingDrawerMovement || isClosingDrawer
+              ? "Saving..."
+              : "Confirm"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1612,8 +2047,8 @@ export default function GeminiPos() {
 function TotalRow({ label, value, danger }) {
   return (
     <Stack direction="row" justifyContent="space-between">
-      <Typography color="#64748B">{label}</Typography>
-      <Typography fontWeight={700} color={danger ? "#EF4444" : "#334155"}>
+      <Typography color="var(--ampla-muted-color, #64748B)">{label}</Typography>
+      <Typography fontWeight={700} color={danger ? "#EF4444" : "var(--ampla-text-color, #334155)"}>
         {value}
       </Typography>
     </Stack>
@@ -1622,22 +2057,22 @@ function TotalRow({ label, value, danger }) {
 
 const scrollbarStyle = {
   scrollbarWidth: "thin",
-  scrollbarColor: "#c3d4c8 #eef5f0",
+  scrollbarColor: "var(--ampla-accent-color, #c3d4c8) var(--ampla-surface-soft, #eef5f0)",
   "&::-webkit-scrollbar": {
     width: 8,
     height: 8,
   },
   "&::-webkit-scrollbar-track": {
-    backgroundColor: "#eef5f0",
+    backgroundColor: "var(--ampla-surface-soft, #eef5f0)",
     borderRadius: 999,
   },
   "&::-webkit-scrollbar-thumb": {
-    backgroundColor: "#c3d4c8",
+    backgroundColor: "var(--ampla-accent-color, #c3d4c8)",
     borderRadius: 999,
-    border: "2px solid #eef5f0",
+    border: "2px solid var(--ampla-surface-soft, #eef5f0)",
   },
   "&::-webkit-scrollbar-thumb:hover": {
-    backgroundColor: "#9bb8a3",
+    backgroundColor: "var(--ampla-accent-color, #9bb8a3)",
   },
 };
 
@@ -1652,7 +2087,7 @@ const pageOuterStyle = {
   minHeight: "100vh",
   overflowY: "auto",
   overflowX: "hidden",
-  bgcolor: "#F8FCF9",
+  bgcolor: "var(--ampla-surface-soft, #F8FCF9)",
   p: { xs: 2, md: 3 },
 };
 
@@ -1674,7 +2109,7 @@ const mainGridStyle = {
 
 const toolbarStyle = {
   p: 2,
-  borderBottom: "1px solid #E7EFE9",
+  borderBottom: "1px solid var(--ampla-border-color, #E7EFE9)",
   display: "grid",
   gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr auto auto" },
   gap: 1.5,
@@ -1699,18 +2134,18 @@ const productListCardStyle = {
   gap: 1.5,
   alignItems: "center",
   borderRadius: 2.5,
-  border: "1px solid #E7EFE9",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
   boxShadow: "0 6px 18px rgba(15,23,42,.035)",
   cursor: "pointer",
   transition: ".2s ease",
-  "&:hover": { transform: "translateY(-2px)", borderColor: "rgba(47,143,87,.35)", bgcolor: "#FBFEFC" },
+  "&:hover": { transform: "translateY(-2px)", borderColor: "rgba(var(--ampla-accent-rgb, 47, 143, 87), .35)", bgcolor: "var(--ampla-surface-soft, #FBFEFC)" },
 };
 
 const checkoutTotalStyle = {
   p: 2,
   borderRadius: 3,
-  bgcolor: "#E8F5EC",
-  border: "1px solid #D7EBDD",
+  bgcolor: "var(--ampla-accent-soft, #E8F5EC)",
+  border: "1px solid var(--ampla-border-color, #D7EBDD)",
   textAlign: "center",
 };
 
@@ -1719,8 +2154,8 @@ const checkoutSummaryStyle = {
   gap: 1.1,
   p: 2,
   borderRadius: 3,
-  bgcolor: "#FBFEFC",
-  border: "1px solid #E7EFE9",
+  bgcolor: "var(--ampla-surface-soft, #FBFEFC)",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
 };
 
 const checkoutAdjustmentGridStyle = {
@@ -1732,18 +2167,18 @@ const checkoutAdjustmentGridStyle = {
 const checkoutAdjustmentCardStyle = {
   p: 2,
   borderRadius: 3,
-  bgcolor: "#FBFEFC",
-  border: "1px solid #E7EFE9",
+  bgcolor: "var(--ampla-surface-soft, #FBFEFC)",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
 };
 
 const floatingCartFabStyle = {
   display: { xs: "flex", xl: "none" },
   position: "fixed",
   right: 18,
-  bottom: 18,
+  bottom: { xs: "calc(96px + env(safe-area-inset-bottom))", lg: 18 },
   zIndex: 1300,
-  bgcolor: "#14231B",
-  color: "#fff",
+  bgcolor: "var(--ampla-text-color, #14231B)",
+  color: "var(--ampla-surface-bg, #ffffff)",
   borderRadius: "18px",
   px: 2,
   py: 1.4,
@@ -1757,7 +2192,7 @@ const floatingCartBubble = {
   width: 28,
   height: 28,
   borderRadius: "50%",
-  bgcolor: "#2F8F57",
+  bgcolor: "var(--ampla-accent-color, #2F8F57)",
   display: "grid",
   placeItems: "center",
   fontWeight: 900,
@@ -1782,7 +2217,7 @@ const cartDrawerStyle = {
   width: "92%",
   maxWidth: 420,
   height: "100vh",
-  bgcolor: "#fff",
+  bgcolor: "var(--ampla-surface-bg, #ffffff)",
   zIndex: 1400,
   p: 2.5,
   transition: ".3s ease",
@@ -1791,11 +2226,11 @@ const cartDrawerStyle = {
 
 const miniCartItemStyle = {
   display: "grid",
-  gridTemplateColumns: "52px 1fr auto",
+  gridTemplateColumns: { xs: "44px minmax(0, 1fr)", sm: "52px minmax(0, 1fr) auto" },
   gap: 1,
-  alignItems: "center",
+  alignItems: "start",
   p: 1,
-  border: "1px solid #E7EFE9",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
   borderRadius: 3,
 };
 
@@ -1806,15 +2241,16 @@ const heldSaleItemStyle = {
   alignItems: "center",
   p: 1.5,
   borderRadius: 3,
-  border: "1px solid #E7EFE9",
-  bgcolor: "#FBFEFC",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
+  bgcolor: "var(--ampla-surface-soft, #FBFEFC)",
 };
 
 const cartCardStyle = {
   borderRadius: 4,
-  border: "1px solid #E7EFE9",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
   boxShadow: "0 16px 40px rgba(15, 23, 42, 0.06)",
-  overflow: "hidden",
+  overflowX: "hidden",
+  overflowY: { xs: "visible", xl: "auto" },
   alignSelf: "start",
   position: { xl: "sticky" },
   top: 20,
@@ -1826,7 +2262,7 @@ const cartCardStyle = {
 const cartItemsStyle = {
   p: 2.5,
   minHeight: 250,
-  maxHeight: "50vh",
+  maxHeight: { xs: "none", xl: "34vh" },
   overflowY: "auto",
   flex: 1,
   ...scrollbarStyle,
@@ -1848,58 +2284,73 @@ const quickPayStyle = {
 
 const cardStyle = {
   borderRadius: 4,
-  border: "1px solid #E7EFE9",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
   boxShadow: "0 16px 40px rgba(15, 23, 42, 0.06)",
   overflow: "hidden",
 };
 
 const greenButton = {
   borderRadius: 2.5,
-  bgcolor: "#2F8F57",
+  bgcolor: "var(--ampla-accent-color, #2F8F57)",
   fontWeight: 800,
   textTransform: "none",
   boxShadow: "0 10px 25px rgba(47,143,87,.22)",
-  "&:hover": { bgcolor: "#267347" },
+  "&:hover": { bgcolor: "var(--ampla-accent-color, #267347)" },
+};
+
+const cashDrawerMetricStyle = {
+  p: 1.2,
+  borderRadius: 2.5,
+  bgcolor: "var(--ampla-surface-bg, #FFFFFF)",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
+};
+
+const drawerButtonStyle = {
+  borderRadius: 2,
+  textTransform: "none",
+  fontWeight: 800,
+  borderColor: "#BFD8C8",
+  color: "var(--ampla-accent-color, #237B49)",
 };
 
 const chipStyle = {
-  bgcolor: "#E8F5EC",
-  color: "#237B49",
+  bgcolor: "var(--ampla-accent-soft, #E8F5EC)",
+  color: "var(--ampla-accent-color, #237B49)",
   fontWeight: 800,
   px: 1,
 };
 
 const activeIconStyle = {
-  bgcolor: "#2F8F57",
-  color: "white",
+  bgcolor: "var(--ampla-accent-color, #2F8F57)",
+  color: "var(--ampla-on-accent-color, #ffffff)",
   borderRadius: 2,
-  "&:hover": { bgcolor: "#267347" },
+  "&:hover": { bgcolor: "var(--ampla-accent-color, #267347)" },
 };
 
 const plainIconStyle = {
-  bgcolor: "#F4FAF5",
-  color: "#64748B",
+  bgcolor: "var(--ampla-surface-soft, #F4FAF5)",
+  color: "var(--ampla-muted-color, #64748B)",
   borderRadius: 2,
 };
 
 const productCardStyle = {
   borderRadius: 2.5,
-  border: "1px solid #E7EFE9",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
   boxShadow: "0 6px 18px rgba(15,23,42,.04)",
   cursor: "pointer",
   minHeight: 190,
   transition: ".2s ease",
   "& .MuiCardContent-root": { padding: "14px !important" },
-  "&:hover": { transform: "translateY(-4px)", borderColor: "rgba(47,143,87,.35)" },
+  "&:hover": { transform: "translateY(-4px)", borderColor: "rgba(var(--ampla-accent-rgb, 47, 143, 87), .35)" },
 };
 
 const productInitialStyle = {
   width: 52,
   height: 52,
   borderRadius: 2,
-  bgcolor: "#E8F5EC",
-  border: "1px solid #D7EBDD",
-  color: "#237B49",
+  bgcolor: "var(--ampla-accent-soft, #E8F5EC)",
+  border: "1px solid var(--ampla-border-color, #D7EBDD)",
+  color: "var(--ampla-accent-color, #237B49)",
   display: "grid",
   placeItems: "center",
   fontSize: 16,
@@ -1911,17 +2362,17 @@ const productImageStyle = {
   height: 56,
   borderRadius: 2,
   objectFit: "cover",
-  border: "1px solid #D7EBDD",
-  bgcolor: "#E8F5EC",
+  border: "1px solid var(--ampla-border-color, #D7EBDD)",
+  bgcolor: "var(--ampla-accent-soft, #E8F5EC)",
 };
 
 const cartInitialStyle = {
   width: 52,
   height: 52,
   borderRadius: 2.5,
-  bgcolor: "#E8F5EC",
-  border: "1px solid #D7EBDD",
-  color: "#237B49",
+  bgcolor: "var(--ampla-accent-soft, #E8F5EC)",
+  border: "1px solid var(--ampla-border-color, #D7EBDD)",
+  color: "var(--ampla-accent-color, #237B49)",
   display: "grid",
   placeItems: "center",
   fontSize: 16,
@@ -1931,22 +2382,46 @@ const cartInitialStyle = {
 const qtyButton = {
   width: 30,
   height: 30,
-  border: "1px solid #E7EFE9",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
   borderRadius: 2,
 };
 
+const quantityInputStyle = {
+  width: 82,
+  "& .MuiInputBase-root": {
+    height: 36,
+    borderRadius: 2,
+    bgcolor: "var(--ampla-input-bg, var(--ampla-surface-bg, #FFFFFF))",
+    fontWeight: 900,
+  },
+  "& input": {
+    p: "6px 8px",
+    textAlign: "center",
+    fontWeight: 900,
+  },
+};
+
+const quantityInputCompactStyle = {
+  ...quantityInputStyle,
+  width: 76,
+  "& .MuiInputBase-root": {
+    ...quantityInputStyle["& .MuiInputBase-root"],
+    height: 34,
+  },
+};
+
 const adjustmentChip = {
-  bgcolor: "#F4FAF5",
-  color: "#486353",
-  border: "1px solid #E7EFE9",
+  bgcolor: "var(--ampla-surface-soft, #F4FAF5)",
+  color: "var(--ampla-text-color, #486353)",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
   fontWeight: 800,
 };
 
 const adjustmentChipActive = {
   ...adjustmentChip,
-  bgcolor: "#E8F5EC",
-  color: "#237B49",
-  borderColor: "#D7EBDD",
+  bgcolor: "var(--ampla-accent-soft, #E8F5EC)",
+  color: "var(--ampla-accent-color, #237B49)",
+  borderColor: "var(--ampla-border-color, #D7EBDD)",
 };
 
 const holdButtonStyle = {
@@ -1960,31 +2435,31 @@ const holdButtonStyle = {
 const quickAmount = {
   height: 54,
   borderRadius: 2.5,
-  bgcolor: "#FFFFFF",
-  border: "1px solid #E7EFE9",
-  color: "#237B49",
+  bgcolor: "var(--ampla-surface-bg, #FFFFFF)",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
+  color: "var(--ampla-accent-color, #237B49)",
   fontWeight: 900,
   textTransform: "none",
-  "&:hover": { bgcolor: "#E8F5EC" },
+  "&:hover": { bgcolor: "var(--ampla-accent-soft, #E8F5EC)" },
 };
 
 const modeButtonStyle = {
   flex: 1,
   minWidth: 0,
   borderRadius: 2.5,
-  border: "1px solid #E7EFE9",
-  bgcolor: "#FFFFFF",
-  color: "#486353",
+  border: "1px solid var(--ampla-border-color, #E7EFE9)",
+  bgcolor: "var(--ampla-surface-bg, #FFFFFF)",
+  color: "var(--ampla-text-color, #486353)",
   fontWeight: 800,
   textTransform: "none",
-  "&:hover": { bgcolor: "#F4FAF5" },
+  "&:hover": { bgcolor: "var(--ampla-surface-soft, #F4FAF5)" },
 };
 
 const modeButtonActiveStyle = {
   ...modeButtonStyle,
-  bgcolor: "#E8F5EC",
-  color: "#237B49",
-  borderColor: "#D7EBDD",
+  bgcolor: "var(--ampla-accent-soft, #E8F5EC)",
+  color: "var(--ampla-accent-color, #237B49)",
+  borderColor: "var(--ampla-border-color, #D7EBDD)",
 };
 
 const linePriceToggle = {
@@ -1992,40 +2467,40 @@ const linePriceToggle = {
   px: 1.25,
   py: 0.45,
   borderRadius: 999,
-  border: "1px solid #DCE8DF",
-  bgcolor: "#FFFFFF",
-  color: "#64748B",
+  border: "1px solid var(--ampla-border-color, #DCE8DF)",
+  bgcolor: "var(--ampla-surface-bg, #FFFFFF)",
+  color: "var(--ampla-muted-color, #64748B)",
   fontWeight: 800,
   fontSize: 11,
   lineHeight: 1,
   textTransform: "none",
-  "&:hover": { bgcolor: "#F4FAF5" },
+  "&:hover": { bgcolor: "var(--ampla-surface-soft, #F4FAF5)" },
 };
 
 const linePriceToggleActive = {
   ...linePriceToggle,
-  bgcolor: "#E8F5EC",
-  color: "#237B49",
-  borderColor: "#CFE5D6",
+  bgcolor: "var(--ampla-accent-soft, #E8F5EC)",
+  color: "var(--ampla-accent-color, #237B49)",
+  borderColor: "var(--ampla-border-color, #CFE5D6)",
 };
 
 const pagerButton = {
   minWidth: 36,
   borderRadius: 2,
-  color: "#64748B",
+  color: "var(--ampla-muted-color, #64748B)",
   fontWeight: 800,
 };
 
 const pagerActive = {
   ...pagerButton,
-  bgcolor: "#2F8F57",
-  color: "white",
-  "&:hover": { bgcolor: "#267347" },
+  bgcolor: "var(--ampla-accent-color, #2F8F57)",
+  color: "var(--ampla-on-accent-color, #ffffff)",
+  "&:hover": { bgcolor: "var(--ampla-accent-color, #267347)" },
 };
 
 const stockChipStyle = {
-  bgcolor: "#DFF3E6",
-  color: "#237B49",
+  bgcolor: "var(--ampla-accent-soft, #DFF3E6)",
+  color: "var(--ampla-accent-color, #237B49)",
   fontWeight: 800,
 };
 
@@ -2036,7 +2511,7 @@ const outOfStockChipStyle = {
 };
 
 const inCartChipStyle = {
-  bgcolor: "#2F8F57",
-  color: "#FFFFFF",
+  bgcolor: "var(--ampla-accent-color, #2F8F57)",
+  color: "var(--ampla-on-accent-color, #FFFFFF)",
   fontWeight: 900,
 };

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import { Box, Button, Chip, LinearProgress, Stack, Tab, TextField, Typography } from "@mui/material";
+import { Box, Button, Chip, LinearProgress, Stack, Tab, TextField } from "@mui/material";
 import { TabContext, TabList, TabPanel } from "@mui/lab";
 import { CalendarMonth, Download, Inventory2, Print, QueryStats } from "@mui/icons-material";
 import format from "date-fns/format";
@@ -14,14 +14,16 @@ import StockEntry from "../../Components/StockEntry";
 import PermissionWrapper from "../../auth/PermissionWrapper";
 import "../../Components/StockWorkspace.css";
 
+const EMPTY_ARRAY = [];
+
 const palette = {
-  bg: "#f8fbf8",
-  surface: "#ffffff",
-  border: "#e7efe9",
-  text: "#15202b",
-  muted: "#6f7d8c",
-  green: "#2f8f57",
-  greenSoft: "#e8f5ec",
+  bg: "var(--ampla-app-bg, #f8fbf8)",
+  surface: "var(--ampla-surface-bg, #ffffff)",
+  border: "var(--ampla-border-color, #e7efe9)",
+  text: "var(--ampla-text-color, #15202b)",
+  muted: "var(--ampla-muted-color, #6f7d8c)",
+  green: "var(--ampla-accent-color, #2f8f57)",
+  greenSoft: "var(--ampla-accent-soft, #e8f5ec)",
   blue: "#2f80ed",
   blueSoft: "#e8f1ff",
   amber: "#f59e0b",
@@ -58,9 +60,9 @@ const ItemsExcerpt = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const stock = useSelector(selectStok) ?? [];
-  const items = useSelector(selectStock) ?? [];
-  const branches = useSelector(selectBranches) ?? [];
+  const stock = useSelector(selectStok) ?? EMPTY_ARRAY;
+  const items = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
 
   const itemsMap = useMemo(
     () => new Map(items.map((item) => [Number(item.itemId), item.itemName])),
@@ -407,7 +409,7 @@ const stockPrimaryButtonStyle = {
   backgroundColor: palette.green,
   boxShadow: "0 12px 24px rgba(47, 143, 87, 0.18)",
   "&:hover": {
-    backgroundColor: "#27794a",
+    backgroundColor: palette.green,
     boxShadow: "0 14px 28px rgba(47, 143, 87, 0.24)",
   },
 };
@@ -420,7 +422,7 @@ const stockGhostButtonStyle = {
   fontWeight: 700,
   borderColor: palette.border,
   color: palette.text,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   "&:hover": {
     borderColor: palette.green,
     backgroundColor: palette.greenSoft,
@@ -434,7 +436,7 @@ const stockIconButtonStyle = {
   borderRadius: "12px",
   borderColor: palette.border,
   color: palette.text,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   "&:hover": {
     borderColor: palette.green,
     backgroundColor: palette.greenSoft,

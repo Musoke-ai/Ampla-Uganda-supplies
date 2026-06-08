@@ -7,13 +7,15 @@ import { Form, Button, Modal, Row, Col } from 'react-bootstrap';
 import { useSelector } from "react-redux";
 import { selectBranchScope } from "../../auth/authSlice";
 
+const EMPTY_ARRAY = [];
+
 const AddCustomer = ({
     showModal,
     handleModalToggle
 }) => {
 
     useGetBranchesQuery();
-    const branches = useSelector(selectBranches) ?? [];
+    const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
     const branchScope = useSelector(selectBranchScope) ?? {};
     const currentBranchId = branchScope?.effective_branch_id ? String(branchScope.effective_branch_id) : "";
     const canSwitchBranches = Boolean(branchScope?.can_switch_branches);
@@ -25,7 +27,7 @@ const AddCustomer = ({
       return branches.filter((branch) => String(branch.branchId) === currentBranchId);
     }, [branches, canSwitchBranches, currentBranchId]);
 
-    const [addCustomer, {data,isLoading, isError,error,isSuccess}] = useCreateCustomerMutation();
+    const [addCustomer, { isLoading }] = useCreateCustomerMutation();
 
     const [newCustomer, setNewCustomer] = useState({
         name: '',

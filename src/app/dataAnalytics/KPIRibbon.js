@@ -110,7 +110,7 @@ const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
           justifyContent: "space-around",
           flexWrap: "wrap",
           padding: "10px",
-          backgroundColor: "#f8f9fa",
+          backgroundColor: "var(--ampla-surface-soft, #f8f9fa)",
           borderRadius: "8px",
           boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
         }}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Button, Spinner } from "react-bootstrap";
 import { Camera, XCircle } from "react-bootstrap-icons";
 
@@ -44,7 +44,7 @@ export default function ImageCaptureDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -55,7 +55,7 @@ export default function ImageCaptureDialog({
     }
 
     setIsReady(false);
-  };
+  }, []);
 
   useEffect(() => {
     if (!show) {
@@ -116,12 +116,12 @@ export default function ImageCaptureDialog({
       isMounted = false;
       stopCamera();
     };
-  }, [show]);
+  }, [show, stopCamera]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     stopCamera();
     onClose?.();
-  };
+  }, [onClose, stopCamera]);
 
   const captureFrame = (event) => {
     event?.preventDefault?.();
@@ -176,7 +176,7 @@ export default function ImageCaptureDialog({
     window.addEventListener("keydown", handleKeyDown, true);
 
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [show]);
+  }, [handleClose, show]);
 
   if (!show) {
     return null;

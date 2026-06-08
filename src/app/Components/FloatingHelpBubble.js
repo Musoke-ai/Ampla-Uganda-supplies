@@ -245,6 +245,24 @@ const FloatingHelpBubble = ({ roles = [] }) => {
   }, [open]);
 
   useEffect(() => {
+    if (!open || !widgetRef.current) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      if (!widgetRef.current) return;
+
+      const rect = widgetRef.current.getBoundingClientRect();
+      const currentPosition = position || { x: rect.left, y: rect.top };
+      const next = clampPosition(currentPosition.x, currentPosition.y, rect.width, rect.height);
+
+      if (next.x !== currentPosition.x || next.y !== currentPosition.y || !position) {
+        savePosition(next);
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, position]);
+
+  useEffect(() => {
     const handleResize = () => {
       if (!position || !widgetRef.current) return;
 

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React from 'react';
 import EmployeeManagement from '../../../production/EmployeeManagement';
 import FactoryExpenses from '../../../production/Expenses';

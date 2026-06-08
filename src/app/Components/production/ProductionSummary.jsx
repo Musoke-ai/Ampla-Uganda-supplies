@@ -26,6 +26,8 @@ import { selectRawMaterials, useGetRawMaterialsQuery } from "../../features/api/
 import { selectStock, useGetStockQuery } from "../../features/stock/stockSlice";
 import { useSettings } from "../Settings";
 
+const EMPTY_ARRAY = [];
+
 const palette = {
   green: "#2f8f57",
   greenSoft: "#e8f5ec",
@@ -55,10 +57,10 @@ const percent = (value, total) => (total > 0 ? Math.min(100, Math.round((value /
 export default function ProductionSummary() {
   const { settings } = useSettings();
   const currency = settings?.currency !== "none" ? settings?.currency : "UGX";
-  const batches = useSelector(selectProductionBatches) ?? [];
-  const products = useSelector(selectStock) ?? [];
-  const branches = useSelector(selectBranches) ?? [];
-  const rawMaterials = useSelector(selectRawMaterials) ?? [];
+  const batches = useSelector(selectProductionBatches) ?? EMPTY_ARRAY;
+  const products = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
+  const rawMaterials = useSelector(selectRawMaterials) ?? EMPTY_ARRAY;
 
   const { isLoading: isLoadingBatches, isError, error } = useGetProductionBatchesQuery();
   const [postOutput, { isLoading: isPostingOutput }] = usePostProductionBatchOutputMutation();

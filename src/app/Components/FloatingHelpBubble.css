@@ -5,6 +5,11 @@
   z-index: 1500;
   color: #15202b;
   font-family: inherit;
+  max-width: calc(100vw - 24px);
+}
+
+.floating-help-open {
+  max-width: calc(100vw - 24px);
 }
 
 .floating-help-bubble {
@@ -243,7 +248,7 @@
 @media (max-width: 640px) {
   .floating-help {
     right: 16px;
-    bottom: 16px;
+    bottom: calc(94px + env(safe-area-inset-bottom));
   }
 
   .floating-help-panel {

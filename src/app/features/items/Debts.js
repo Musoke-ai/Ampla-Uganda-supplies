@@ -553,7 +553,7 @@ setDebtId("");
         <Modal.Body>
           <Form>
             <Form.Group>
-              <h5 className="d-flex flex-row shadow text-white p-2 rounded" style={{ backgroundColor: "#1C4E80" }}><span>Pay For: </span> <pan>{<ItemExerpty itemId={payItem.indebtItemId} />}</pan></h5>
+              <h5 className="d-flex flex-row shadow text-white p-2 rounded" style={{ backgroundColor: "var(--ampla-accent-color, #1C4E80)" }}><span>Pay For: </span> <pan>{<ItemExerpty itemId={payItem.indebtItemId} />}</pan></h5>
               {ispayDebtLoading ? <LinearProgress /> : ""}
               <p>
                 <strong>Bal: </strong>{Number(payItem.totalAmount) - Number(payItem.initialDeposit)}

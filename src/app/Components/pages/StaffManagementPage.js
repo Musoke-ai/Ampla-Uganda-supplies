@@ -61,6 +61,13 @@ import {
 } from "../../features/api/AccountsSlice";
 import AdminAccountManager from "../production/AdminAccountManager";
 
+const EMPTY_ARRAY = [];
+const PROTECTED_ACCOUNT_ROLES = new Set(["admin", "superadmin", "super_admin", "super admin", "developer"]);
+
+const normalizeRole = (role) => String(role || "").trim().toLowerCase();
+const isProtectedAccount = (user) =>
+  (user?.roles ?? EMPTY_ARRAY).some((role) => PROTECTED_ACCOUNT_ROLES.has(normalizeRole(role)));
+
 const API_PUBLIC_BASE = (process.env.REACT_APP_API_BASE_URL || "").replace(/\/api\/?$/, "");
 
 const toAssetUrl = (path) => {
@@ -125,6 +132,12 @@ const initials = (name = "U") =>
     .map((part) => part.charAt(0).toUpperCase())
     .join("") || "U";
 
+const staffSurfaceSx = {
+  border: "1px solid var(--ampla-border-color, #e6ece8)",
+  bgcolor: "var(--ampla-surface-bg, #ffffff)",
+  color: "var(--ampla-text-color, #17251d)",
+};
+
 const StatCard = ({ label, value, tone = "#2f8f57", icon: Icon }) => (
   <Paper
     elevation={0}
@@ -132,8 +145,7 @@ const StatCard = ({ label, value, tone = "#2f8f57", icon: Icon }) => (
       p: 2,
       height: "100%",
       borderRadius: 2,
-      border: "1px solid #e6ece8",
-      bgcolor: "#ffffff",
+      ...staffSurfaceSx,
     }}
   >
     <Stack direction="row" spacing={1.5} alignItems="center">
@@ -152,10 +164,10 @@ const StatCard = ({ label, value, tone = "#2f8f57", icon: Icon }) => (
         <Icon size={19} />
       </Box>
       <Box sx={{ minWidth: 0 }}>
-        <Typography variant="h5" sx={{ fontWeight: 800, color: "#17251d" }}>
+        <Typography variant="h5" sx={{ fontWeight: 800, color: "var(--ampla-text-color, #17251d)" }}>
           {value}
         </Typography>
-        <Typography variant="body2" sx={{ color: "#647067" }}>
+        <Typography variant="body2" sx={{ color: "var(--ampla-muted-color, #647067)" }}>
           {label}
         </Typography>
       </Box>
@@ -187,29 +199,43 @@ const StaffManagementPage = () => {
   const [deleteUser, { isLoading: isDeleteLoading }] = useDeleteUserMutation();
   const [uploadStaffDocuments, { isLoading: isUploadingDocuments }] = useUploadStaffDocumentsMutation();
 
-  const users = data?.users ?? [];
-  const summary = data?.summary ?? {};
-  const roles = useMemo(
-    () => Array.from(new Set(users.flatMap((user) => user.roles ?? []))).sort(),
+  const users = data?.users ?? EMPTY_ARRAY;
+  const staffUsers = useMemo(
+    () => users.filter((user) => !isProtectedAccount(user)),
     [users]
+  );
+  const visibleSummary = useMemo(
+    () => ({
+      total: staffUsers.length,
+      online: staffUsers.filter((user) => user.online).length,
+      active: staffUsers.filter((user) => user.accountStatus === "active").length,
+      inactive: staffUsers.filter((user) => user.accountStatus === "inactive").length,
+      banned: staffUsers.filter((user) => user.accountStatus === "banned").length,
+      passwordResetRequired: staffUsers.filter((user) => user.forcePasswordReset).length,
+    }),
+    [staffUsers]
+  );
+  const roles = useMemo(
+    () => Array.from(new Set(staffUsers.flatMap((user) => user.roles ?? EMPTY_ARRAY))).sort(),
+    [staffUsers]
   );
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return users.filter((user) => {
+    return staffUsers.filter((user) => {
       const matchesSearch =
         !query ||
-        [user.username, user.email, ...(user.roles ?? [])]
+        [user.username, user.email, ...(user.roles ?? EMPTY_ARRAY)]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
           .includes(query);
       const matchesStatus = statusFilter === "all" || user.accountStatus === statusFilter;
-      const matchesRole = roleFilter === "all" || (user.roles ?? []).includes(roleFilter);
+      const matchesRole = roleFilter === "all" || (user.roles ?? EMPTY_ARRAY).includes(roleFilter);
 
       return matchesSearch && matchesStatus && matchesRole;
     });
-  }, [roleFilter, search, statusFilter, users]);
+  }, [roleFilter, search, staffUsers, statusFilter]);
 
   const selectedUserId = selectedUser?.id;
   const { data: activityData, isFetching: isActivityFetching } = useGetStaffActivityQuery(
@@ -359,6 +385,11 @@ const StaffManagementPage = () => {
 
     try {
       if (confirmAction.action === "delete") {
+        if (isProtectedAccount(confirmAction.user)) {
+          toast.error("Administrator accounts cannot be deleted from Staff Management.");
+          closeConfirm();
+          return;
+        }
         const response = await deleteUser({ user_id: confirmAction.user.id }).unwrap();
         toast.success(response?.message || "User deleted successfully.");
       } else {
@@ -418,7 +449,38 @@ const StaffManagementPage = () => {
   };
 
   return (
-    <Box sx={{ px: { xs: 2, md: 3 }, py: 3, bgcolor: "#f8faf8", minHeight: "100vh" }}>
+    <Box
+      className="staff-management-page"
+      sx={{
+        px: { xs: 2, md: 3 },
+        py: 3,
+        bgcolor: "var(--ampla-app-bg, #f8faf8)",
+        color: "var(--ampla-text-color, #17251d)",
+        minHeight: "100vh",
+        "& .MuiPaper-root": staffSurfaceSx,
+        "& .MuiInputBase-root": {
+          bgcolor: "var(--ampla-input-bg, #ffffff)",
+          color: "var(--ampla-text-color, #17251d)",
+        },
+        "& .MuiInputLabel-root, & .MuiInputAdornment-root, & .MuiSvgIcon-root": {
+          color: "var(--ampla-muted-color, #647067)",
+        },
+        "& .MuiOutlinedInput-notchedOutline": {
+          borderColor: "var(--ampla-border-color, #e6ece8)",
+        },
+        "& .MuiTableCell-root": {
+          color: "var(--ampla-text-color, #17251d)",
+          borderColor: "var(--ampla-border-color, #e6ece8)",
+        },
+        "& .MuiTableHead-root .MuiTableCell-root": {
+          bgcolor: "var(--ampla-surface-soft, #f0f6f2)",
+          color: "var(--ampla-muted-color, #647067)",
+        },
+        "& .MuiTableBody-root .MuiTableRow-root": {
+          bgcolor: "var(--ampla-surface-bg, #ffffff)",
+        },
+      }}
+    >
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
@@ -427,10 +489,10 @@ const StaffManagementPage = () => {
         sx={{ mb: 2.5 }}
       >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 900, color: "#17251d", mb: 0.5 }}>
+          <Typography variant="h4" sx={{ fontWeight: 900, color: "var(--ampla-text-color, #17251d)", mb: 0.5 }}>
             Staff Management
           </Typography>
-          <Typography variant="body1" sx={{ color: "#647067", maxWidth: 760 }}>
+          <Typography variant="body1" sx={{ color: "var(--ampla-muted-color, #647067)", maxWidth: 760 }}>
             Monitor staff access, online presence, account health, recent activity, and sensitive administrator actions.
           </Typography>
         </Box>
@@ -450,7 +512,7 @@ const StaffManagementPage = () => {
         elevation={0}
         sx={{
           borderRadius: 2,
-          border: "1px solid #e6ece8",
+          border: "1px solid var(--ampla-border-color, #e6ece8)",
           overflow: "hidden",
           mb: 2,
         }}
@@ -465,23 +527,23 @@ const StaffManagementPage = () => {
         <>
           <Grid container spacing={1.5} sx={{ mb: 2 }}>
             <Grid item xs={12} sm={6} lg={2.4}>
-              <StatCard label="Total staff" value={summary.total ?? 0} icon={PersonCheck} />
+              <StatCard label="Total staff" value={visibleSummary.total} icon={PersonCheck} />
             </Grid>
             <Grid item xs={12} sm={6} lg={2.4}>
-              <StatCard label="Online now" value={summary.online ?? 0} tone="#1570ef" icon={Activity} />
+              <StatCard label="Online now" value={visibleSummary.online} tone="#1570ef" icon={Activity} />
             </Grid>
             <Grid item xs={12} sm={6} lg={2.4}>
-              <StatCard label="Active accounts" value={summary.active ?? 0} tone="#2f8f57" icon={CheckCircle} />
+              <StatCard label="Active accounts" value={visibleSummary.active} tone="#2f8f57" icon={CheckCircle} />
             </Grid>
             <Grid item xs={12} sm={6} lg={2.4}>
-              <StatCard label="Locked or banned" value={(summary.inactive ?? 0) + (summary.banned ?? 0)} tone="#b42318" icon={SlashCircle} />
+              <StatCard label="Locked or banned" value={visibleSummary.inactive + visibleSummary.banned} tone="#b42318" icon={SlashCircle} />
             </Grid>
             <Grid item xs={12} sm={6} lg={2.4}>
-              <StatCard label="Reset pending" value={summary.passwordResetRequired ?? 0} tone="#b54708" icon={Key} />
+              <StatCard label="Reset pending" value={visibleSummary.passwordResetRequired} tone="#b54708" icon={Key} />
             </Grid>
           </Grid>
 
-          <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: "1px solid #e6ece8", mb: 2 }}>
+          <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: "1px solid var(--ampla-border-color, #e6ece8)", mb: 2 }}>
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
               <TextField
                 value={search}
@@ -527,10 +589,10 @@ const StaffManagementPage = () => {
             </Alert>
           ) : null}
 
-          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: "1px solid #e6ece8" }}>
+          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: "1px solid var(--ampla-border-color, #e6ece8)" }}>
             <Table>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#f0f6f2" }}>
+                <TableRow sx={{ bgcolor: "var(--ampla-surface-soft, #f0f6f2)" }}>
                   <TableCell sx={{ fontWeight: 900 }}>Staff member</TableCell>
                   <TableCell sx={{ fontWeight: 900 }}>Status</TableCell>
                   <TableCell sx={{ fontWeight: 900 }}>Documents</TableCell>
@@ -549,7 +611,7 @@ const StaffManagementPage = () => {
                   </TableRow>
                 ) : filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 6, color: "#647067" }}>
+                    <TableCell colSpan={7} align="center" sx={{ py: 6, color: "var(--ampla-muted-color, #647067)" }}>
                       No staff members match the current filters.
                     </TableCell>
                   </TableRow>
@@ -566,12 +628,12 @@ const StaffManagementPage = () => {
                           </Avatar>
                           <Box sx={{ minWidth: 0 }}>
                             <Stack direction="row" spacing={1} alignItems="center">
-                              <Typography sx={{ fontWeight: 900, color: "#17251d" }}>{user.username}</Typography>
+                              <Typography sx={{ fontWeight: 900, color: "var(--ampla-text-color, #17251d)" }}>{user.username}</Typography>
                               {user.online ? (
                                 <Chip size="small" label="Online" sx={{ bgcolor: "#dcfce7", color: "#166534", fontWeight: 800 }} />
                               ) : null}
                             </Stack>
-                            <Typography variant="body2" sx={{ color: "#647067" }}>{user.email || "No email recorded"}</Typography>
+                            <Typography variant="body2" sx={{ color: "var(--ampla-muted-color, #647067)" }}>{user.email || "No email recorded"}</Typography>
                           </Box>
                         </Stack>
                       </TableCell>
@@ -601,16 +663,16 @@ const StaffManagementPage = () => {
                       </TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                          {(user.roles ?? []).slice(0, 3).map((role) => (
+                          {(user.roles ?? EMPTY_ARRAY).slice(0, 3).map((role) => (
                             <Chip key={role} size="small" label={role} variant="outlined" />
                           ))}
-                          {(user.roles ?? []).length > 3 ? <Chip size="small" label={`+${user.roles.length - 3}`} /> : null}
+                          {(user.roles ?? EMPTY_ARRAY).length > 3 ? <Chip size="small" label={`+${user.roles.length - 3}`} /> : null}
                         </Stack>
                       </TableCell>
                       <TableCell>{formatDateTime(user.lastSeenAt || user.lastLoginAt)}</TableCell>
                       <TableCell>
                         <Typography sx={{ fontWeight: 800 }}>{user.activityCount ?? 0} events</Typography>
-                        <Typography variant="body2" sx={{ color: "#647067" }}>{formatDateTime(user.lastActivityAt)}</Typography>
+                        <Typography variant="body2" sx={{ color: "var(--ampla-muted-color, #647067)" }}>{formatDateTime(user.lastActivityAt)}</Typography>
                       </TableCell>
                       <TableCell align="right">
                         <Stack direction="row" spacing={0.5} justifyContent="flex-end">
@@ -638,9 +700,11 @@ const StaffManagementPage = () => {
                           <Tooltip title="Upload staff documents">
                             <IconButton onClick={() => openDocumentDialog(user)}><ShieldLock size={17} /></IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete user">
-                            <IconButton color="error" onClick={() => openConfirm(user, "delete")}><Trash size={17} /></IconButton>
-                          </Tooltip>
+                          {!isProtectedAccount(user) ? (
+                            <Tooltip title="Delete user">
+                              <IconButton color="error" onClick={() => openConfirm(user, "delete")}><Trash size={17} /></IconButton>
+                            </Tooltip>
+                          ) : null}
                         </Stack>
                       </TableCell>
                     </TableRow>
@@ -708,7 +772,7 @@ const StaffManagementPage = () => {
             <Stack spacing={2}>
               <Box>
                 <Typography sx={{ fontWeight: 900, mb: 1 }}>Recent system actions</Typography>
-                {(activityData?.activity ?? []).length === 0 ? (
+                {(activityData?.activity ?? EMPTY_ARRAY).length === 0 ? (
                   <Typography variant="body2" sx={{ color: "#647067" }}>No audited actions recorded yet.</Typography>
                 ) : (
                   <Stack spacing={1}>
@@ -726,7 +790,7 @@ const StaffManagementPage = () => {
 
               <Box>
                 <Typography sx={{ fontWeight: 900, mb: 1 }}>Login history</Typography>
-                {(activityData?.logins ?? []).length === 0 ? (
+                {(activityData?.logins ?? EMPTY_ARRAY).length === 0 ? (
                   <Typography variant="body2" sx={{ color: "#647067" }}>No login records found.</Typography>
                 ) : (
                   <Stack spacing={1}>

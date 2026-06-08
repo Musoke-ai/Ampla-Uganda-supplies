@@ -14,13 +14,15 @@ import { selectBranches, useGetBranchesQuery } from "../features/api/branchesSli
 import { useAddStokMutation } from "../features/api/stockSlice";
 import "./StockWorkspace.css";
 
+const EMPTY_ARRAY = [];
+
 const palette = {
-  surface: "#ffffff",
-  border: "#e7efe9",
-  text: "#15202b",
-  muted: "#6f7d8c",
-  green: "#2f8f57",
-  greenSoft: "#e8f5ec",
+  surface: "var(--ampla-surface-bg, #ffffff)",
+  border: "var(--ampla-border-color, #e7efe9)",
+  text: "var(--ampla-text-color, #15202b)",
+  muted: "var(--ampla-muted-color, #6f7d8c)",
+  green: "var(--ampla-accent-color, #2f8f57)",
+  greenSoft: "var(--ampla-accent-soft, #e8f5ec)",
   blue: "#2f80ed",
   blueSoft: "#e8f1ff",
   red: "#ef4444",
@@ -55,8 +57,8 @@ function StockMetricCard({ title, value, note, accent, color }) {
 const StockEntry = () => {
   useGetBranchesQuery();
   const [addStock, { isLoading, isError, error }] = useAddStokMutation();
-  const products = useSelector(selectStock) ?? [];
-  const branches = useSelector(selectBranches) ?? [];
+  const products = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
   const branchScope = useSelector(selectBranchScope);
   const currentBranchId = branchScope?.effective_branch_id ? String(branchScope.effective_branch_id) : "";
   const canSwitchBranches = Boolean(branchScope?.can_switch_branches);
@@ -450,7 +452,7 @@ const stockAddButtonStyle = {
   backgroundColor: palette.green,
   boxShadow: "none",
   "&:hover": {
-    backgroundColor: "#27794a",
+    backgroundColor: palette.green,
     boxShadow: "none",
   },
 };
@@ -472,7 +474,7 @@ const stockSecondaryButtonStyle = {
   fontWeight: 700,
   borderColor: palette.border,
   color: palette.text,
-  backgroundColor: "#ffffff",
+  backgroundColor: palette.surface,
   "&:hover": {
     borderColor: palette.green,
     backgroundColor: palette.greenSoft,
@@ -488,7 +490,7 @@ const stockSaveButtonStyle = {
   backgroundColor: palette.green,
   boxShadow: "0 12px 24px rgba(47, 143, 87, 0.18)",
   "&:hover": {
-    backgroundColor: "#27794a",
+    backgroundColor: palette.green,
     boxShadow: "0 14px 28px rgba(47, 143, 87, 0.24)",
   },
 };

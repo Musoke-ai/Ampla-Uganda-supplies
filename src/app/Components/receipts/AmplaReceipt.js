@@ -8,6 +8,8 @@ import { selectStock } from "../../features/stock/stockSlice";
 import { selectCustomers } from "../../features/api/customers";
 import { useSettings } from "../Settings";
 
+const EMPTY_ARRAY = [];
+
 const getQty = (item) => Number(item?.saleQuantity ?? item?.itemQuantity ?? item?.qty ?? 0);
 const getPrice = (item) => Number(item?.salePrice ?? item?.price ?? 0);
 const getItemId = (item) => item?.saleItemId ?? item?.itemId ?? item?.id;
@@ -21,100 +23,168 @@ export const formatAmount = (value, currency = "UGX") =>
     maximumFractionDigits: 2,
   })}`;
 
+export const receiptTemplateOptions = {
+  modern: "Standard POS",
+  compact: "Compact POS",
+  classic: "Classic Retail",
+};
+
+export const getReceiptPaperWidth = (value) => (value === "58mm" ? "58mm" : "80mm");
+const POWERED_BY_TEXT = "Powered by HamuzahAndSteve Technologies";
+
+const getReceiptTemplateVariables = (template = "modern") => {
+  if (template === "compact") {
+    return {
+      "--receipt-radius": "0px",
+      "--receipt-shadow": "none",
+      "--receipt-border": "#111111",
+      "--receipt-hero-bg": "#ffffff",
+      "--receipt-hero-border": "#111111",
+      "--receipt-text": "#111111",
+      "--receipt-muted": "#444444",
+      "--receipt-accent": "#111111",
+      "--receipt-accent-soft": "#f4f4f4",
+      "--receipt-card-bg": "#ffffff",
+      "--receipt-section-bg": "#ffffff",
+      "--receipt-line": "#111111",
+      "--receipt-chip-bg": "#ffffff",
+      "--receipt-chip-border": "#111111",
+    };
+  }
+
+  if (template === "classic") {
+    return {
+      "--receipt-radius": "10px",
+      "--receipt-shadow": "0 12px 30px rgba(15, 23, 42, 0.08)",
+      "--receipt-border": "#1f2937",
+      "--receipt-hero-bg": "#f8fafc",
+      "--receipt-hero-border": "#1f2937",
+      "--receipt-text": "#111827",
+      "--receipt-muted": "#4b5563",
+      "--receipt-accent": "#111827",
+      "--receipt-accent-soft": "#eef2f7",
+      "--receipt-card-bg": "#ffffff",
+      "--receipt-section-bg": "#f9fafb",
+      "--receipt-line": "#1f2937",
+      "--receipt-chip-bg": "#ffffff",
+      "--receipt-chip-border": "#1f2937",
+    };
+  }
+
+  return {
+    "--receipt-radius": "2px",
+    "--receipt-shadow": "0 18px 42px rgba(15, 23, 42, 0.08)",
+    "--receipt-border": "#111111",
+    "--receipt-hero-bg": "#ffffff",
+    "--receipt-hero-border": "#111111",
+    "--receipt-text": "#111111",
+    "--receipt-muted": "#444444",
+    "--receipt-accent": "#111111",
+    "--receipt-accent-soft": "#f2f2f2",
+    "--receipt-card-bg": "#ffffff",
+    "--receipt-section-bg": "#ffffff",
+    "--receipt-line": "#111111",
+    "--receipt-chip-bg": "#ffffff",
+    "--receipt-chip-border": "#111111",
+  };
+};
+
 export const receiptStyles = {
   shell: {
     width: "100%",
     fontFamily: '"Inter", "Segoe UI", sans-serif',
-    color: "#183023",
+    color: "var(--receipt-text)",
     background: "#ffffff",
-    borderRadius: "20px",
-    border: "1px solid #dfe9e2",
-    boxShadow: "0 24px 60px rgba(15, 23, 42, 0.08)",
+    borderRadius: "var(--receipt-radius)",
+    border: "1px solid var(--receipt-border)",
+    boxShadow: "var(--receipt-shadow)",
     overflow: "hidden",
   },
   hero: {
-    padding: "20px 18px 16px",
-    background:
-      "radial-gradient(circle at top right, rgba(47, 143, 87, 0.18), transparent 34%), linear-gradient(180deg, #f7fcf8 0%, #ffffff 100%)",
-    borderBottom: "1px solid #e7efe9",
+    padding: "16px 14px 12px",
+    background: "var(--receipt-hero-bg)",
+    borderBottom: "1px dashed var(--receipt-hero-border)",
+    textAlign: "center",
   },
   brandRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
-    marginBottom: "12px",
+    marginBottom: "10px",
   },
   brandBadge: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "42px",
-    height: "42px",
-    borderRadius: "14px",
-    background: "#e4f3e8",
-    color: "#2f8f57",
+    width: "34px",
+    height: "34px",
+    borderRadius: "50%",
+    background: "var(--receipt-accent-soft)",
+    color: "var(--receipt-accent)",
     fontWeight: 800,
     fontSize: "15px",
     letterSpacing: "0.06em",
   },
   paidChip: {
-    padding: "7px 12px",
+    padding: "4px 8px",
     borderRadius: "999px",
-    background: "#e7f5ec",
-    color: "#2f8f57",
-    fontSize: "11px",
+    background: "var(--receipt-chip-bg)",
+    color: "var(--receipt-accent)",
+    border: "1px solid var(--receipt-chip-border)",
+    fontSize: "9px",
     fontWeight: 800,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
     whiteSpace: "nowrap",
   },
   title: {
-    fontSize: "20px",
+    fontSize: "17px",
     fontWeight: 800,
-    letterSpacing: "-0.03em",
+    letterSpacing: 0,
     margin: 0,
+    textTransform: "uppercase",
   },
   subtitle: {
-    fontSize: "12px",
-    color: "#64806f",
+    fontSize: "10px",
+    color: "var(--receipt-muted)",
     margin: "4px 0 0",
     lineHeight: 1.5,
   },
   metaGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
-    padding: "16px 18px",
-    borderBottom: "1px solid #edf2ee",
-    background: "#fbfefc",
+    gap: "6px 10px",
+    padding: "12px 14px",
+    borderBottom: "1px dashed var(--receipt-line)",
+    background: "var(--receipt-section-bg)",
   },
   metaCard: {
-    border: "1px solid #e7efe9",
-    borderRadius: "14px",
-    padding: "10px 12px",
-    background: "#ffffff",
+    border: 0,
+    borderRadius: 0,
+    padding: 0,
+    background: "var(--receipt-card-bg)",
   },
   metaLabel: {
-    fontSize: "10px",
-    color: "#6f7d8c",
+    fontSize: "9px",
+    color: "var(--receipt-muted)",
     fontWeight: 700,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
     marginBottom: "4px",
   },
   metaValue: {
-    fontSize: "13px",
+    fontSize: "11px",
     fontWeight: 700,
-    color: "#183023",
+    color: "var(--receipt-text)",
     lineHeight: 1.4,
   },
   section: {
-    padding: "18px",
+    padding: "14px",
   },
   sectionTitle: {
-    fontSize: "11px",
-    color: "#2f8f57",
+    fontSize: "10px",
+    color: "var(--receipt-accent)",
     fontWeight: 800,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
@@ -122,61 +192,63 @@ export const receiptStyles = {
   },
   lineItemHeader: {
     display: "grid",
-    gridTemplateColumns: "1.8fr 0.6fr 1fr",
-    gap: "10px",
-    fontSize: "11px",
+    gridTemplateColumns: "1.7fr 0.45fr 0.85fr",
+    gap: "8px",
+    fontSize: "10px",
     fontWeight: 800,
-    color: "#6f7d8c",
+    color: "var(--receipt-muted)",
     paddingBottom: "8px",
-    borderBottom: "1px dashed #d8e5dc",
+    borderBottom: "1px dashed var(--receipt-line)",
   },
   lineItem: {
     display: "grid",
-    gridTemplateColumns: "1.8fr 0.6fr 1fr",
-    gap: "10px",
+    gridTemplateColumns: "1.7fr 0.45fr 0.85fr",
+    gap: "8px",
     alignItems: "start",
-    padding: "12px 0",
-    borderBottom: "1px solid #edf2ee",
+    padding: "8px 0",
+    borderBottom: "1px dotted var(--receipt-line)",
   },
   itemName: {
-    fontSize: "13px",
+    fontSize: "11px",
     fontWeight: 700,
-    color: "#183023",
+    color: "var(--receipt-text)",
     lineHeight: 1.35,
   },
   itemMeta: {
-    fontSize: "11px",
-    color: "#7b8e81",
+    fontSize: "9px",
+    color: "var(--receipt-muted)",
     marginTop: "3px",
   },
   alignCenter: {
     textAlign: "center",
-    fontSize: "13px",
+    fontSize: "11px",
     fontWeight: 700,
   },
   alignRight: {
     textAlign: "right",
-    fontSize: "13px",
+    fontSize: "11px",
     fontWeight: 700,
   },
   summaryBox: {
-    marginTop: "16px",
-    borderRadius: "18px",
-    border: "1px solid #dfe9e2",
-    background: "#fbfefc",
-    padding: "14px 14px 8px",
+    marginTop: "12px",
+    borderRadius: 0,
+    border: 0,
+    borderTop: "1px dashed var(--receipt-line)",
+    borderBottom: "1px dashed var(--receipt-line)",
+    background: "var(--receipt-section-bg)",
+    padding: "10px 0 4px",
   },
   summaryRow: {
     display: "flex",
     justifyContent: "space-between",
     gap: "12px",
-    marginBottom: "10px",
-    fontSize: "13px",
-    color: "#587062",
+    marginBottom: "7px",
+    fontSize: "11px",
+    color: "var(--receipt-muted)",
   },
   summaryValue: {
     fontWeight: 700,
-    color: "#183023",
+    color: "var(--receipt-text)",
   },
   totalRow: {
     display: "flex",
@@ -184,36 +256,46 @@ export const receiptStyles = {
     gap: "12px",
     marginTop: "12px",
     paddingTop: "12px",
-    borderTop: "1px dashed #d0dfd4",
-    fontSize: "18px",
+    borderTop: "1px dashed var(--receipt-line)",
+    fontSize: "15px",
     fontWeight: 800,
-    color: "#183023",
+    color: "var(--receipt-text)",
   },
   paymentBox: {
     display: "grid",
     gap: "10px",
-    marginTop: "16px",
-    padding: "14px",
-    borderRadius: "18px",
-    background: "#f3faf5",
-    border: "1px solid #dfeee4",
+    marginTop: "10px",
+    padding: "10px 0 4px",
+    borderRadius: 0,
+    background: "var(--receipt-section-bg)",
+    border: 0,
+    borderBottom: "1px dashed var(--receipt-line)",
   },
   footer: {
     padding: "0 18px 18px",
     textAlign: "center",
   },
   footerNote: {
-    borderTop: "1px dashed #d8e5dc",
+    borderTop: "1px dashed var(--receipt-line)",
     paddingTop: "14px",
     fontSize: "11px",
-    color: "#738679",
+    color: "var(--receipt-muted)",
     lineHeight: 1.6,
   },
   footerThanks: {
     fontSize: "13px",
     fontWeight: 800,
-    color: "#183023",
+    color: "var(--receipt-text)",
     marginTop: "8px",
+  },
+  poweredBy: {
+    marginTop: "8px",
+    paddingTop: "8px",
+    borderTop: "1px dotted var(--receipt-line)",
+    fontSize: "9px",
+    fontWeight: 700,
+    color: "var(--receipt-muted)",
+    textTransform: "uppercase",
   },
 };
 
@@ -229,18 +311,21 @@ export const ReceiptDocumentView = forwardRef(
       receiptNumber = "N/A",
       issuedAt = "",
       receiptSize = "80mm",
+      receiptTemplate = "modern",
     },
     ref
   ) => {
     const subtotal = getSubtotal(cart);
     const paymentStatus = Number(saleDetails?.dueAmount || 0) > 0 ? "Part Paid" : "Paid";
+    const templateVariables = getReceiptTemplateVariables(receiptTemplate);
 
     return (
       <div
         ref={ref}
-        className="receipt-template-shell mx-auto"
+        className={`receipt-template-shell receipt-template-${receiptTemplate} mx-auto`}
         style={{
           ...receiptStyles.shell,
+          ...templateVariables,
           width: receiptSize,
           transition: "width 0.3s ease-in-out",
         }}
@@ -278,6 +363,14 @@ export const ReceiptDocumentView = forwardRef(
           <div style={receiptStyles.metaCard}>
             <div style={receiptStyles.metaLabel}>Payment</div>
             <div style={receiptStyles.metaValue}>{saleDetails?.paymentMethod || "Cash"}</div>
+          </div>
+          <div style={receiptStyles.metaCard}>
+            <div style={receiptStyles.metaLabel}>Branch</div>
+            <div style={receiptStyles.metaValue}>{saleDetails?.branchName || "Main branch"}</div>
+          </div>
+          <div style={receiptStyles.metaCard}>
+            <div style={receiptStyles.metaLabel}>Cashier</div>
+            <div style={receiptStyles.metaValue}>{saleDetails?.cashierName || "Current user"}</div>
           </div>
         </div>
 
@@ -346,6 +439,7 @@ export const ReceiptDocumentView = forwardRef(
           <div style={receiptStyles.footerNote}>
             {saleDetails?.moreInfo || "Generated from Ampla POS."}
             <div style={receiptStyles.footerThanks}>Thank you for your business.</div>
+            <div style={receiptStyles.poweredBy}>{POWERED_BY_TEXT}</div>
           </div>
         </div>
       </div>
@@ -369,12 +463,14 @@ const ReceiptPreviewModal = forwardRef((props, ref) => {
     currency,
     receiptNumber,
     issuedAt,
+    receiptTemplate,
   } = props;
 
   if (!show) return null;
 
   const subtotal = getSubtotal(cart);
   const paymentStatus = Number(saleDetails?.dueAmount || 0) > 0 ? "Part Paid" : "Paid";
+  const templateVariables = getReceiptTemplateVariables(receiptTemplate);
 
   return (
     <Modal
@@ -410,9 +506,10 @@ const ReceiptPreviewModal = forwardRef((props, ref) => {
       <Modal.Body className="bg-light-subtle">
         <div
           ref={ref}
-          className="receipt-template-shell mx-auto"
+          className={`receipt-template-shell receipt-template-${receiptTemplate} mx-auto`}
           style={{
             ...receiptStyles.shell,
+            ...templateVariables,
             width: receiptSize,
             transition: "width 0.3s ease-in-out",
           }}
@@ -430,7 +527,7 @@ const ReceiptPreviewModal = forwardRef((props, ref) => {
               {companyInfo?.busLocation || "Business location not set"}
               <br />
               {companyInfo?.busContactOne || "No contact set"}
-              {companyInfo?.busContactTwo ? ` · ${companyInfo.busContactTwo}` : ""}
+              {companyInfo?.busContactTwo ? ` - ${companyInfo.busContactTwo}` : ""}
             </p>
           </div>
 
@@ -450,6 +547,14 @@ const ReceiptPreviewModal = forwardRef((props, ref) => {
             <div style={receiptStyles.metaCard}>
               <div style={receiptStyles.metaLabel}>Payment</div>
               <div style={receiptStyles.metaValue}>{saleDetails?.paymentMethod || "Cash"}</div>
+            </div>
+            <div style={receiptStyles.metaCard}>
+              <div style={receiptStyles.metaLabel}>Branch</div>
+              <div style={receiptStyles.metaValue}>{saleDetails?.branchName || "Main branch"}</div>
+            </div>
+            <div style={receiptStyles.metaCard}>
+              <div style={receiptStyles.metaLabel}>Cashier</div>
+              <div style={receiptStyles.metaValue}>{saleDetails?.cashierName || "Current user"}</div>
             </div>
           </div>
 
@@ -520,6 +625,7 @@ const ReceiptPreviewModal = forwardRef((props, ref) => {
             <div style={receiptStyles.footerNote}>
               {saleDetails?.moreInfo || "Generated from Ampla POS."}
               <div style={receiptStyles.footerThanks}>Thank you for your business.</div>
+              <div style={receiptStyles.poweredBy}>{POWERED_BY_TEXT}</div>
             </div>
           </div>
         </div>
@@ -548,13 +654,25 @@ export default function AmplaReceipt({
   cart = [],
   saleDetails = {},
 }) {
-  const [receiptSize, setReceiptSize] = React.useState("80mm");
   const previewRef = useRef();
   const { settings } = useSettings();
   const currency = settings?.currency && settings.currency !== "none" ? settings.currency : "UGX";
+  const receiptTemplate =
+    settings?.receiptTemplate in receiptTemplateOptions ? settings.receiptTemplate : "modern";
+  const defaultReceiptSize = getReceiptPaperWidth(settings?.receiptPaperWidth);
+  const printerMode = settings?.receiptPrinterMode === "system" ? "system" : "browser";
+  const [receiptSize, setReceiptSize] = React.useState(defaultReceiptSize);
+  const [issuedAt, setIssuedAt] = React.useState(() => new Date().toLocaleString());
 
-  const products = useSelector(selectStock) ?? [];
-  const customers = useSelector(selectCustomers) ?? [];
+  React.useEffect(() => {
+    if (show) {
+      setReceiptSize(defaultReceiptSize);
+      setIssuedAt(new Date().toLocaleString());
+    }
+  }, [defaultReceiptSize, show]);
+
+  const products = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const customers = useSelector(selectCustomers) ?? EMPTY_ARRAY;
 
   const productsMap = useMemo(
     () => new Map(products.map((product) => [product.itemId, product.itemName])),
@@ -571,8 +689,6 @@ export default function AmplaReceipt({
     () => saleDetails?.receiptNumber || `RC-${Math.floor(10000 + Math.random() * 90000)}`,
     [saleDetails]
   );
-  const issuedAt = useMemo(() => new Date().toLocaleString(), [show]);
-
   const handlePrint = () => {
     const printContent = previewRef.current;
     if (!printContent) return;
@@ -601,7 +717,10 @@ export default function AmplaReceipt({
     printWindow.document.write(`
       <script>
         window.onload = function() {
-          setTimeout(function() { window.print(); window.close(); }, 250);
+          setTimeout(function() {
+            window.print();
+            ${printerMode === "browser" ? "window.close();" : ""}
+          }, 250);
         }
       </script>
     `);
@@ -619,6 +738,116 @@ export default function AmplaReceipt({
     const discountAmount = getDiscountAmount(saleDetails);
     const taxAmount = getTaxAmount(saleDetails);
     let y = 12;
+
+    if (receiptTemplate !== "modern") {
+      const isCompact = receiptTemplate === "compact";
+      const line = () => {
+        doc.setDrawColor(20, 20, 20);
+        doc.setLineWidth(0.2);
+        doc.line(margin, y, rightAlign, y);
+        y += isCompact ? 4 : 5;
+      };
+      const summaryLine = (label, value, strong = false) => {
+        doc.setFont("Helvetica", strong ? "bold" : "normal");
+        doc.setFontSize(strong ? 10 : 8);
+        doc.text(label, margin, y);
+        doc.text(value, rightAlign, y, { align: "right" });
+        y += strong ? 7 : 5;
+      };
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(isCompact ? 11 : 13);
+      doc.text(companyInfo?.busName || "Business Name", center, y, { align: "center" });
+      y += 6;
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(7);
+      doc.text(companyInfo?.busLocation || "Business location not set", center, y, {
+        align: "center",
+        maxWidth: paperWidth - margin * 2,
+      });
+      y += 4;
+      doc.text(companyInfo?.busContactOne || "No contact set", center, y, { align: "center" });
+      y += 5;
+      line();
+
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(isCompact ? 9 : 10);
+      doc.text("SALES RECEIPT", center, y, { align: "center" });
+      y += 6;
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(7);
+      doc.text(`Receipt: ${receiptNumber}`, margin, y);
+      doc.text(issuedAt, rightAlign, y, { align: "right", maxWidth: 34 });
+      y += 5;
+      doc.text(`Customer: ${resolvedCustomerName}`, margin, y, {
+        maxWidth: paperWidth - margin * 2,
+      });
+      y += 5;
+      doc.text(`Payment: ${saleDetails?.paymentMethod || "Cash"}`, margin, y);
+      y += 5;
+      doc.text(`Branch: ${saleDetails?.branchName || "Main branch"}`, margin, y, {
+        maxWidth: paperWidth - margin * 2,
+      });
+      y += 5;
+      doc.text(`Cashier: ${saleDetails?.cashierName || "Current user"}`, margin, y, {
+        maxWidth: paperWidth - margin * 2,
+      });
+      y += 5;
+      line();
+
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(7);
+      doc.text("ITEM", margin, y);
+      doc.text("QTY", center, y, { align: "center" });
+      doc.text("AMOUNT", rightAlign, y, { align: "right" });
+      y += 4;
+      line();
+
+      cart.forEach((item) => {
+        const name = item.itemName || productsMap.get(getItemId(item)) || `ID: ${getItemId(item)}`;
+        const wrappedName = doc.splitTextToSize(name, paperWidth / 2 - 6);
+        const itemTotal = getQty(item) * getPrice(item);
+
+        doc.setFont("Helvetica", "normal");
+        doc.setFontSize(7);
+        doc.text(wrappedName, margin, y);
+        doc.text(String(getQty(item)), center, y, { align: "center" });
+        doc.text(formatAmount(itemTotal, currency), rightAlign, y, { align: "right" });
+        y += wrappedName.length * 3.5 + 2;
+        if (!isCompact) {
+          doc.setFontSize(6);
+          doc.text(`${formatAmount(getPrice(item), currency)} each`, margin, y);
+          y += 4;
+        }
+      });
+
+      line();
+      summaryLine("Subtotal", formatAmount(subtotal, currency));
+      summaryLine("Discount", `-${formatAmount(discountAmount, currency)}`);
+      summaryLine("Tax", formatAmount(taxAmount, currency));
+      line();
+      summaryLine("Total", formatAmount(saleDetails?.total, currency), true);
+      summaryLine("Tendered", formatAmount(saleDetails?.tenderedAmount, currency));
+      summaryLine("Balance Due", formatAmount(saleDetails?.dueAmount, currency), true);
+      line();
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(7);
+      doc.text(saleDetails?.moreInfo || "Generated from Ampla POS.", center, y, {
+        align: "center",
+        maxWidth: paperWidth - margin * 2,
+      });
+      y += 6;
+      doc.setFont("Helvetica", "bold");
+      doc.text("Thank you for your business.", center, y, { align: "center" });
+      y += 5;
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(6);
+      doc.text(POWERED_BY_TEXT, center, y, { align: "center" });
+
+      doc.save(`receipt-${String(resolvedCustomerName).replace(/\s/g, "_")}-${Date.now()}.pdf`);
+      return;
+    }
 
     doc.setFillColor(247, 252, 248);
     doc.roundedRect(margin, 6, paperWidth - margin * 2, 28, 3, 3, "F");
@@ -651,7 +880,7 @@ export default function AmplaReceipt({
     y = 40;
     doc.setDrawColor(223, 233, 226);
     doc.setLineWidth(0.2);
-    doc.roundedRect(margin, y, paperWidth - margin * 2, 24, 3, 3);
+    doc.roundedRect(margin, y, paperWidth - margin * 2, 34, 3, 3);
 
     const metaLeft = margin + 3;
     const metaRight = center + 2;
@@ -662,6 +891,8 @@ export default function AmplaReceipt({
     doc.text("ISSUED", metaRight, y + 5);
     doc.text("CUSTOMER", metaLeft, y + 15);
     doc.text("PAYMENT", metaRight, y + 15);
+    doc.text("BRANCH", metaLeft, y + 25);
+    doc.text("CASHIER", metaRight, y + 25);
 
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(8);
@@ -670,8 +901,10 @@ export default function AmplaReceipt({
     doc.text(issuedAt, metaRight, y + 9);
     doc.text(resolvedCustomerName, metaLeft, y + 19);
     doc.text(saleDetails?.paymentMethod || "Cash", metaRight, y + 19);
+    doc.text(saleDetails?.branchName || "Main branch", metaLeft, y + 29, { maxWidth: 30 });
+    doc.text(saleDetails?.cashierName || "Current user", metaRight, y + 29, { maxWidth: 28 });
 
-    y += 31;
+    y += 41;
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(7);
     doc.setTextColor(47, 143, 87);
@@ -759,6 +992,11 @@ export default function AmplaReceipt({
     doc.setFont("Helvetica", "bold");
     doc.setTextColor(24, 48, 35);
     doc.text("Thank you for your business.", center, y, { align: "center" });
+    y += 5;
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(6);
+    doc.setTextColor(115, 134, 121);
+    doc.text(POWERED_BY_TEXT, center, y, { align: "center" });
 
     doc.save(`receipt-${String(resolvedCustomerName).replace(/\s/g, "_")}-${Date.now()}.pdf`);
   };
@@ -780,6 +1018,7 @@ export default function AmplaReceipt({
       currency={currency}
       receiptNumber={receiptNumber}
       issuedAt={issuedAt}
+      receiptTemplate={receiptTemplate}
     />
   );
 }

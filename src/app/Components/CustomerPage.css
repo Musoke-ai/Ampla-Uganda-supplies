@@ -64,30 +64,30 @@
   min-height: 44px;
   padding: 0.7rem 1rem;
   border-radius: 999px;
-  background-color: #f8fbf8;
-  border: 1px solid #e7efe9;
-  color: #6f7d8c;
+  background-color: var(--ampla-app-bg, #f8fbf8);
+  border: 1px solid var(--ampla-border-color, #e7efe9);
+  color: var(--ampla-muted-color, #6f7d8c);
   font-weight: 600;
 }
 
 .customer-back-link {
   display: inline-flex !important;
   align-items: center;
-  color: #2f8f57 !important;
+  color: var(--ampla-accent-color, #2f8f57) !important;
   text-decoration: none !important;
   font-weight: 700 !important;
 }
 
 .customer-section-title {
   margin: 0;
-  color: #15202b;
+  color: var(--ampla-text-color, #15202b);
   font-size: 1.05rem;
   font-weight: 800;
 }
 
 .customer-section-subtitle {
   margin: 0.35rem 0 0;
-  color: #6f7d8c;
+  color: var(--ampla-muted-color, #6f7d8c);
   line-height: 1.6;
 }
 
@@ -115,7 +115,7 @@
 .customer-modern-select {
   min-height: 46px;
   border-radius: 16px;
-  border-color: #e7efe9;
+  border-color: var(--ampla-border-color, #e7efe9);
 }
 
 .customer-metrics-grid {
@@ -148,13 +148,13 @@
 }
 
 .customer-metric-title {
-  color: #6f7d8c;
+  color: var(--ampla-muted-color, #6f7d8c);
   font-size: 0.92rem;
 }
 
 .customer-metric-value {
   margin-top: 0.35rem;
-  color: #15202b;
+  color: var(--ampla-text-color, #15202b);
   font-size: clamp(1.35rem, 2.2vw, 1.8rem);
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -165,7 +165,7 @@
 
 .customer-metric-note {
   margin-top: 0.45rem;
-  color: #6f7d8c;
+  color: var(--ampla-muted-color, #6f7d8c);
   font-size: 0.9rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -176,21 +176,21 @@
 }
 
 .customer-modern-tabs.nav-tabs {
-  border-bottom: 1px solid #e7efe9;
+  border-bottom: 1px solid var(--ampla-border-color, #e7efe9);
   gap: 0.4rem;
 }
 
 .customer-modern-tabs.nav-tabs .nav-link {
   border: none;
   border-radius: 14px 14px 0 0;
-  color: #6f7d8c;
+  color: var(--ampla-muted-color, #6f7d8c);
   font-weight: 700;
   padding: 0.85rem 1rem;
 }
 
 .customer-modern-tabs.nav-tabs .nav-link.active {
-  background-color: #e8f5ec;
-  color: #2f8f57;
+  background-color: var(--ampla-accent-soft, #e8f5ec);
+  color: var(--ampla-accent-color, #2f8f57);
 }
 
 .customer-table-wrap {
@@ -208,7 +208,7 @@
 }
 
 .customer-name-cell strong {
-  color: #15202b;
+  color: var(--ampla-text-color, #15202b);
 }
 
 .customer-badge {
@@ -234,13 +234,13 @@
 }
 
 .customer-badge-solid-green {
-  color: #ffffff;
-  background-color: #2f8f57;
-  border-color: #2f8f57;
+  color: var(--ampla-on-accent-color, #ffffff);
+  background-color: var(--ampla-accent-color, #2f8f57);
+  border-color: var(--ampla-accent-color, #2f8f57);
 }
 
 .customer-badge-solid-red {
-  color: #ffffff;
+  color: var(--ampla-on-accent-color, #ffffff);
   background-color: #d64545;
   border-color: #d64545;
 }
@@ -251,12 +251,12 @@
   gap: 1rem;
   padding-top: 1rem;
   margin-top: 1rem;
-  border-top: 1px solid #e7efe9;
+  border-top: 1px solid var(--ampla-border-color, #e7efe9);
   flex-wrap: wrap;
 }
 
 .customer-table-summary {
-  color: #6f7d8c;
+  color: var(--ampla-muted-color, #6f7d8c);
 }
 
 .customer-summary-spacer {
@@ -292,24 +292,24 @@
 
 .customer-page-modal .modal-header,
 .customer-page-modal .modal-footer {
-  border-color: #e7efe9;
+  border-color: var(--ampla-border-color, #e7efe9);
 }
 
 .customer-page-modal .modal-header {
   background:
     linear-gradient(135deg, rgba(232, 245, 236, 0.9), rgba(255, 255, 255, 0.98)),
-    #ffffff;
+    var(--ampla-surface-bg, #ffffff);
 }
 
 .customer-page-modal .modal-body {
-  background-color: #ffffff;
+  background-color: var(--ampla-surface-bg, #ffffff);
 }
 
 .customer-page-modal .form-control,
 .customer-page-modal .form-select {
   min-height: 46px;
   border-radius: 14px;
-  border-color: #d9e7dd;
+  border-color: var(--ampla-border-color, #d9e7dd);
 }
 
 .customer-page-modal textarea.form-control {

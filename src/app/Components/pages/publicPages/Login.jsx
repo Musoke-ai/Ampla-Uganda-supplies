@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import {useRef, useState, useEffect } from 'react';
 
 import { Button, Modal, Form, Container, Alert, InputGroup } from "react-bootstrap";
@@ -339,7 +340,12 @@ const Login = () => {
       className='w-100'
       onClick={handleSubmit}
       disabled={isLoading}
-      style={{ backgroundColor: accent, borderColor: accent, fontWeight: 700 }}
+      style={{
+        backgroundColor: accent,
+        borderColor: accent,
+        color: "var(--ampla-on-accent-color, #ffffff)",
+        fontWeight: 700,
+      }}
     >
       {isLoading ? "Signing in..." : "Login"}
     </Button>

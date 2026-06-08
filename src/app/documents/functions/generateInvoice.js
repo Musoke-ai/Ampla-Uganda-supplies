@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, array-callback-return */
 import jsPDF from 'jspdf'
 import format from 'date-fns/format';
 

@@ -13,6 +13,7 @@
 
 # misc
 .env
+.env.production
 .DS_Store
 .env.local
 .env.development.local
@@ -22,6 +23,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+reports-dev-server*.log
+*.zip
+*.rar
 
 # Dependencies
 /node_modules

@@ -17,6 +17,7 @@ import { selectOrders } from "../../features/api/orderSlice";
 import { selectRawMaterials } from "../../features/api/rawmaterialsSlice";
 import { selectCategories } from "../../features/api/categorySlice";
 import { selectCustomers } from "../../features/api/customers";
+import { formatCurrency } from "../../utils/currency";
 
 import PermissionWrapper from "../../auth/PermissionWrapper";
 
@@ -139,11 +140,11 @@ const ReportsPage = () => {
   const summary = () => {
     if (reportType === "Sales") {
       const total = reportData.reduce((sum, row) => sum + (row.Total || 0), 0);
-      return <Card className="p-2 mb-2">Total Sales: UGX {total.toLocaleString()}</Card>;
+      return <Card className="p-2 mb-2">Total Sales: {formatCurrency(total, "UGX")}</Card>;
     }
     if (reportType === "Expenses") {
       const total = reportData.reduce((sum, row) => sum + (row.Amount || 0), 0);
-      return <Card className="p-2 mb-2">Total Expenses: UGX {total.toLocaleString()}</Card>;
+      return <Card className="p-2 mb-2">Total Expenses: {formatCurrency(total, "UGX")}</Card>;
     }
     return null;
   };

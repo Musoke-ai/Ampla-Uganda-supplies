@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import Fuse from 'fuse.js';

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, default-case */
 import React, { useEffect, useMemo, useState } from "react";
 import { Table, Button, Container, Modal, Form, InputGroup } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -21,6 +22,8 @@ import {
   paginateItems,
   ProductionTableFooter,
 } from "./ProductionTableControls";
+
+const EMPTY_ARRAY = [];
 
 const handleApiError = (error) => {
   const status = error?.status || 'unknown';
@@ -55,7 +58,7 @@ const FactoryExpenses = () => {
   const canSwitchBranches = Boolean(branchScope?.can_switch_branches);
 
   useGetBranchesQuery();
-  const branches = useSelector(selectBranches) ?? [];
+  const branches = useSelector(selectBranches) ?? EMPTY_ARRAY;
   const expenses = useSelector(selectExpenses);
   const branchMap = useMemo(
     () => new Map(branches.map((branch) => [String(branch.branchId), branch.branchName])),
@@ -63,7 +66,7 @@ const FactoryExpenses = () => {
   );
   const expensesWithBranch = useMemo(
     () =>
-      (expenses ?? []).map((expense) => ({
+      (expenses ?? EMPTY_ARRAY).map((expense) => ({
         ...expense,
         branchId: expense.branchId ? String(expense.branchId) : "",
         branchName: expense.branchId ? branchMap.get(String(expense.branchId)) || "Unknown branch" : "Unassigned",

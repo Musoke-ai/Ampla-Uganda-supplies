@@ -12,8 +12,11 @@ import {
 } from "../../features/api/notificationsSlice";
 import ModernSidebar from "../ModernSidebar";
 import ModernNavBar from "../ModernNavBar";
+import MobileBottomNav from "../MobileBottomNav";
 import FloatingHelpBubble from "../FloatingHelpBubble";
 import { useSettings } from "../Settings";
+
+const EMPTY_ARRAY = [];
 
 const subscriptions = [
   {
@@ -78,9 +81,9 @@ const subscriptions = [
 const ProtectedLayout = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const roles = useSelector(selectRoles) ?? [];
+  const roles = useSelector(selectRoles) ?? EMPTY_ARRAY;
   const profile = useSelector(selectProfile) ?? {};
-  const notifications = useSelector(selectNotifications) ?? [];
+  const notifications = useSelector(selectNotifications) ?? EMPTY_ARRAY;
   const { settings, notificationPollingInterval } = useSettings();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -156,7 +159,8 @@ const ProtectedLayout = () => {
         minHeight: 0,
         display: "flex",
         overflow: "hidden",
-        bgcolor: isDark ? "#0c1210" : "#f8fbf8",
+        bgcolor: "var(--ampla-app-bg, #f8fbf8)",
+        color: "var(--ampla-text-color, #15202b)",
       }}
     >
       <ModernSidebar
@@ -199,31 +203,40 @@ const ProtectedLayout = () => {
             minHeight: 0,
             px: { xs: 1.5, sm: 2, md: 2.5 },
             py: { xs: 1.5, sm: 2, md: 2.5 },
+            pb: {
+              xs: "calc(6.5rem + env(safe-area-inset-bottom))",
+              lg: 2.5,
+            },
             overflowY: "auto",
             overflowX: "hidden",
             scrollbarGutter: "stable",
             scrollbarWidth: "thin",
-            scrollbarColor: isDark ? "#3f5d49 #18231e" : "#c3d4c8 #eef5f0",
+            bgcolor: "var(--ampla-app-bg, #f8fbf8)",
+            color: "var(--ampla-text-color, #15202b)",
+            scrollbarColor: isDark
+              ? "var(--ampla-accent-color, #3f5d49) var(--ampla-surface-soft, #18231e)"
+              : "var(--ampla-accent-color, #c3d4c8) var(--ampla-surface-soft, #eef5f0)",
             "&::-webkit-scrollbar": {
               width: 8,
             },
             "&::-webkit-scrollbar-track": {
-              backgroundColor: isDark ? "#18231e" : "#eef5f0",
+              backgroundColor: "var(--ampla-surface-soft, #eef5f0)",
               borderRadius: 999,
             },
             "&::-webkit-scrollbar-thumb": {
-              backgroundColor: isDark ? "#3f5d49" : "#c3d4c8",
+              backgroundColor: "var(--ampla-accent-color, #c3d4c8)",
               borderRadius: 999,
-              border: `2px solid ${isDark ? "#18231e" : "#eef5f0"}`,
+              border: "2px solid var(--ampla-surface-soft, #eef5f0)",
             },
             "&::-webkit-scrollbar-thumb:hover": {
-              backgroundColor: isDark ? "#5a7f66" : "#9bb8a3",
+              backgroundColor: "var(--ampla-accent-color, #9bb8a3)",
             },
           }}
         >
           <Outlet />
         </Box>
       </Box>
+      <MobileBottomNav roles={roles} />
       <FloatingHelpBubble roles={roles} />
     </Box>
   );

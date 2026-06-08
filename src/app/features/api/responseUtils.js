@@ -3,17 +3,37 @@ export const extractArray = (response) => {
 
   if (!response || typeof response !== "object") return [];
 
-  if (Array.isArray(response.data)) return response.data;
-  if (Array.isArray(response.items)) return response.items;
-  if (Array.isArray(response.rows)) return response.rows;
-  if (Array.isArray(response.records)) return response.records;
-  if (Array.isArray(response.results)) return response.results;
+  const listKeys = [
+    "data",
+    "items",
+    "rows",
+    "records",
+    "results",
+    "products",
+    "stock",
+    "sales",
+    "customers",
+    "orders",
+    "debts",
+    "expenses",
+    "employees",
+    "branches",
+    "categories",
+    "rawMaterials",
+    "materials",
+    "notifications",
+    "receipts",
+  ];
+
+  for (const key of listKeys) {
+    if (Array.isArray(response[key])) return response[key];
+  }
 
   if (response.data && typeof response.data === "object") {
-    if (Array.isArray(response.data.items)) return response.data.items;
-    if (Array.isArray(response.data.rows)) return response.data.rows;
-    if (Array.isArray(response.data.records)) return response.data.records;
-    if (Array.isArray(response.data.results)) return response.data.results;
+    for (const key of listKeys) {
+      if (Array.isArray(response.data[key])) return response.data[key];
+    }
+
     if (response.data.entities && typeof response.data.entities === "object") {
       return Object.values(response.data.entities);
     }

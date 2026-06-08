@@ -44,7 +44,7 @@ function IncDecCounter({
   }
 
   useEffect(() => {
-   if(num != ""){
+   if(num !== ""){
     if(num <= 0){
 window.alert("Invalid Quantity!");
 setNum(1);
@@ -68,7 +68,7 @@ calTotalProducts();
       calTotalProducts();
     }
    }
-  }, [num]);
+  }, [_item, calTotal, calTotalProducts, num]);
 
  let handleChange = (e)=>{
   setNum(e.target.value);

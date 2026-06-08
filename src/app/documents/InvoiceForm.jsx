@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, eqeqeq, react-hooks/exhaustive-deps, array-callback-return */
 import { useState, useEffect } from 'react';
 import { ColorPicker } from 'primereact/colorpicker'; 
 import SignPad from './SignPad';

@@ -8,6 +8,8 @@ import { selectStock } from "../../features/stock/stockSlice";
 import HistoryTable from "../tables/HistoryTable";
 import "./WorkspacePages.css";
 
+const EMPTY_ARRAY = [];
+
 const palette = {
   surface: "#ffffff",
   border: "#e7efe9",
@@ -45,8 +47,8 @@ function MetricCard({ icon, title, value, note, accent, color }) {
 }
 
 const HistoryPage = () => {
-  const inventory = useSelector(selectStock) ?? [];
-  const history = useSelector(selectHistory) ?? [];
+  const inventory = useSelector(selectStock) ?? EMPTY_ARRAY;
+  const history = useSelector(selectHistory) ?? EMPTY_ARRAY;
 
   const totals = useMemo(() => {
     const itemIds = new Set(history.map((item) => item.historyItemId));
